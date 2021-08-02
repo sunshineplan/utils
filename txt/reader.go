@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-// ReadAll reads all content from r.
+// ReadAll reads all contents from r.
 func ReadAll(r io.Reader) ([]string, error) {
 	var content []string
 	scanner := bufio.NewScanner(r)
@@ -17,7 +17,7 @@ func ReadAll(r io.Reader) ([]string, error) {
 	return content, scanner.Err()
 }
 
-// ReadFile reads all content from file.
+// ReadFile reads all contents from file.
 func ReadFile(file string) ([]string, error) {
 	f, err := os.Open(file)
 	if err != nil {

@@ -5,23 +5,17 @@ import (
 	"os"
 )
 
-// Export writes content to writer w.
-func Export(content []string, w io.Writer) error {
-	for _, i := range content {
-		if _, err := io.WriteString(w, i+"\n"); err != nil {
-			return err
-		}
-	}
-
-	return nil
+// Export writes contents to writer w.
+func Export(contents []string, w io.Writer) error {
+	return NewWriter(w).WriteAll(contents)
 }
 
-// ExportFile writes content to file.
-func ExportFile(content []string, file string) error {
+// ExportFile writes contents to file.
+func ExportFile(contents []string, file string) error {
 	f, err := os.Create(file)
 	if err != nil {
 		return err
 	}
 
-	return Export(content, f)
+	return Export(contents, f)
 }
