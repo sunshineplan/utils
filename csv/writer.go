@@ -12,8 +12,8 @@ var utf8bom = []byte{0xEF, 0xBB, 0xBF}
 
 // A Writer writes records using CSV encoding.
 type Writer struct {
-	writer        io.Writer
-	csvWriter     *csv.Writer
+	*csv.Writer
+	w             io.Writer
 	utf8bom       bool
 	fields        []string
 	fieldsWritten bool
@@ -22,9 +22,9 @@ type Writer struct {
 // NewWriter returns a new Writer that writes to w.
 func NewWriter(w io.Writer, utf8bom bool) *Writer {
 	return &Writer{
-		writer:    w,
-		csvWriter: csv.NewWriter(w),
-		utf8bom:   utf8bom,
+		Writer:  csv.NewWriter(w),
+		w:       w,
+		utf8bom: utf8bom,
 	}
 }
 
@@ -56,19 +56,21 @@ func (w *Writer) WriteFields(fields interface{}) error {
 			return fmt.Errorf("only can get fieldnames from slice which is string slice")
 		}
 	default:
-		return fmt.Errorf("can not get fieldnames from interface which is not struct or string slice")
+		return fmt.Errorf("can not get fieldnames from fields which is not struct or string slice")
 	}
 
 	w.fields = fieldnames
 
 	if w.utf8bom {
-		w.writer.Write(utf8bom)
+		w.w.Write(utf8bom)
 	}
 
-	if err := w.csvWriter.Write(fieldnames); err != nil {
+	if err := w.Writer.Write(fieldnames); err != nil {
 		return err
 	}
-	if err := w.Flush(); err != nil {
+	w.Flush()
+
+	if err := w.Error(); err != nil {
 		return err
 	}
 
@@ -121,7 +123,7 @@ func (w *Writer) Write(record interface{}) error {
 		return fmt.Errorf("not support record format: %s", v.Kind())
 	}
 
-	return w.csvWriter.Write(r)
+	return w.Writer.Write(r)
 }
 
 // WriteAll writes multiple CSV records to w using Write and then calls Flush, returning any error from the Flush.
@@ -136,18 +138,7 @@ func (w *Writer) WriteAll(records interface{}) error {
 			return err
 		}
 	}
-
-	return w.Flush()
-}
-
-// Error reports any error that has occurred during a previous Write or Flush.
-func (w *Writer) Error() error {
-	return w.csvWriter.Error()
-}
-
-// Flush writes any buffered data to the underlying io.Writer.
-func (w *Writer) Flush() error {
-	w.csvWriter.Flush()
+	w.Flush()
 
 	return w.Error()
 }
