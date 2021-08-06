@@ -1,24 +1,11 @@
 package archive
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 )
-
-func match(magic string, b []byte) bool {
-	if len(magic) != len(b) {
-		return false
-	}
-	for i, c := range b {
-		if magic[i] != c && magic[i] != '?' {
-			return false
-		}
-	}
-	return true
-}
 
 // Unpack decompresses an archive to File struct.
 func Unpack(r io.Reader) ([]File, error) {
@@ -26,13 +13,15 @@ func Unpack(r io.Reader) ([]File, error) {
 	if err != nil {
 		return nil, err
 	}
-	switch {
-	case match(zipMagic, b[:len(zipMagic)]):
+
+	_, format := IsArchive(b)
+	switch format {
+	case ZIP:
 		return unpackZip(b)
-	case match(tarMagic, b[:len(tarMagic)]):
+	case TAR:
 		return unpackTar(b)
 	default:
-		return nil, errors.New("unsupport file format")
+		return nil, ErrFormat
 	}
 }
 
