@@ -9,6 +9,12 @@ import (
 )
 
 func TestProgessBar(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("gave no panic; want panic")
+		}
+	}()
+
 	pb := New(15).SetRefresh(4 * time.Second)
 	pb.Start()
 	for i := int64(0); i < pb.total; i++ {
@@ -26,6 +32,9 @@ func TestProgessBar(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 	pb.Done()
+
+	pb = New(0)
+	pb.Start()
 }
 
 func TestCancel(t *testing.T) {
@@ -45,7 +54,7 @@ func TestCancel(t *testing.T) {
 }
 
 func TestFromReader(t *testing.T) {
-	resp, err := http.Get("https://github.com/sunshineplan/feh/releases/download/v1.0/feh")
+	resp, err := http.Get("https://github.com/sunshineplan/feh/releases/latest/download/feh")
 	if err != nil {
 		t.Fatal(err)
 	}

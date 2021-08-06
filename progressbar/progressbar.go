@@ -70,6 +70,10 @@ func New(total int) *ProgressBar {
 
 // New64 returns a new ProgressBar with default options.
 func New64(total int64) *ProgressBar {
+	if total <= 0 {
+		panic("invalid total number")
+	}
+
 	return &ProgressBar{
 		blockWidth: 40,
 		refresh:    5 * time.Second,
