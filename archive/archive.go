@@ -32,14 +32,14 @@ func match(magic string, b []byte) bool {
 
 // IsArchive tests b is an archive file or not, if ok also return its format.
 func IsArchive(b []byte) (bool, Format) {
-	switch {
-	case match(zipMagic, b[:len(zipMagic)]):
+	l := len(b)
+	if zip := len(zipMagic); l >= zip && match(zipMagic, b[:zip]) {
 		return true, ZIP
-	case match(tarMagic, b[:len(tarMagic)]):
+	} else if tar := len(tarMagic); l >= tar && match(tarMagic, b[:tar]) {
 		return true, TAR
-	default:
-		return false, -1
 	}
+
+	return false, -1
 }
 
 // File struct contains bytes body and the provided name field.

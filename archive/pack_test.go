@@ -19,10 +19,10 @@ func TestPackZIP(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(buf1.Bytes(), buf2.Bytes()) {
-		t.Error("expected equal zip archive; got not equal")
+		t.Error("expected equal bytes; got not equal")
 	}
-	if !match(zipMagic, buf1.Bytes()[:len(zipMagic)]) {
-		t.Error("expected equal magic; got not equal")
+	if _, format := IsArchive(buf1.Bytes()); format != ZIP {
+		t.Errorf("expected format is ZIP(%d); got %d", ZIP, format)
 	}
 }
 
@@ -31,13 +31,13 @@ func TestPackTAR(t *testing.T) {
 	if err := Pack(&buf1, TAR, files...); err != nil {
 		t.Fatal(err)
 	}
-	if !match(tarMagic, buf1.Bytes()[:len(tarMagic)]) {
-		t.Error("expected equal magic; got not equal")
+	if _, format := IsArchive(buf1.Bytes()); format != TAR {
+		t.Errorf("expected format is TAR(%d); got %d", TAR, format)
 	}
 	if err := PackFromFiles(&buf2, TAR, "testdata/1.txt", "testdata/2.txt"); err != nil {
 		t.Fatal(err)
 	}
-	if !match(tarMagic, buf2.Bytes()[:len(tarMagic)]) {
-		t.Error("expected equal magic; got not equal")
+	if _, format := IsArchive(buf2.Bytes()); format != TAR {
+		t.Errorf("expected format is TAR(%d); got %d", TAR, format)
 	}
 }
