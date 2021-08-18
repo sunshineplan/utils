@@ -1,10 +1,17 @@
 package database
 
-import "database/sql"
+// Backupper is the interface that wraps the basic Backup method.
+type Backupper interface {
+	Backup(string) error
+}
 
-// Database is the interface that wraps the basic database operation method.
-type Database interface {
-	Open() (*sql.DB, error)
-	Backup(file string) error
-	Restore(file string) error
+// Restorer is the interface that wraps the basic Restore method.
+type Restorer interface {
+	Restore(string) error
+}
+
+// BackupRestorer is the interface that groups the basic Backup and Restore methods.
+type BackupRestorer interface {
+	Backupper
+	Restorer
 }
