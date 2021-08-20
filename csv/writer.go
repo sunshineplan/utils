@@ -28,7 +28,8 @@ func NewWriter(w io.Writer, utf8bom bool) *Writer {
 	}
 }
 
-// WriteFields writes fieldnames to w along with necessary utf8bom bytes.
+// WriteFields writes fieldnames to w along with necessary utf8bom bytes. The fields must be a
+// non-zero field struct or a non-zero length string slice, otherwise an error will be return.
 // It can be run only once.
 func (w *Writer) WriteFields(fields interface{}) error {
 	if w.fieldsWritten {
