@@ -75,6 +75,7 @@ func ReadFile(file string) (*Rows, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	return ReadAll(f)
 }
