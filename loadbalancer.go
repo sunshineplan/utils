@@ -1,12 +1,13 @@
 package utils
 
 import (
+	"context"
 	"errors"
 	"sync"
 )
 
 // LoadBalancer gets the fastest result from the same function use several selector
-func LoadBalancer(selector []interface{}, fn func(interface{}, chan<- interface{}, chan<- error)) (interface{}, error) {
+func LoadBalancer(selector []interface{}, fn func(interface{}) (interface{}, error)) (interface{}, error) {
 	count := len(selector)
 	if count == 0 {
 		return nil, errors.New("selector can't be empty")
@@ -15,38 +16,38 @@ func LoadBalancer(selector []interface{}, fn func(interface{}, chan<- interface{
 	var mu sync.Mutex
 	result := make(chan interface{}, 1)
 	lasterr := make(chan error, 1)
-	done := make(chan bool, 1)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	run := func(s interface{}) {
-		rc := make(chan interface{}, 1)
-		ec := make(chan error, 1)
+		var r interface{}
+		var err error
+		c := make(chan error, 1)
 
-		go fn(s, rc, ec)
+		go func() {
+			r, err = fn(s)
+			c <- err
+		}()
 
-		for {
-			select {
-			case ok := <-done:
-				if ok {
-					return
-				}
-			case err := <-ec:
+		select {
+		case <-ctx.Done():
+			return
+		case err := <-c:
+			if err != nil {
 				mu.Lock()
 
 				if count == 1 {
 					result <- nil
 					lasterr <- err
-					done <- false
 				}
 				count--
 
 				mu.Unlock()
-
-				return
-			case r := <-rc:
+			} else {
+				cancel()
 				result <- r
-				done <- true
-
-				return
+				lasterr <- nil
 			}
 		}
 	}
@@ -55,10 +56,9 @@ func LoadBalancer(selector []interface{}, fn func(interface{}, chan<- interface{
 		go run(i)
 	}
 
-	r := <-result
-	if len(lasterr) == 0 {
-		return r, nil
+	if err := <-lasterr; err != nil {
+		return nil, err
 	}
 
-	return nil, <-lasterr
+	return <-result, nil
 }

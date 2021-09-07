@@ -13,14 +13,8 @@ const uaCDNAPI = "https://cdn.jsdelivr.net/gh/sunshineplan/useragent/user-agent"
 func UserAgentString() (string, error) {
 	result, err := LoadBalancer(
 		[]interface{}{uaAPI, uaCDNAPI},
-		func(url interface{}, r chan<- interface{}, e chan<- error) {
-			resp, err := http.Get(url.(string))
-			if err != nil {
-				e <- err
-				return
-			}
-
-			r <- resp
+		func(url interface{}) (interface{}, error) {
+			return http.Get(url.(string))
 		},
 	)
 	if err != nil {

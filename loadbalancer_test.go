@@ -9,9 +9,9 @@ import (
 func TestLoadBalancer(t *testing.T) {
 	result, err := LoadBalancer(
 		[]interface{}{1, 3, 5},
-		func(n interface{}, c chan<- interface{}, _ chan<- error) {
+		func(n interface{}) (interface{}, error) {
 			time.Sleep(time.Second * time.Duration(n.(int)))
-			c <- n
+			return n, nil
 		},
 	)
 	if err != nil {
@@ -23,9 +23,9 @@ func TestLoadBalancer(t *testing.T) {
 
 	if _, err := LoadBalancer(
 		[]interface{}{1, 3, 5},
-		func(n interface{}, _ chan<- interface{}, c chan<- error) {
+		func(n interface{}) (interface{}, error) {
 			time.Sleep(time.Second * time.Duration(n.(int)))
-			c <- fmt.Errorf("%v", n)
+			return nil, fmt.Errorf("%v", n)
 		},
 	); err == nil || err.Error() != "5" {
 		t.Errorf("expected error %d; got %v", 5, err)
