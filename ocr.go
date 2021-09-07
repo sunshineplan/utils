@@ -16,7 +16,7 @@ const (
 
 // OCR reads image from reader r and converts it into string.
 func OCR(r io.Reader) (string, error) {
-	return OCRWithClient(r, &http.Client{Transport: &http.Transport{Proxy: nil}})
+	return OCRWithClient(r, http.DefaultClient)
 }
 
 // OCRWithClient reads image from reader r and converts it into string

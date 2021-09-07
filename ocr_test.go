@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"net/http"
 	"os"
 	"testing"
 )
@@ -11,7 +10,7 @@ func TestOCR(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	r, err := OCRWithClient(f, http.DefaultClient)
+	r, err := OCR(f)
 	if err != nil {
 		t.Error(err)
 	}
