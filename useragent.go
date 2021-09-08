@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/sunshineplan/utils/executor"
 )
 
 const uaAPI = "https://raw.githubusercontent.com/sunshineplan/useragent/main/user-agent"
@@ -11,8 +13,8 @@ const uaCDNAPI = "https://cdn.jsdelivr.net/gh/sunshineplan/useragent/user-agent"
 
 // UserAgentString gets latest chrome user agent string.
 func UserAgentString() (string, error) {
-	result, err := LoadBalancer(
-		[]interface{}{uaAPI, uaCDNAPI},
+	result, err := executor.ExecuteConcurrent(
+		[]string{uaAPI, uaCDNAPI},
 		func(url interface{}) (interface{}, error) {
 			return http.Get(url.(string))
 		},
