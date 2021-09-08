@@ -15,7 +15,7 @@ type item struct {
 }
 
 func (i *item) Expired() bool {
-	if i.Expiration == 0 {
+	if i.Duration == 0 {
 		return false
 	}
 
