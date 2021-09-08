@@ -67,33 +67,47 @@ func TestLimit(t *testing.T) {
 	limit := rand.Intn(1000) + 51
 	workers := rand.Intn(50) + 1
 
+	var mu1, mu2, mu3, mu4 sync.Mutex
 	var count1, count2, count3, count4 int
 	go Range(1, limit, func(_ int) {
+		mu1.Lock()
 		count1++
+		mu1.Unlock()
 		for {
 			select {}
 		}
 	})
 	go New(0).Range(1, limit, func(_ int) {
+		mu2.Lock()
 		count2++
+		mu2.Unlock()
 		for {
 			select {}
 		}
 	})
 	go New(-1).Range(1, limit, func(_ int) {
+		mu3.Lock()
 		count3++
+		mu3.Unlock()
 		for {
 			select {}
 		}
 	})
 	go New(workers).Range(1, limit, func(_ int) {
+		mu4.Lock()
 		count4++
+		mu4.Unlock()
 		for {
 			select {}
 		}
 	})
 
 	time.Sleep(time.Second)
+
+	mu1.Lock()
+	mu2.Lock()
+	mu3.Lock()
+	mu4.Lock()
 
 	if count1 != NumCPU() {
 		t.Errorf("expected %d; got %d", NumCPU(), count1)

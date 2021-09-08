@@ -139,8 +139,10 @@ func (pb *ProgressBar) startRefresh() {
 	for {
 		<-ticker.C
 
+		pb.Lock()
 		now := pb.current
 		if now >= pb.total || !pb.status {
+			pb.Unlock()
 			return
 		}
 
@@ -156,13 +158,17 @@ func (pb *ProgressBar) startRefresh() {
 		}
 
 		pb.refreshStatus = true
+		pb.Unlock()
 	}
 }
 
 func (pb *ProgressBar) startCount() {
 	defer func() {
 		pb.done <- true
+
+		pb.Lock()
 		pb.status = false
+		pb.Unlock()
 	}()
 
 	ticker := time.NewTicker(time.Second)
@@ -171,6 +177,8 @@ func (pb *ProgressBar) startCount() {
 	for {
 		select {
 		case <-ticker.C:
+			pb.Lock()
+
 			now := pb.current
 			if now > pb.total {
 				now = pb.total
@@ -241,8 +249,11 @@ func (pb *ProgressBar) startCount() {
 
 				io.WriteString(os.Stderr, "\n")
 
+				pb.Unlock()
 				return
 			}
+
+			pb.Unlock()
 		case <-pb.cancel:
 			io.WriteString(os.Stderr, "\nCancelled\n")
 
@@ -276,13 +287,21 @@ func (pb *ProgressBar) Start() error {
 
 // Done waits the progress bar finished.
 func (pb *ProgressBar) Done() {
-	if pb.status || len(pb.done) == 1 {
+	pb.Lock()
+	status := pb.status
+	length := len(pb.done)
+	pb.Unlock()
+
+	if status || length == 1 {
 		<-pb.done
 	}
 }
 
 // Cancel cancels the progress bar.
 func (pb *ProgressBar) Cancel() {
+	pb.Lock()
+	defer pb.Unlock()
+
 	if pb.status {
 		pb.cancel <- true
 	}
