@@ -28,7 +28,7 @@ func TestExecuteConcurrent(t *testing.T) {
 	select {
 	case err := <-c:
 		if err != nil {
-			t.Error(err)
+			t.Errorf("expected nil error; got non-nil error %v", err)
 		}
 		if result != 1 {
 			t.Errorf("expected %d; got %v", 1, result)
@@ -60,11 +60,11 @@ func TestExecuteConcurrent(t *testing.T) {
 }
 
 func TestExecuteSerial(t *testing.T) {
-	c := make(chan error)
 	var result interface{}
 	var err error
 
-	t1 := time.NewTicker(time.Second + 100*time.Millisecond)
+	c1 := make(chan error)
+	t1 := time.NewTicker(time.Second + 200*time.Millisecond)
 	defer t1.Stop()
 	go func() {
 		result, err = ExecuteSerial(
@@ -74,10 +74,10 @@ func TestExecuteSerial(t *testing.T) {
 				return n, nil
 			},
 		)
-		c <- err
+		c1 <- err
 	}()
 	select {
-	case err := <-c:
+	case err := <-c1:
 		if err != nil {
 			t.Error(err)
 		}
@@ -88,7 +88,8 @@ func TestExecuteSerial(t *testing.T) {
 		t.Error("time out")
 	}
 
-	t2 := time.NewTicker(3*time.Second + 100*time.Millisecond)
+	c2 := make(chan error)
+	t2 := time.NewTicker(3*time.Second + 600*time.Millisecond)
 	defer t2.Stop()
 	go func() {
 		_, err = ExecuteSerial(
@@ -98,10 +99,10 @@ func TestExecuteSerial(t *testing.T) {
 				return nil, fmt.Errorf("%v", n)
 			},
 		)
-		c <- err
+		c2 <- err
 	}()
 	select {
-	case err := <-c:
+	case err := <-c2:
 		if err == nil || err.Error() != "2" {
 			t.Errorf("expected error %d; got %v", 2, err)
 		}

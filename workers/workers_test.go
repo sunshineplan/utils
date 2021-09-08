@@ -24,8 +24,8 @@ func TestSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual([]string{"a", "bb", "ccc"}, result) {
-		t.Errorf("expected %q; got %q", []string{"a", "bb", "ccc"}, result)
+	if expect := []string{"a", "bb", "ccc"}; !reflect.DeepEqual(expect, result) {
+		t.Errorf("expected %v; got %v", expect, result)
 	}
 }
 
@@ -41,8 +41,8 @@ func TestMap(t *testing.T) {
 	}
 
 	sort.Strings(result)
-	if !reflect.DeepEqual([]string{"a", "bb", "ccc"}, result) {
-		t.Errorf("expected %q; got %q", []string{"a", "bb", "ccc"}, result)
+	if expect := []string{"a", "bb", "ccc"}; !reflect.DeepEqual(expect, result) {
+		t.Errorf("expected %v; got %v", expect, result)
 	}
 }
 
@@ -56,8 +56,8 @@ func TestRange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual([]string{"a", "bb", "ccc"}, result) {
-		t.Errorf("expected %q; got %q", []string{"a", "bb", "ccc"}, result)
+	if expect := []string{"a", "bb", "ccc"}; !reflect.DeepEqual(expect, result) {
+		t.Errorf("expected %v; got %v", expect, result)
 	}
 }
 
@@ -109,8 +109,8 @@ func TestLimit(t *testing.T) {
 	mu3.Lock()
 	mu4.Lock()
 
-	if count1 != NumCPU() {
-		t.Errorf("expected %d; got %d", NumCPU(), count1)
+	if cpu := NumCPU(); count1 != cpu {
+		t.Errorf("expected %d; got %d", cpu, count1)
 	}
 	if count2 != count1 {
 		t.Errorf("expected %d; got %d", count1, count2)

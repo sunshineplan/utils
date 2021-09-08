@@ -23,8 +23,8 @@ b,2,"[3,4]"
 	}
 
 	fields := rs.Fields()
-	if !reflect.DeepEqual([]string{"A", "B", "C"}, fields) {
-		t.Errorf("expected %v; got %v", []string{"A", "B", "C"}, fields)
+	if expect := []string{"A", "B", "C"}; !reflect.DeepEqual(expect, fields) {
+		t.Errorf("expected %v; got %v", expect, fields)
 	}
 
 	var results []result
@@ -35,7 +35,7 @@ b,2,"[3,4]"
 		}
 		results = append(results, result)
 	}
-	if !reflect.DeepEqual([]result{{"a", 1, []int{1, 2}}, {"b", 2, []int{3, 4}}}, results) {
-		t.Errorf("expected %v; got %v", []result{{"a", 1, []int{1, 2}}, {"b", 2, []int{3, 4}}}, results)
+	if expect := []result{{"a", 1, []int{1, 2}}, {"b", 2, []int{3, 4}}}; !reflect.DeepEqual(expect, results) {
+		t.Errorf("expected %v; got %v", expect, results)
 	}
 }

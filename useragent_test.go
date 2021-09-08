@@ -8,9 +8,9 @@ import (
 func TestUserAgentString(t *testing.T) {
 	ua, err := UserAgentString()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
-	if !strings.Contains(ua, "Chrome") {
-		t.Errorf("expected contains %q; got %q", "Chrome", ua)
+	if expect := "Chrome"; !strings.Contains(ua, expect) {
+		t.Fatalf("expected contains %q; got %q", expect, ua)
 	}
 }

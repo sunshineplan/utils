@@ -76,6 +76,6 @@ func TestSetTemplate(t *testing.T) {
 		t.Error(err)
 	}
 	if err := pb.SetTemplate(`{{.Test}}`); err == nil {
-		t.Error("gave nil error; want error")
+		t.Error("expected non-nil error; got nil error")
 	}
 }

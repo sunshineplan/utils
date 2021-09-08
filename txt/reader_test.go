@@ -16,7 +16,7 @@ C
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual([]string{"A", "B", "C"}, content) {
-		t.Errorf("expected %v; got %v", []string{"A", "B", "C"}, content)
+	if expect := []string{"A", "B", "C"}; !reflect.DeepEqual(expect, content) {
+		t.Errorf("expected %v; got %v", expect, content)
 	}
 }
