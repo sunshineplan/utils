@@ -11,19 +11,19 @@ import (
 func TestExecuteConcurrent(t *testing.T) {
 	c := make(chan error)
 	var result interface{}
-	var err error
+	var err1, err2 error
 
-	t1 := time.NewTicker(time.Second + 100*time.Millisecond)
+	t1 := time.NewTicker(time.Second + 200*time.Millisecond)
 	defer t1.Stop()
 	go func() {
-		result, err = ExecuteConcurrent(
+		result, err1 = ExecuteConcurrent(
 			[]int{1, 2, 3},
 			func(n interface{}) (interface{}, error) {
 				time.Sleep(time.Second * time.Duration(n.(int)))
 				return n, nil
 			},
 		)
-		c <- err
+		c <- err1
 	}()
 	select {
 	case err := <-c:
@@ -37,17 +37,17 @@ func TestExecuteConcurrent(t *testing.T) {
 		t.Error("time out")
 	}
 
-	t2 := time.NewTicker(3*time.Second + 100*time.Millisecond)
+	t2 := time.NewTicker(3*time.Second + 200*time.Millisecond)
 	defer t2.Stop()
 	go func() {
-		_, err = ExecuteConcurrent(
+		_, err2 = ExecuteConcurrent(
 			[]int{1, 2, 3},
 			func(n interface{}) (interface{}, error) {
 				time.Sleep(time.Second * time.Duration(n.(int)))
 				return nil, fmt.Errorf("%v", n)
 			},
 		)
-		c <- err
+		c <- err2
 	}()
 	select {
 	case err := <-c:
