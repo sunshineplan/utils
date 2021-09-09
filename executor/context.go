@@ -37,10 +37,10 @@ func (ctx *fnContext) run(s interface{}, rc chan<- interface{}, ec chan<- error)
 	case <-ctx.Done():
 		return
 	case err := <-c:
-		if err != nil {
-			ctx.Lock()
-			defer ctx.Unlock()
+		ctx.Lock()
+		defer ctx.Unlock()
 
+		if err != nil {
 			if ctx.count == 1 {
 				rc <- nil
 				ec <- err
