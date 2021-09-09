@@ -57,7 +57,7 @@ func TestAutoCleanRegenerate(t *testing.T) {
 		defer func() { done <- true }()
 		return "new", nil
 	})
-	cache.Set("expire", "value", 2*time.Second, nil)
+	cache.Set("expire", "value", 1*time.Second, nil)
 
 	value, ok := cache.Get("expire")
 	if !ok {
@@ -75,7 +75,7 @@ func TestAutoCleanRegenerate(t *testing.T) {
 		t.Errorf("expected %q; got %q", expect, value)
 	}
 
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(4 * time.Second)
 	defer ticker.Stop()
 
 	select {
