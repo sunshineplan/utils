@@ -21,10 +21,13 @@ func newContext(count int, fn func(interface{}) (interface{}, error)) fnContext 
 }
 
 func (ctx *fnContext) run(s interface{}, rc chan<- interface{}, ec chan<- error) {
-	c := make(chan error, 1)
+	if ctx.Err() != nil {
+		return
+	}
 
 	var r interface{}
 	var err error
+	c := make(chan error, 1)
 	go func() {
 		r, err = ctx.fn(s)
 		c <- err
