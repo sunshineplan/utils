@@ -57,7 +57,7 @@ func Execute(argMethod, fnMethod Method, arg interface{}, fn ...func(interface{}
 		}
 	default:
 		count = 1
-		v = reflect.MakeSlice(reflect.SliceOf(src.Type()), 1, 1)
+		v = reflect.MakeSlice(reflect.SliceOf(src.Type()), 0, 0)
 		v = reflect.Append(v, src)
 	}
 
