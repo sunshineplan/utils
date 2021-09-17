@@ -13,7 +13,7 @@ const uaCDNAPI = "https://cdn.jsdelivr.net/gh/sunshineplan/useragent/user-agent"
 
 // UserAgentString gets latest chrome user agent string.
 func UserAgentString() (string, error) {
-	result, err := executor.ExecuteConcurrent(
+	result, err := executor.ExecuteConcurrentArg(
 		[]string{uaAPI, uaCDNAPI},
 		func(url interface{}) (interface{}, error) {
 			return http.Get(url.(string))
