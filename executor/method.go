@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"reflect"
 	"time"
+
+	"github.com/sunshineplan/utils/workers"
 )
 
 // Method represents the execute method.
@@ -19,13 +21,22 @@ const (
 	Random
 )
 
+var defaultLimit = workers.NumCPU()
+
 func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// SetLimit sets default limit.
+// If n < 0, represents no limit.
+// If n = 0, limit will be set as CPU number.
+func SetLimit(n int) {
+	defaultLimit = n
+}
+
 // Execute gets the result from the functions with several args by specified method.
 // If both argMethod and fnMethod is Concurrent, fnMethod will be first.
-func Execute(argMethod, fnMethod Method, arg interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
+func Execute(argMethod, fnMethod Method, limit int, arg interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
 	if len(fn) == 0 {
 		return nil, errors.New("no function provided")
 	}
@@ -65,6 +76,8 @@ func Execute(argMethod, fnMethod Method, arg interface{}, fn ...func(interface{}
 		rand.Shuffle(len(fn), func(i, j int) { fn[i], fn[j] = fn[j], fn[i] })
 	}
 
+	ws := workers.New(limit)
+	single := workers.New(1)
 	switch fnMethod {
 	case Concurrent:
 		result := make(chan interface{}, 1)
@@ -74,9 +87,9 @@ func Execute(argMethod, fnMethod Method, arg interface{}, fn ...func(interface{}
 			ctx := newArgContext(len(fn), nil)
 			defer ctx.cancel()
 
-			for _, f := range fn {
-				go ctx.run(f, result, lasterr)
-			}
+			ws.Slice(fn, func(_ int, f interface{}) {
+				ctx.run(f.(func(interface{}) (interface{}, error)), result, lasterr)
+			})
 
 			if err := <-lasterr; err != nil {
 				return nil, err
@@ -87,9 +100,9 @@ func Execute(argMethod, fnMethod Method, arg interface{}, fn ...func(interface{}
 
 		for i := 0; i < count; i++ {
 			ctx := newArgContext(len(fn), v.Index(i).Interface())
-			for _, f := range fn {
-				go ctx.run(f, result, lasterr)
-			}
+			ws.Slice(fn, func(_ int, f interface{}) {
+				ctx.run(f.(func(interface{}) (interface{}, error)), result, lasterr)
+			})
 
 			if err := <-lasterr; err == nil {
 				return <-result, nil
@@ -105,14 +118,7 @@ func Execute(argMethod, fnMethod Method, arg interface{}, fn ...func(interface{}
 
 			ctx := newFnContext(count, f)
 			if nilArg {
-				switch argMethod {
-				case Concurrent:
-					go ctx.run(nil, result, lasterr)
-				case Serial, Random:
-					ctx.run(nil, result, lasterr)
-				default:
-					return nil, errors.New("unknown arg method")
-				}
+				ctx.run(nil, result, lasterr)
 			} else {
 				if argMethod == Random {
 					rand.Shuffle(count, func(i, j int) {
@@ -123,16 +129,18 @@ func Execute(argMethod, fnMethod Method, arg interface{}, fn ...func(interface{}
 					})
 				}
 
-				for i := 0; i < count; i++ {
-					switch argMethod {
-					case Concurrent:
-						go ctx.run(v.Index(i).Interface(), result, lasterr)
-					case Serial, Random:
-						ctx.run(v.Index(i).Interface(), result, lasterr)
-					default:
-						return nil, errors.New("unknown arg method")
-					}
+				var worker *workers.Workers
+				switch argMethod {
+				case Concurrent:
+					worker = ws
+				case Serial, Random:
+					worker = single
+				default:
+					return nil, errors.New("unknown arg method")
 				}
+				worker.Slice(v.Interface(), func(_ int, i interface{}) {
+					ctx.run(i, result, lasterr)
+				})
 			}
 
 			if err := <-lasterr; err == nil {
@@ -151,20 +159,20 @@ func Execute(argMethod, fnMethod Method, arg interface{}, fn ...func(interface{}
 
 // ExecuteConcurrentArg gets the fastest result from the functions with args, args will be run concurrently.
 func ExecuteConcurrentArg(arg interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
-	return Execute(Concurrent, Serial, arg, fn...)
+	return Execute(Concurrent, Serial, defaultLimit, arg, fn...)
 }
 
 // ExecuteConcurrentFn gets the fastest result from the functions with args, functions will be run concurrently.
 func ExecuteConcurrentFn(arg interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
-	return Execute(Serial, Concurrent, arg, fn...)
+	return Execute(Serial, Concurrent, defaultLimit, arg, fn...)
 }
 
 // ExecuteSerial gets the result until success from the functions with args in order.
 func ExecuteSerial(arg interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
-	return Execute(Serial, Serial, arg, fn...)
+	return Execute(Serial, Serial, defaultLimit, arg, fn...)
 }
 
 // ExecuteRandom gets the result until success from the functions with args randomly.
 func ExecuteRandom(arg interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
-	return Execute(Random, Random, arg, fn...)
+	return Execute(Random, Random, defaultLimit, arg, fn...)
 }
