@@ -145,7 +145,7 @@ func TestExecuteSerial2(t *testing.T) {
 }
 
 func TestExecuteRandom1(t *testing.T) {
-	testcase := []string{"a", "b", "c", "d", "e"}
+	testcase := []string{"a", "b", "c", "d", "e", "f", "g"}
 	var result []string
 	_, err := ExecuteRandom(
 		testcase,
@@ -190,12 +190,20 @@ func TestExecuteRandom2(t *testing.T) {
 			result = append(result, "e")
 			return nil, fmt.Errorf("e")
 		},
+		func(i interface{}) (interface{}, error) {
+			result = append(result, "f")
+			return nil, fmt.Errorf("f")
+		},
+		func(i interface{}) (interface{}, error) {
+			result = append(result, "g")
+			return nil, fmt.Errorf("g")
+		},
 	)
 	if err == nil {
 		t.Fatal("expected error; got nil")
 	}
 
-	expect := []string{"a", "b", "c", "d", "e"}
+	expect := []string{"a", "b", "c", "d", "e", "f", "g"}
 	if reflect.DeepEqual(expect, result) {
 		t.Errorf("expected not equal; got equal: %v", result)
 	}
