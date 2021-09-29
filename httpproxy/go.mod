@@ -1,4 +1,4 @@
-module httpproxy
+module github.com/sunshineplan/utils/httpproxy
 
 go 1.16
 
