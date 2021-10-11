@@ -18,6 +18,9 @@ func TestWatcher(t *testing.T) {
 	f.Close()
 
 	w := New(f.Name(), time.Second)
+	if w.File() != f.Name() {
+		t.Fatal("filename is not same")
+	}
 
 	f, err = os.Create(f.Name())
 	if err != nil {

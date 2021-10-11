@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -39,16 +40,22 @@ func (w *watcher) start() {
 	}
 }
 
+// Watcher watches whether file is changed.
 type Watcher struct {
 	C <-chan os.FileInfo
 	w watcher
 }
 
+// New creates a Watcher for file. The refresh period is specified by the interval argument.
 func New(file string, interval time.Duration) *Watcher {
 	if interval <= 0 {
 		panic(fmt.Errorf("non-positive interval"))
 	}
 
+	file, err := filepath.Abs(file)
+	if err != nil {
+		panic(err)
+	}
 	info, err := os.Stat(file)
 	if err != nil {
 		panic(err)
@@ -72,6 +79,12 @@ func New(file string, interval time.Duration) *Watcher {
 	return w
 }
 
+// File returns which file is being watched.
+func (w *Watcher) File() string {
+	return w.w.file
+}
+
+// Stop stops watching file.
 func (w *Watcher) Stop() {
 	w.w.ticker.Stop()
 }
