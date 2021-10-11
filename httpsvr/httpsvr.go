@@ -18,6 +18,11 @@ type Server struct {
 	Port string
 }
 
+// New creates an HTTP server. 
+func New() *Server {
+	return &Server{Server: &http.Server{}}
+}
+
 // Run runs an HTTP server which can be gracefully shut down.
 func (s *Server) run(serve func(net.Listener) error) error {
 	idleConnsClosed := make(chan struct{})
