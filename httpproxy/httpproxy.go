@@ -18,15 +18,18 @@ type Proxy struct {
 	forward proxy.Dialer
 }
 
-func NewDialer(u *url.URL, forward proxy.Dialer) (proxy.Dialer, error) {
-	p := new(Proxy)
-	p.URL = u
+func New(u *url.URL, forward proxy.Dialer) *Proxy {
+	p := &Proxy{URL: u}
 	if forward == nil {
 		forward = proxy.Direct
 	}
 	p.forward = forward
 
-	return p, nil
+	return p
+}
+
+func NewDialer(u *url.URL, forward proxy.Dialer) (proxy.Dialer, error) {
+	return New(u, forward), nil
 }
 
 func (p *Proxy) dialForward() (net.Conn, error) {
