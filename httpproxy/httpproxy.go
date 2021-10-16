@@ -13,13 +13,13 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-type httpProxy struct {
+type Proxy struct {
 	*url.URL
 	forward proxy.Dialer
 }
 
 func NewDialer(u *url.URL, forward proxy.Dialer) (proxy.Dialer, error) {
-	p := new(httpProxy)
+	p := new(Proxy)
 	p.URL = u
 	if forward == nil {
 		forward = proxy.Direct
@@ -29,7 +29,7 @@ func NewDialer(u *url.URL, forward proxy.Dialer) (proxy.Dialer, error) {
 	return p, nil
 }
 
-func (p *httpProxy) dialForward() (net.Conn, error) {
+func (p *Proxy) dialForward() (net.Conn, error) {
 	addr := p.Host
 
 	conn, err := p.forward.Dial("tcp", addr)
@@ -49,39 +49,47 @@ func (p *httpProxy) dialForward() (net.Conn, error) {
 	return conn, nil
 }
 
-func (p *httpProxy) Dial(network, addr string) (net.Conn, error) {
+func (p *Proxy) DialWithHeader(addr string, header http.Header) (net.Conn, *http.Response, error) {
 	conn, err := p.dialForward()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	req := &http.Request{
 		Method: "CONNECT",
 		URL:    &url.URL{Opaque: addr},
 		Host:   addr,
-		Header: make(http.Header),
+		Header: header,
 	}
-	if p.User != nil {
-		password, _ := p.User.Password()
-		req.Header.Set("Proxy-Authorization", "Basic "+basicAuth(p.User.Username(), password))
+	if err := req.Write(conn); err != nil {
+		return nil, nil, err
 	}
 
-	resp, err := doRequest(conn, req)
+	br := bufio.NewReader(conn)
+	resp, err := http.ReadResponse(br, req)
 	if err != nil {
 		conn.Close()
+		return nil, nil, err
+	}
+
+	return conn, resp, nil
+}
+
+func (p *Proxy) Dial(network, addr string) (net.Conn, error) {
+	if network != "tcp" {
+		return nil, fmt.Errorf("network must be tcp")
+	}
+
+	header := make(http.Header)
+	if p.User != nil {
+		password, _ := p.User.Password()
+		header.Set("Proxy-Authorization", "Basic "+basicAuth(p.User.Username(), password))
+	}
+
+	conn, resp, err := p.DialWithHeader(addr, header)
+	if err != nil {
 		return nil, err
 	}
-
-	if resp.StatusCode == http.StatusProxyAuthRequired && p.User != nil {
-		password, _ := p.User.Password()
-		req.SetBasicAuth(p.User.Username(), password)
-		resp, err = doRequest(conn, req)
-		if err != nil {
-			conn.Close()
-			return nil, err
-		}
-	}
-
 	if resp.StatusCode != 200 {
 		conn.Close()
 		return nil, fmt.Errorf("no StatusOK: [%d]", resp.StatusCode)
@@ -93,15 +101,6 @@ func (p *httpProxy) Dial(network, addr string) (net.Conn, error) {
 func basicAuth(username, password string) string {
 	auth := username + ":" + password
 	return base64.StdEncoding.EncodeToString([]byte(auth))
-}
-
-func doRequest(conn net.Conn, req *http.Request) (*http.Response, error) {
-	if err := req.Write(conn); err != nil {
-		return nil, err
-	}
-
-	br := bufio.NewReader(conn)
-	return http.ReadResponse(br, req)
 }
 
 func init() {
