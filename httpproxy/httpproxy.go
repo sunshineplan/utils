@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"crypto/tls"
 	"encoding/base64"
-	"fmt"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
@@ -65,6 +65,7 @@ func (p *Proxy) DialWithHeader(addr string, header http.Header) (net.Conn, *http
 		Header: header,
 	}
 	if err := req.Write(conn); err != nil {
+		conn.Close()
 		return nil, nil, err
 	}
 
@@ -80,7 +81,7 @@ func (p *Proxy) DialWithHeader(addr string, header http.Header) (net.Conn, *http
 
 func (p *Proxy) Dial(network, addr string) (net.Conn, error) {
 	if network != "tcp" {
-		return nil, fmt.Errorf("network must be tcp")
+		return nil, errors.New("network must be tcp")
 	}
 
 	header := make(http.Header)
@@ -95,7 +96,7 @@ func (p *Proxy) Dial(network, addr string) (net.Conn, error) {
 	}
 	if resp.StatusCode != 200 {
 		conn.Close()
-		return nil, fmt.Errorf("no StatusOK: [%d]", resp.StatusCode)
+		return nil, errors.New(resp.Status)
 	}
 
 	return conn, nil
