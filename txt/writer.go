@@ -25,7 +25,7 @@ func NewWriterSize(w io.Writer, size int) *Writer {
 	return &Writer{Writer: bufio.NewWriterSize(w, size)}
 }
 
-// WriteString writes a string end with the line terminator. It returns the number of bytes written.
+// WriteLine writes a string end with the line terminator. It returns the number of bytes written.
 // If the count is less than expected, it also returns an error explaining why the write is short.
 func (w *Writer) WriteLine(s string) (int, error) {
 	if w.UseCRLF {
