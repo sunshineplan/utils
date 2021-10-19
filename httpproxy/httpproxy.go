@@ -2,6 +2,7 @@ package httpproxy
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
@@ -13,23 +14,38 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-type Proxy struct {
-	*url.URL
-	forward proxy.Dialer
+// A Dialer is a means to establish a connection.
+type Dialer interface {
+	// Dial connects to the given address via the proxy.
+	Dial(network, addr string) (c net.Conn, err error)
 }
 
-func New(u *url.URL, forward proxy.Dialer) *Proxy {
+// A ContextDialer dials using a context.
+type ContextDialer interface {
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
+}
+
+type Proxy struct {
+	*url.URL
+	forward Dialer
+}
+
+func New(u *url.URL, forward Dialer) *Proxy {
 	p := &Proxy{URL: u}
 	if forward == nil {
-		forward = proxy.Direct
+		forward = Direct
 	}
 	p.forward = forward
 
 	return p
 }
 
-func NewDialer(u *url.URL, forward proxy.Dialer) (proxy.Dialer, error) {
+func NewDialer(u *url.URL, forward Dialer) (Dialer, error) {
 	return New(u, forward), nil
+}
+
+func NewProxyDialer(u *url.URL, forward proxy.Dialer) (proxy.Dialer, error) {
+	return NewDialer(u, forward)
 }
 
 func (p *Proxy) dialForward() (net.Conn, error) {
@@ -108,6 +124,6 @@ func basicAuth(username, password string) string {
 }
 
 func init() {
-	proxy.RegisterDialerType("http", NewDialer)
-	proxy.RegisterDialerType("https", NewDialer)
+	proxy.RegisterDialerType("http", NewProxyDialer)
+	proxy.RegisterDialerType("https", NewProxyDialer)
 }
