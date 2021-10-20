@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
@@ -154,7 +155,7 @@ func (c *Client) Auth(d *Dialer) error {
 //
 // Changed
 // Use Dialer arg instead of addr and auth, and add context
-func (d *Dialer) SendMail(from string, to []string, msg []byte) error {
+func (d *Dialer) SendMail(ctx context.Context, from string, to []string, msg []byte) error {
 	if err := validateLine(from); err != nil {
 		return err
 	}
@@ -163,7 +164,7 @@ func (d *Dialer) SendMail(from string, to []string, msg []byte) error {
 			return err
 		}
 	}
-	c, err := Dial(fmt.Sprintf("%s:%d", d.Host, d.Port))
+	c, err := Dial(ctx, fmt.Sprintf("%s:%d", d.Host, d.Port))
 	if err != nil {
 		return err
 	}

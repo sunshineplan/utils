@@ -77,7 +77,7 @@ func (d *Dialer) Send(msg ...*Message) error {
 		defer cancel()
 
 		c := make(chan error, 1)
-		go func() { c <- d.SendMail(m.From, m.RcptList(), m.Bytes()) }()
+		go func() { c <- d.SendMail(ctx, m.From, m.RcptList(), m.Bytes()) }()
 
 		select {
 		case <-ctx.Done():

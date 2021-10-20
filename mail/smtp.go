@@ -16,6 +16,7 @@
 package mail
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"io"
@@ -46,8 +47,9 @@ type Client struct {
 
 // Dial returns a new Client connected to an SMTP server at addr.
 // The addr must include a port, as in "mail.example.com:smtp".
-func Dial(addr string) (*Client, error) {
-	conn, err := net.Dial("tcp", addr)
+func Dial(ctx context.Context, addr string) (*Client, error) {
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
 	}
