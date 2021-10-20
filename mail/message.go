@@ -16,7 +16,7 @@ import (
 
 var contentTypes = [...]string{"text/plain", "text/html"}
 
-func (contentType ContentType) string() string {
+func (contentType ContentType) String() string {
 	return contentTypes[contentType]
 }
 
@@ -29,7 +29,7 @@ func randomBoundary() string {
 	return fmt.Sprintf("%x", buf[:])
 }
 
-func (m *Message) toList() []string {
+func (m *Message) RcptList() []string {
 	rcptList := []string{}
 
 	toList, _ := mail.ParseAddressList(strings.Join(m.To, ","))
@@ -50,7 +50,7 @@ func (m *Message) toList() []string {
 	return rcptList
 }
 
-func (m *Message) bytes() []byte {
+func (m *Message) Bytes() []byte {
 	var buf bytes.Buffer
 	buf.WriteString("From: " + m.From + "\r\n")
 
@@ -75,7 +75,7 @@ func (m *Message) bytes() []byte {
 		buf.WriteString("\r\n--" + boundary + "\r\n")
 	}
 
-	buf.WriteString(fmt.Sprintf("Content-Type: %s; charset=utf-8\r\n\r\n", m.ContentType.string()))
+	buf.WriteString(fmt.Sprintf("Content-Type: %s; charset=utf-8\r\n\r\n", m.ContentType))
 	buf.WriteString(m.Body)
 	buf.WriteString("\r\n")
 

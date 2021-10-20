@@ -49,8 +49,8 @@ func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 	return nil, nil
 }
 
-// cmd is a convenience function that sends a command and returns the response
-func (c *client) cmd(expectCode int, format string, args ...interface{}) (int, string, error) {
+// Cmd is a convenience function that sends a command and returns the response
+func (c *Client) Cmd(expectCode int, format string, args ...interface{}) (int, string, error) {
 	// Changed
 	// Add debug print
 	if debug {
@@ -74,7 +74,7 @@ func (c *client) cmd(expectCode int, format string, args ...interface{}) (int, s
 // Auth authenticates a client using the provided authentication mechanism.
 // A failed authentication closes the connection.
 // Only servers that advertise the AUTH extension support this function.
-func (c *client) Auth(d *Dialer) error {
+func (c *Client) Auth(d *Dialer) error {
 	if err := c.hello(); err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (c *client) Auth(d *Dialer) error {
 	}
 	resp64 := make([]byte, encoding.EncodedLen(len(resp)))
 	encoding.Encode(resp64, resp)
-	code, msg64, err := c.cmd(0, strings.TrimSpace(fmt.Sprintf("AUTH %s %s", mech, resp64)))
+	code, msg64, err := c.Cmd(0, strings.TrimSpace(fmt.Sprintf("AUTH %s %s", mech, resp64)))
 	for err == nil {
 		var msg []byte
 		switch code {
@@ -117,7 +117,7 @@ func (c *client) Auth(d *Dialer) error {
 		}
 		if err != nil {
 			// abort the AUTH
-			c.cmd(501, "*")
+			c.Cmd(501, "*")
 			c.Quit()
 			break
 		}
@@ -126,7 +126,7 @@ func (c *client) Auth(d *Dialer) error {
 		}
 		resp64 = make([]byte, encoding.EncodedLen(len(resp)))
 		encoding.Encode(resp64, resp)
-		code, msg64, err = c.cmd(0, string(resp64))
+		code, msg64, err = c.Cmd(0, string(resp64))
 	}
 	return err
 }
@@ -154,7 +154,7 @@ func (c *client) Auth(d *Dialer) error {
 //
 // Changed
 // Use Dialer arg instead of addr and auth, and add context
-func (d *Dialer) sendMail(from string, to []string, msg []byte) error {
+func (d *Dialer) SendMail(from string, to []string, msg []byte) error {
 	if err := validateLine(from); err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func (d *Dialer) sendMail(from string, to []string, msg []byte) error {
 			return err
 		}
 	}
-	c, err := dial(fmt.Sprintf("%s:%d", d.Host, d.Port))
+	c, err := Dial(fmt.Sprintf("%s:%d", d.Host, d.Port))
 	if err != nil {
 		return err
 	}
