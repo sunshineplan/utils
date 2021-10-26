@@ -10,6 +10,8 @@ import (
 	"sync"
 	"text/template"
 	"time"
+
+	"github.com/sunshineplan/utils/unit"
 )
 
 const defaultTemplate = `[{{.Done}}{{.Undone}}]   {{.Speed}}   {{.Current -}}
@@ -205,12 +207,12 @@ func (pb *ProgressBar) startCount() {
 				f = format{
 					Done:    progressed,
 					Undone:  strings.Repeat(" ", pb.blockWidth-done),
-					Speed:   formatBytes(int64(pb.speed)) + "/s",
-					Current: formatBytes(now),
+					Speed:   unit.FormatBytes(int64(pb.speed)) + "/s",
+					Current: unit.FormatBytes(now),
 					Percent: fmt.Sprintf("%.2f%%", percent),
-					Total:   formatBytes(pb.total),
-					Elapsed: fmt.Sprintf("Elapsed: %s", formatDuration(time.Since(pb.start))),
-					Left:    fmt.Sprintf("Left: %s", formatDuration(left)),
+					Total:   unit.FormatBytes(pb.total),
+					Elapsed: fmt.Sprintf("Elapsed: %s", unit.FormatDuration(time.Since(pb.start))),
+					Left:    fmt.Sprintf("Left: %s", unit.FormatDuration(left)),
 				}
 			} else {
 				f = format{
@@ -220,8 +222,8 @@ func (pb *ProgressBar) startCount() {
 					Current: strconv.FormatInt(now, 10),
 					Percent: fmt.Sprintf("%.2f%%", percent),
 					Total:   strconv.FormatInt(pb.total, 10),
-					Elapsed: fmt.Sprintf("Elapsed: %s", formatDuration(time.Since(pb.start))),
-					Left:    fmt.Sprintf("Left: %s", formatDuration(left)),
+					Elapsed: fmt.Sprintf("Elapsed: %s", unit.FormatDuration(time.Since(pb.start))),
+					Left:    fmt.Sprintf("Left: %s", unit.FormatDuration(left)),
 				}
 			}
 
@@ -239,7 +241,7 @@ func (pb *ProgressBar) startCount() {
 			if now == pb.total {
 				totalSpeed := float64(pb.total) / (float64(time.Since(pb.start)) / float64(time.Second))
 				if pb.unit == "bytes" {
-					f.Speed = formatBytes(int64(totalSpeed)) + "/s"
+					f.Speed = unit.FormatBytes(int64(totalSpeed)) + "/s"
 				} else {
 					f.Speed = fmt.Sprintf("%.2f/s", totalSpeed)
 				}

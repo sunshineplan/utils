@@ -1,11 +1,11 @@
-package progressbar
+package unit
 
 import (
 	"fmt"
 	"time"
 )
 
-func formatBytes(i int64) (result string) {
+func FormatBytes(i int64) (result string) {
 	switch {
 	case i >= 1024*1024*1024:
 		result = fmt.Sprintf("%.02f GB", float64(i)/(1024*1024*1024))
@@ -20,7 +20,7 @@ func formatBytes(i int64) (result string) {
 	return
 }
 
-func formatDuration(d time.Duration) (result string) {
+func FormatDuration(d time.Duration) (result string) {
 	if d > time.Hour*24 {
 		result = fmt.Sprintf("%dd", d/24/time.Hour)
 		d -= (d / time.Hour / 24) * (time.Hour * 24)
