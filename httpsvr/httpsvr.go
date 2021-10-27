@@ -86,9 +86,15 @@ func (s *Server) run(serve func(net.Listener) error) error {
 			return fmt.Errorf("failed to server: %v", err)
 		}
 	} else {
-		if s.Host != "" && s.Port != "" {
-			s.Addr = s.Host + ":" + s.Port
+		port := s.Port
+		if port == "" {
+			if s.tls {
+				port = "https"
+			} else {
+				port = "http"
+			}
 		}
+		s.Addr = s.Host + ":" + port
 		if err := serve(nil); err != http.ErrServerClosed {
 			return fmt.Errorf("failed to server: %v", err)
 		}
