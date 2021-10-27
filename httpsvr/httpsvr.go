@@ -2,13 +2,22 @@ package httpsvr
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"github.com/sunshineplan/utils/cache"
 )
+
+var certCache = cache.New(false)
+
+var defaultReload = 24 * time.Hour
 
 // Server defines parameters for running an HTTP server.
 type Server struct {
@@ -16,11 +25,20 @@ type Server struct {
 	Unix string
 	Host string
 	Port string
+
+	tls      bool
+	certFile string
+	keyFile  string
+	reload   time.Duration
 }
 
-// New creates an HTTP server. 
+// New creates an HTTP server.
 func New() *Server {
 	return &Server{Server: &http.Server{}}
+}
+
+func (s *Server) SetReload(d time.Duration) {
+	s.reload = d
 }
 
 // Run runs an HTTP server which can be gracefully shut down.
@@ -32,9 +50,27 @@ func (s *Server) run(serve func(net.Listener) error) error {
 		<-quit
 
 		if err := s.Shutdown(context.Background()); err != nil {
-			fmt.Println("Failed to close server:", err)
+			log.Println("Failed to close server:", err)
 		}
 		close(idleConnsClosed)
+	}()
+
+	go func() {
+		hup := make(chan os.Signal, 1)
+		signal.Notify(hup, syscall.SIGHUP)
+		for range hup {
+			if s.tls {
+				cert, err := s.loadCertificate()
+				if err != nil {
+					log.Println("Failed to reload certificate:", err)
+					continue
+				}
+				if s.reload == 0 {
+					s.reload = defaultReload
+				}
+				certCache.Set("cert", cert, s.reload, s.loadCertificate)
+			}
+		}
 	}()
 
 	if s.Unix != "" {
@@ -61,8 +97,37 @@ func (s *Server) run(serve func(net.Listener) error) error {
 	return nil
 }
 
+func (s *Server) loadCertificate() (interface{}, error) {
+	cert, err := tls.LoadX509KeyPair(s.certFile, s.keyFile)
+	if err != nil {
+		return nil, err
+	}
+	return &cert, nil
+}
+
+func (s *Server) getCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	v, ok := certCache.Get("cert")
+	if ok {
+		return v.(*tls.Certificate), nil
+	}
+
+	cert, err := s.loadCertificate()
+	if err != nil {
+		return nil, err
+	}
+
+	if s.reload == 0 {
+		s.reload = defaultReload
+	}
+	certCache.Set("cert", &cert, s.reload, s.loadCertificate)
+
+	return cert.(*tls.Certificate), nil
+}
+
 // Run runs an HTTP server which can be gracefully shut down.
 func (s *Server) Run() error {
+	s.tls = false
+
 	if s.Unix != "" {
 		return s.run(func(l net.Listener) error {
 			return s.Serve(l)
@@ -74,13 +139,18 @@ func (s *Server) Run() error {
 }
 
 func (s *Server) RunTLS(certFile, keyFile string) error {
+	s.tls = true
+	s.certFile = certFile
+	s.keyFile = keyFile
+	s.TLSConfig = &tls.Config{GetCertificate: s.getCertificate}
+
 	if s.Unix != "" {
 		return s.run(func(l net.Listener) error {
-			return s.ServeTLS(l, certFile, keyFile)
+			return s.ServeTLS(l, "", "")
 		})
 	}
 	return s.run(func(_ net.Listener) error {
-		return s.ListenAndServeTLS(certFile, keyFile)
+		return s.ListenAndServeTLS("", "")
 	})
 }
 
