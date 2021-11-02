@@ -37,7 +37,7 @@ type ProgressBar struct {
 	speed      float64
 	unit       string
 
-	counter *counter.Writer
+	cw *counter.Writer
 }
 
 type format struct {
@@ -117,10 +117,10 @@ func (pb *ProgressBar) Add(n int64) {
 }
 
 func (pb *ProgressBar) now() int64 {
-	if pb.counter == nil {
+	if pb.cw == nil {
 		return pb.current
 	}
-	return int64(pb.counter.Count())
+	return int64(pb.cw.Count())
 }
 
 func (pb *ProgressBar) print(f format) {
@@ -146,12 +146,15 @@ func (pb *ProgressBar) startRefresh() {
 	defer ticker.Stop()
 
 	for {
+		pb.Lock()
+		last := pb.now()
+		pb.Unlock()
 		select {
 		case <-ticker.C:
 			pb.Lock()
 			now := pb.now()
 			totalSpeed := float64(now) / (float64(time.Since(start)) / float64(time.Second))
-			intervalSpeed := float64(pb.now()-now) / (float64(pb.refresh) / float64(time.Second))
+			intervalSpeed := float64(now-last) / (float64(pb.refresh) / float64(time.Second))
 			if intervalSpeed == 0 {
 				pb.speed = totalSpeed
 			} else {
@@ -159,6 +162,7 @@ func (pb *ProgressBar) startRefresh() {
 			}
 			if intervalSpeed == 0 && pb.refresh < maxRefresh {
 				pb.refresh += time.Second
+				ticker.Reset(pb.refresh)
 			}
 			pb.Unlock()
 		case <-pb.ctx.Done():
@@ -286,8 +290,8 @@ func (pb *ProgressBar) Cancel() {
 
 // FromReader starts the progress bar from a reader.
 func (pb *ProgressBar) FromReader(r io.Reader, w io.Writer) (int64, error) {
-	pb.counter = counter.NewWriter(w)
+	pb.cw = counter.NewWriter(w)
 	pb.Start()
 
-	return io.Copy(pb.counter, r)
+	return io.Copy(pb.cw, r)
 }
