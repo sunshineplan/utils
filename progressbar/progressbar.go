@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -110,15 +111,12 @@ func (pb *ProgressBar) SetUnit(unit string) *ProgressBar {
 
 // Add adds the specified amount to the progress bar.
 func (pb *ProgressBar) Add(n int64) {
-	pb.Lock()
-	defer pb.Unlock()
-
-	pb.current += n
+	atomic.AddInt64(&pb.current, n)
 }
 
 func (pb *ProgressBar) now() int64 {
 	if pb.cw == nil {
-		return pb.current
+		return atomic.LoadInt64(&pb.current)
 	}
 	return int64(pb.cw.Count())
 }
@@ -146,25 +144,23 @@ func (pb *ProgressBar) startRefresh() {
 	defer ticker.Stop()
 
 	for {
-		pb.Lock()
 		last := pb.now()
-		pb.Unlock()
 		select {
 		case <-ticker.C:
-			pb.Lock()
 			now := pb.now()
 			totalSpeed := float64(now) / (float64(time.Since(start)) / float64(time.Second))
 			intervalSpeed := float64(now-last) / (float64(pb.refresh) / float64(time.Second))
+			pb.Lock()
 			if intervalSpeed == 0 {
 				pb.speed = totalSpeed
 			} else {
 				pb.speed = intervalSpeed
 			}
+			pb.Unlock()
 			if intervalSpeed == 0 && pb.refresh < maxRefresh {
 				pb.refresh += time.Second
 				ticker.Reset(pb.refresh)
 			}
-			pb.Unlock()
 		case <-pb.ctx.Done():
 			return
 		case <-pb.done:
@@ -180,7 +176,6 @@ func (pb *ProgressBar) startCount() {
 	for {
 		select {
 		case <-ticker.C:
-			pb.Lock()
 			now := pb.now()
 			if now > pb.total {
 				now = pb.total
@@ -188,18 +183,17 @@ func (pb *ProgressBar) startCount() {
 			done := int(int64(pb.blockWidth) * now / pb.total)
 			percent := float64(now) * 100 / float64(pb.total)
 
-			var left time.Duration
-			if pb.speed == 0 {
-				left = 0
-			} else {
-				left = time.Duration(float64(pb.total-now)/pb.speed) * time.Second
-			}
-
 			var progressed string
 			if now < pb.total && done != 0 {
 				progressed = strings.Repeat("=", done-1) + ">"
 			} else {
 				progressed = strings.Repeat("=", done)
+			}
+
+			pb.Lock()
+			var left time.Duration
+			if pb.speed != 0 {
+				left = time.Duration(float64(pb.total-now)/pb.speed) * time.Second
 			}
 
 			var f format
@@ -231,6 +225,7 @@ func (pb *ProgressBar) startCount() {
 				f.Speed = "--/s"
 				f.Left = "Left: calculating" + strings.Repeat(".", time.Now().Second()%3+1)
 			}
+			pb.Unlock()
 
 			pb.print(f)
 
@@ -246,12 +241,9 @@ func (pb *ProgressBar) startCount() {
 				pb.print(f)
 				io.WriteString(os.Stderr, "\n")
 
-				pb.Unlock()
 				close(pb.done)
 				return
 			}
-
-			pb.Unlock()
 		case <-pb.ctx.Done():
 			io.WriteString(os.Stderr, "\nCancelled\n")
 			return
