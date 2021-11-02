@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/sunshineplan/utils/counter"
 	"github.com/sunshineplan/utils/unit"
 )
 
@@ -35,16 +36,8 @@ type ProgressBar struct {
 	lastWidth  int
 	speed      float64
 	unit       string
-}
 
-type counter struct{ *ProgressBar }
-
-var _ io.Writer = &counter{}
-
-func (c *counter) Write(b []byte) (int, error) {
-	c.Add(int64(len(b)))
-
-	return 0, nil
+	counter *counter.Writer
 }
 
 type format struct {
@@ -116,11 +109,18 @@ func (pb *ProgressBar) SetUnit(unit string) *ProgressBar {
 }
 
 // Add adds the specified amount to the progress bar.
-func (pb *ProgressBar) Add(num int64) {
+func (pb *ProgressBar) Add(n int64) {
 	pb.Lock()
 	defer pb.Unlock()
 
-	pb.current += num
+	pb.current += n
+}
+
+func (pb *ProgressBar) now() int64 {
+	if pb.counter == nil {
+		return pb.current
+	}
+	return int64(pb.counter.Count())
 }
 
 func (pb *ProgressBar) print(f format) {
@@ -149,9 +149,9 @@ func (pb *ProgressBar) startRefresh() {
 		select {
 		case <-ticker.C:
 			pb.Lock()
-			now := pb.current
+			now := pb.now()
 			totalSpeed := float64(now) / (float64(time.Since(start)) / float64(time.Second))
-			intervalSpeed := float64(pb.current-now) / (float64(pb.refresh) / float64(time.Second))
+			intervalSpeed := float64(pb.now()-now) / (float64(pb.refresh) / float64(time.Second))
 			if intervalSpeed == 0 {
 				pb.speed = totalSpeed
 			} else {
@@ -177,8 +177,7 @@ func (pb *ProgressBar) startCount() {
 		select {
 		case <-ticker.C:
 			pb.Lock()
-
-			now := pb.current
+			now := pb.now()
 			if now > pb.total {
 				now = pb.total
 			}
@@ -287,7 +286,8 @@ func (pb *ProgressBar) Cancel() {
 
 // FromReader starts the progress bar from a reader.
 func (pb *ProgressBar) FromReader(r io.Reader, w io.Writer) (int64, error) {
+	pb.counter = counter.NewWriter(w)
 	pb.Start()
 
-	return io.Copy(w, io.TeeReader(r, &counter{pb}))
+	return io.Copy(pb.counter, r)
 }
