@@ -5,16 +5,16 @@ import (
 	"time"
 )
 
-func FormatBytes(i int64) (result string) {
+func FormatBytes(n uint64) (result string) {
 	switch {
-	case i >= 1024*1024*1024:
-		result = fmt.Sprintf("%.02f GB", float64(i)/(1024*1024*1024))
-	case i >= 1024*1024:
-		result = fmt.Sprintf("%.02f MB", float64(i)/(1024*1024))
-	case i >= 1024:
-		result = fmt.Sprintf("%.02f KB", float64(i)/1024)
+	case n >= 1024*1024*1024:
+		result = fmt.Sprintf("%.02f GB", float64(n)/(1024*1024*1024))
+	case n >= 1024*1024:
+		result = fmt.Sprintf("%.02f MB", float64(n)/(1024*1024))
+	case n >= 1024:
+		result = fmt.Sprintf("%.02f KB", float64(n)/1024)
 	default:
-		result = fmt.Sprintf("%d B", i)
+		result = fmt.Sprintf("%d B", n)
 	}
 
 	return
