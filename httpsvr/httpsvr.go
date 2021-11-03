@@ -152,10 +152,16 @@ func (s *Server) RunTLS(certFile, keyFile string) error {
 }
 
 func (s *Server) ReadCount() uint64 {
+	if s.l == nil {
+		return 0
+	}
 	return s.l.ReadCount()
 }
 
 func (s *Server) WriteCount() uint64 {
+	if s.l == nil {
+		return 0
+	}
 	return s.l.WriteCount()
 }
 
