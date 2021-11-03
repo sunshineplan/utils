@@ -11,16 +11,16 @@ var (
 )
 
 type Writer struct {
-	w io.Writer
+	io.Writer
 	n uint64
 }
 
 func NewWriter(w io.Writer) *Writer {
-	return &Writer{w: w}
+	return &Writer{Writer: w}
 }
 
 func (w *Writer) Write(p []byte) (n int, err error) {
-	n, err = w.w.Write(p)
+	n, err = w.Writer.Write(p)
 	if err != nil {
 		return
 	}

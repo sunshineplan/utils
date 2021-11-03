@@ -11,16 +11,16 @@ var (
 )
 
 type Reader struct {
-	r io.Reader
+	io.Reader
 	n uint64
 }
 
 func NewReader(r io.Reader) *Reader {
-	return &Reader{r: r}
+	return &Reader{Reader: r}
 }
 
 func (r *Reader) Read(p []byte) (n int, err error) {
-	n, err = r.r.Read(p)
+	n, err = r.Reader.Read(p)
 	if err != nil {
 		return
 	}

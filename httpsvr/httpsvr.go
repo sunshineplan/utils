@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sunshineplan/utils/cache"
+	"github.com/sunshineplan/utils/counter"
 )
 
 var certCache = cache.New(false)
@@ -30,6 +31,8 @@ type Server struct {
 	certFile string
 	keyFile  string
 	reload   time.Duration
+
+	l *counter.Listener
 }
 
 // New creates an HTTP server.
@@ -42,7 +45,7 @@ func (s *Server) SetReload(d time.Duration) {
 }
 
 // Run runs an HTTP server which can be gracefully shut down.
-func (s *Server) run(serve func(net.Listener) error) error {
+func (s *Server) run() error {
 	idleConnsClosed := make(chan struct{})
 	go func() {
 		quit := make(chan os.Signal, 1)
@@ -82,9 +85,7 @@ func (s *Server) run(serve func(net.Listener) error) error {
 		if err := os.Chmod(s.Unix, 0666); err != nil {
 			return fmt.Errorf("failed to chmod socket file: %v", err)
 		}
-		if err := serve(listener); err != http.ErrServerClosed {
-			return fmt.Errorf("failed to server: %v", err)
-		}
+		s.l = counter.NewListener(listener)
 	} else {
 		port := s.Port
 		if port == "" {
@@ -95,10 +96,16 @@ func (s *Server) run(serve func(net.Listener) error) error {
 			}
 		}
 		s.Addr = s.Host + ":" + port
-		if err := serve(nil); err != http.ErrServerClosed {
-			return fmt.Errorf("failed to server: %v", err)
+		listener, err := net.Listen("tcp", s.Addr)
+		if err != nil {
+			return fmt.Errorf("failed to listen tcp: %v", err)
 		}
+		s.l = counter.NewListener(listener)
 	}
+	if err := s.Serve(s.l); err != http.ErrServerClosed {
+		return fmt.Errorf("failed to serve: %v", err)
+	}
+
 	<-idleConnsClosed
 	return nil
 }
@@ -133,15 +140,7 @@ func (s *Server) getCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error
 // Run runs an HTTP server which can be gracefully shut down.
 func (s *Server) Run() error {
 	s.tls = false
-
-	if s.Unix != "" {
-		return s.run(func(l net.Listener) error {
-			return s.Serve(l)
-		})
-	}
-	return s.run(func(_ net.Listener) error {
-		return s.ListenAndServe()
-	})
+	return s.run()
 }
 
 func (s *Server) RunTLS(certFile, keyFile string) error {
@@ -149,15 +148,15 @@ func (s *Server) RunTLS(certFile, keyFile string) error {
 	s.certFile = certFile
 	s.keyFile = keyFile
 	s.TLSConfig = &tls.Config{GetCertificate: s.getCertificate}
+	return s.run()
+}
 
-	if s.Unix != "" {
-		return s.run(func(l net.Listener) error {
-			return s.ServeTLS(l, "", "")
-		})
-	}
-	return s.run(func(_ net.Listener) error {
-		return s.ListenAndServeTLS("", "")
-	})
+func (s *Server) ReadCount() uint64 {
+	return s.l.ReadCount()
+}
+
+func (s *Server) WriteCount() uint64 {
+	return s.l.WriteCount()
 }
 
 // TCP runs an HTTP server on TCP network listener.
