@@ -102,7 +102,14 @@ func (s *Server) run() error {
 		}
 		s.l = counter.NewListener(listener)
 	}
-	if err := s.Serve(s.l); err != http.ErrServerClosed {
+
+	var err error
+	if s.tls {
+		err = s.ServeTLS(s.l, "", "")
+	} else {
+		err = s.Serve(s.l)
+	}
+	if err != http.ErrServerClosed {
 		return fmt.Errorf("failed to serve: %v", err)
 	}
 
