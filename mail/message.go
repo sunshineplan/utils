@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"mime"
 	"net/mail"
 	"path/filepath"
@@ -16,17 +15,28 @@ import (
 
 var contentTypes = [...]string{"text/plain", "text/html"}
 
+// ContentType represents content type
+type ContentType int
+
+const (
+	// TextPlain sets body type to text/plain in message body
+	TextPlain ContentType = iota
+	// TextHTML sets body type to text/html in message body
+	TextHTML
+)
+
 func (contentType ContentType) String() string {
 	return contentTypes[contentType]
 }
 
-func randomBoundary() string {
-	var buf [30]byte
-	_, err := io.ReadFull(rand.Reader, buf[:])
-	if err != nil {
-		panic(err)
-	}
-	return fmt.Sprintf("%x", buf[:])
+// Message represents an email message
+type Message struct {
+	From        string
+	To, Cc, Bcc []string
+	Subject     string
+	Body        string
+	ContentType ContentType
+	Attachments []*Attachment
 }
 
 func (m *Message) RcptList() []string {
@@ -92,8 +102,7 @@ func (m *Message) Bytes() []byte {
 				ext := filepath.Ext(attachment.Filename)
 				mimetype := mime.TypeByExtension(ext)
 				if mimetype != "" {
-					mime := fmt.Sprintf("Content-Type: %s\r\n", mimetype)
-					buf.WriteString(mime)
+					buf.WriteString(fmt.Sprintf("Content-Type: %s\r\n", mimetype))
 				} else {
 					buf.WriteString("Content-Type: application/octet-stream\r\n")
 				}
@@ -122,4 +131,12 @@ func (m *Message) Bytes() []byte {
 	}
 
 	return buf.Bytes()
+}
+
+func randomBoundary() string {
+	b := make([]byte, 30)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", b)
 }

@@ -12,18 +12,29 @@
 // The smtp package is frozen and is not accepting new features.
 // Some external packages provide more functionality. See:
 //
-//   https://godoc.org/?q=smtp
-package mail
+// https://godoc.org/?q=smtp
+// https://github.com/emersion/go-smtp
+package smtp
 
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 	"net"
+	"net/smtp"
 	"net/textproto"
 	"strings"
 )
+
+var debug bool
+
+func SetDebug(b bool) {
+	debug = b
+}
 
 // A Client represents a client connection to an SMTP server.
 type Client struct {
@@ -80,8 +91,7 @@ func (c *Client) Close() error {
 func (c *Client) hello() error {
 	if !c.didHello {
 		c.didHello = true
-		err := c.ehlo()
-		if err != nil {
+		if err := c.ehlo(); err != nil {
 			c.helloError = c.helo()
 		}
 	}
@@ -181,6 +191,77 @@ func (c *Client) Verify(addr string) error {
 	return err
 }
 
+// Auth provides authentication information.
+type Auth struct {
+	Identity string
+	Username string
+	Password string
+	Host     string
+}
+
+// Auth authenticates a client using the provided authentication mechanism.
+// A failed authentication closes the connection.
+// Only servers that advertise the AUTH extension support this function.
+func (c *Client) Auth(auth Auth) error {
+	if err := c.hello(); err != nil {
+		return err
+	}
+
+	// Auto select auth mode
+	auths, ok := c.ext["AUTH"]
+	if !ok {
+		return errors.New("smtp: server doesn't support AUTH")
+	}
+
+	var a smtp.Auth
+	if strings.Contains(auths, "CRAM-MD5") {
+		a = smtp.CRAMMD5Auth(auth.Username, auth.Password)
+	} else if strings.Contains(auths, "PLAIN") {
+		a = smtp.PlainAuth(auth.Identity, auth.Username, auth.Password, auth.Host)
+	} else {
+		a = &loginAuth{auth.Username, auth.Password, auth.Host}
+
+	}
+
+	encoding := base64.StdEncoding
+	mech, resp, err := a.Start(&smtp.ServerInfo{Name: c.serverName, TLS: c.tls, Auth: c.auth})
+	if err != nil {
+		c.Quit()
+		return err
+	}
+	resp64 := make([]byte, encoding.EncodedLen(len(resp)))
+	encoding.Encode(resp64, resp)
+	code, msg64, err := c.Cmd(0, strings.TrimSpace(fmt.Sprintf("AUTH %s %s", mech, resp64)))
+	for err == nil {
+		var msg []byte
+		switch code {
+		case 334:
+			msg, err = encoding.DecodeString(msg64)
+		case 235:
+			// the last message isn't base64 because it isn't a challenge
+			msg = []byte(msg64)
+		default:
+			err = &textproto.Error{Code: code, Msg: msg64}
+		}
+		if err == nil {
+			resp, err = a.Next(msg, code == 334)
+		}
+		if err != nil {
+			// abort the AUTH
+			c.Cmd(501, "*")
+			c.Quit()
+			break
+		}
+		if resp == nil {
+			break
+		}
+		resp64 = make([]byte, encoding.EncodedLen(len(resp)))
+		encoding.Encode(resp64, resp)
+		code, msg64, err = c.Cmd(0, string(resp64))
+	}
+	return err
+}
+
 // Mail issues a MAIL command to the server using the provided email address.
 // If the server supports the 8BITMIME extension, Mail adds the BODY=8BITMIME
 // parameter. If the server supports the SMTPUTF8 extension, Mail adds the
@@ -240,8 +321,6 @@ func (c *Client) Data() (io.WriteCloser, error) {
 	return &dataCloser{c, c.Text.DotWriter()}, nil
 }
 
-var testHookStartTLS func(*tls.Config) // nil, except for tests
-
 // Extension reports whether an extension is support by the server.
 // The extension name is case-insensitive. If the extension is supported,
 // Extension also returns a string that contains any parameters the
@@ -290,14 +369,122 @@ func (c *Client) Quit() error {
 	return c.Text.Close()
 }
 
+// Cmd is a convenience function that sends a command and returns the response
+func (c *Client) Cmd(expectCode int, format string, args ...interface{}) (int, string, error) {
+	// Changed
+	// Add debug print
+	if debug {
+		log.Printf("CMD: "+format, args...)
+	}
+	id, err := c.Text.Cmd(format, args...)
+	if err != nil {
+		return 0, "", err
+	}
+	c.Text.StartResponse(id)
+	defer c.Text.EndResponse(id)
+	code, msg, err := c.Text.ReadResponse(expectCode)
+	// Changed
+	// Add debug print
+	if err == nil && debug {
+		log.Println(code, msg)
+	}
+	return code, msg, err
+}
+
+// SendMail will use an existing connection to send an email from
+// address from, to addresses to, with message r.
+//
+// This function does not start TLS, nor does it perform authentication. Use
+// StartTLS and Auth before-hand if desirable.
+//
+// The addresses in the to parameter are the SMTP RCPT addresses.
+//
+// The r parameter should be an RFC 822-style email with headers
+// first, a blank line, and then the message body. The lines of r
+// should be CRLF terminated. The r headers should usually include
+// fields such as "From", "To", "Subject", and "Cc".  Sending "Bcc"
+// messages is accomplished by including an email address in the to
+// parameter but not including it in the r headers.
+func (c *Client) SendMail(from string, to []string, r io.Reader) error {
+	if err := c.Mail(from); err != nil {
+		return err
+	}
+	for _, addr := range to {
+		if err := c.Rcpt(addr); err != nil {
+			return err
+		}
+	}
+	w, err := c.Data()
+	if err != nil {
+		return err
+	}
+	if _, err = io.Copy(w, r); err != nil {
+		return err
+	}
+
+	if err = w.Close(); err != nil {
+		return err
+	}
+	return c.Quit()
+}
+
+// SendMail connects to the server at addr, switches to TLS if
+// possible, authenticates with the optional mechanism a if possible,
+// and then sends an email from address from, to addresses to, with
+// message r.
+// The addr must include a port, as in "mail.example.com:smtp".
+//
+// The addresses in the to parameter are the SMTP RCPT addresses.
+//
+// The msg parameter should be an RFC 822-style email with headers
+// first, a blank line, and then the message body. The lines of msg
+// should be CRLF terminated. The msg headers should usually include
+// fields such as "From", "To", "Subject", and "Cc".  Sending "Bcc"
+// messages is accomplished by including an email address in the to
+// parameter but not including it in the msg headers.
+//
+// The SendMail function and the net/smtp package are low-level
+// mechanisms and provide no support for DKIM signing, MIME
+// attachments (see the mime/multipart package), or other mail
+// functionality. Higher-level packages exist outside of the standard
+// library.
+func SendMail(ctx context.Context, addr string, auth Auth, from string, to []string, r io.Reader) error {
+	if err := validateLine(from); err != nil {
+		return err
+	}
+	for _, recp := range to {
+		if err := validateLine(recp); err != nil {
+			return err
+		}
+	}
+	c, err := Dial(ctx, addr)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	if err = c.hello(); err != nil {
+		return err
+	}
+	if ok, _ := c.Extension("STARTTLS"); ok {
+		config := &tls.Config{ServerName: c.serverName}
+		if err = c.StartTLS(config); err != nil {
+			return err
+		}
+	}
+	if c.ext != nil {
+		if err = c.Auth(auth); err != nil {
+			return err
+		}
+	}
+
+	return c.SendMail(from, to, r)
+}
+
 // validateLine checks to see if a line has CR or LF as per RFC 5321
 func validateLine(line string) error {
 	if strings.ContainsAny(line, "\n\r") {
 		return errors.New("smtp: A line must not contain CR or LF")
 	}
 	return nil
-}
-
-func isLocalhost(name string) bool {
-	return name == "localhost" || name == "127.0.0.1" || name == "::1"
 }

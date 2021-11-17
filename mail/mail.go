@@ -1,10 +1,14 @@
 package mail
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/sunshineplan/utils/smtp"
 )
 
 // Dialer is a dialer to an SMTP server.
@@ -16,32 +20,31 @@ type Dialer struct {
 	Timeout  time.Duration
 }
 
-// Message represents an email message
-type Message struct {
-	From        string
-	To, Cc, Bcc []string
-	Subject     string
-	Body        string
-	ContentType ContentType
-	Attachments []*Attachment
-}
-
-// ContentType represents content type
-type ContentType int
-
-const (
-	// TextPlain sets body type to text/plain in message body
-	TextPlain ContentType = iota
-	// TextHTML sets body type to text/html in message body
-	TextHTML
-)
-
 // Attachment represents an email attachment
 type Attachment struct {
 	Filename string
 	Path     string
 	Bytes    []byte
 	Inline   bool
+}
+
+// SendMail connects to the server at Dialer's addr, switches to TLS if
+// possible, authenticates with the optional mechanism a if possible,
+// and then sends an email from address from, to addresses to, with
+// message msg.
+//
+// The addresses in the to parameter are the SMTP RCPT addresses.
+//
+// The msg parameter should be an RFC 822-style email with headers
+// first, a blank line, and then the message body. The lines of msg
+// should be CRLF terminated. The msg headers should usually include
+// fields such as "From", "To", "Subject", and "Cc".  Sending "Bcc"
+// messages is accomplished by including an email address in the to
+// parameter but not including it in the msg headers.
+func (d *Dialer) SendMail(ctx context.Context, from string, to []string, msg []byte) error {
+	addr := fmt.Sprintf("%s:%d", d.Host, d.Port)
+	auth := smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Host: d.Host}
+	return smtp.SendMail(ctx, addr, auth, from, to, bytes.NewReader(msg))
 }
 
 // Send sends the given messages.
