@@ -223,7 +223,10 @@ func (pb *ProgressBar) startCount() {
 
 			if pb.speed == 0 {
 				f.Speed = "--/s"
-				f.Left = "Left: calculating" + strings.Repeat(".", time.Now().Second()%3+1)
+				f.Left = fmt.Sprintf("Left: calculating%s%s",
+					strings.Repeat(".", time.Now().Second()%3+1),
+					strings.Repeat(" ", 2-time.Now().Second()%3),
+				)
 			}
 			pb.mu.Unlock()
 
