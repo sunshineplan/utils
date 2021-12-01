@@ -58,15 +58,15 @@ aa,
 
 func TestExportStruct(t *testing.T) {
 	type test struct {
-		A string
+		A string `csv:"a"`
 		B []int
 	}
-	result := `A,B
+	result := `a,B
 a,"[1,2]"
 `
 
 	var b bytes.Buffer
-	if err := Export([]string{"A", "B"}, []test{{A: "a", B: []int{1, 2}}}, &b); err != nil {
+	if err := Export(nil, []test{{A: "a", B: []int{1, 2}}}, &b); err != nil {
 		t.Fatal(err)
 	}
 	if r := b.String(); r != result {

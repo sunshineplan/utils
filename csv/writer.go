@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+
+	"github.com/sunshineplan/utils"
 )
 
 var utf8bom = []byte{0xEF, 0xBB, 0xBF}
@@ -15,8 +17,12 @@ type Writer struct {
 	*csv.Writer
 	w             io.Writer
 	utf8bom       bool
-	fields        []string
+	fields        []field
 	fieldsWritten bool
+}
+
+type field struct {
+	name, tag string
 }
 
 // NewWriter returns a new Writer that writes to w.
@@ -36,8 +42,8 @@ func (w *Writer) WriteFields(fields interface{}) error {
 		return fmt.Errorf("fieldnames already be written")
 	}
 
-	var fieldnames []string
 	v := reflect.ValueOf(fields)
+
 	switch v.Kind() {
 	case reflect.Struct:
 		if v.NumField() == 0 {
@@ -45,28 +51,46 @@ func (w *Writer) WriteFields(fields interface{}) error {
 		}
 
 		for i := 0; i < v.NumField(); i++ {
-			fieldnames = append(fieldnames, v.Type().Field(i).Name)
+			var f field
+			if tag, ok := v.Type().Field(i).Tag.Lookup("csv"); ok {
+				f = field{v.Type().Field(i).Name, tag}
+			} else {
+				f = field{v.Type().Field(i).Name, ""}
+			}
+			w.fields = append(w.fields, f)
 		}
 	case reflect.Slice:
 		if v.Len() == 0 {
 			return fmt.Errorf("can not get fieldnames from zero length slice")
 		}
 
-		var ok bool
-		if fieldnames, ok = fields.([]string); !ok {
+		fieldnames, ok := fields.([]string)
+		if !ok {
 			return fmt.Errorf("only can get fieldnames from slice which is string slice")
+		}
+		for _, i := range fieldnames {
+			w.fields = append(w.fields, field{i, ""})
 		}
 	default:
 		return fmt.Errorf("can not get fieldnames from fields which is not struct or string slice")
 	}
 
-	w.fields = fieldnames
+	w.fields = utils.Deduplicate(w.fields).([]field)
 
 	if w.utf8bom {
 		w.w.Write(utf8bom)
 	}
 
-	if err := w.Writer.Write(fieldnames); err != nil {
+	var record []string
+	for _, i := range w.fields {
+		if i.tag != "" {
+			record = append(record, i.tag)
+		} else {
+			record = append(record, i.name)
+		}
+	}
+
+	if err := w.Writer.Write(record); err != nil {
 		return err
 	}
 	w.Flush()
@@ -96,13 +120,13 @@ func (w *Writer) Write(record interface{}) error {
 	switch v.Kind() {
 	case reflect.Map:
 		if reflect.TypeOf(v.Interface()).Key().Name() == "string" {
-			for index, fieldname := range w.fields {
-				if v := v.MapIndex(reflect.ValueOf(fieldname)); v.IsValid() && v.Interface() != nil {
+			for i, field := range w.fields {
+				if v := v.MapIndex(reflect.ValueOf(field.name)); v.IsValid() && v.Interface() != nil {
 					if vi := v.Interface(); reflect.TypeOf(vi).Kind() == reflect.String {
-						r[index] = vi.(string)
+						r[i] = vi.(string)
 					} else {
 						b, _ := json.Marshal(vi)
-						r[index] = string(b)
+						r[i] = string(b)
 					}
 				}
 			}
@@ -110,13 +134,27 @@ func (w *Writer) Write(record interface{}) error {
 			return fmt.Errorf("only can write record from map which is string")
 		}
 	case reflect.Struct:
-		for index, fieldname := range w.fields {
-			if v := v.FieldByName(fieldname); v.IsValid() && v.Interface() != nil {
-				if vi := v.Interface(); reflect.TypeOf(vi).Kind() == reflect.String {
-					r[index] = vi.(string)
+		for i, field := range w.fields {
+			var val reflect.Value
+			var found bool
+			for i := 0; i < v.NumField(); i++ {
+				if tag, ok := v.Type().Field(i).Tag.Lookup("csv"); ok && tag == field.tag {
+					val = v.FieldByName(field.name)
+					found = true
+					break
+				}
+			}
+			if !found {
+				if val = v.FieldByName(field.name); val.IsValid() && val.Interface() != nil {
+					found = true
+				}
+			}
+			if found {
+				if v := val.Interface(); reflect.TypeOf(v).Kind() == reflect.String {
+					r[i] = v.(string)
 				} else {
-					b, _ := json.Marshal(vi)
-					r[index] = string(b)
+					b, _ := json.Marshal(v)
+					r[i] = string(b)
 				}
 			}
 		}

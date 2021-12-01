@@ -12,10 +12,13 @@ func TestWriteFields(t *testing.T) {
 	if err := w.WriteFields(map[string]string{"test": "test"}); err == nil {
 		t.Error("gave nil error; want error")
 	}
-	if err := w.WriteFields(struct{ A, B string }{}); err != nil {
+	if err := w.WriteFields(struct {
+		A string
+		B string `csv:"b"`
+	}{}); err != nil {
 		t.Error(err)
 	} else {
-		if expect := []string{"A", "B"}; !reflect.DeepEqual(expect, w.fields) {
+		if expect := []field{{"A", ""}, {"B", "b"}}; !reflect.DeepEqual(expect, w.fields) {
 			t.Errorf("expected %v; got %v", expect, w.fields)
 		}
 	}
