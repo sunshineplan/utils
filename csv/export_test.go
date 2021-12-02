@@ -32,6 +32,16 @@ func TestExport(t *testing.T) {
 			slice:      []test{{A: "a", B: "b"}, {A: "aa", B: nil}},
 		},
 		{
+			name:       "D slice",
+			fieldnames: []string{"A", "B"},
+			slice:      []D{{{"A", "a"}, {"B", "b"}}, {{"A", "aa"}, {"B", nil}}},
+		},
+		{
+			name:       "D slice without fieldnames",
+			fieldnames: nil,
+			slice:      []D{{{"A", "a"}, {"B", "b"}}, {{"A", "aa"}, {"B", nil}}},
+		},
+		{
 			name:       "interface slice",
 			fieldnames: []string{"A", "B"},
 			slice: []interface{}{

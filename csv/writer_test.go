@@ -36,6 +36,9 @@ aa|
 	if err := w.WriteFields(struct{ A, B interface{} }{}); err != nil {
 		t.Fatal(err)
 	}
+	if err := w.Write(struct{ A, B interface{} }{}); err != nil {
+		t.Fatal(err)
+	}
 	if err := w.WriteAll([]struct{ A, B interface{} }{{A: "a", B: "b"}, {A: "aa", B: nil}}); err != nil {
 		t.Fatal(err)
 	}

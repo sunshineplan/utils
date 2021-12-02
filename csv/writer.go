@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-
-	"github.com/sunshineplan/utils"
 )
 
 var utf8bom = []byte{0xEF, 0xBB, 0xBF}
@@ -43,7 +41,6 @@ func (w *Writer) WriteFields(fields interface{}) error {
 	}
 
 	v := reflect.ValueOf(fields)
-
 	switch v.Kind() {
 	case reflect.Struct:
 		if v.NumField() == 0 {
@@ -64,18 +61,21 @@ func (w *Writer) WriteFields(fields interface{}) error {
 			return fmt.Errorf("can not get fieldnames from zero length slice")
 		}
 
-		fieldnames, ok := fields.([]string)
-		if !ok {
-			return fmt.Errorf("only can get fieldnames from slice which is string slice")
+		if fieldnames, ok := fields.([]string); ok {
+			for _, i := range fieldnames {
+				w.fields = append(w.fields, field{i, ""})
+			}
+		} else if d, ok := fields.(D); ok {
+			for _, i := range d {
+				w.fields = append(w.fields, field{i.Key, ""})
+			}
+		} else {
+			return fmt.Errorf("only can get fieldnames from slice which is string slice or csv.D")
 		}
-		for _, i := range fieldnames {
-			w.fields = append(w.fields, field{i, ""})
-		}
-	default:
-		return fmt.Errorf("can not get fieldnames from fields which is not struct or string slice")
-	}
 
-	w.fields = utils.Deduplicate(w.fields).([]field)
+	default:
+		return fmt.Errorf("can not get fieldnames from fields which is not struct or string slice or csv.D")
+	}
 
 	if w.utf8bom {
 		w.w.Write(utf8bom)
@@ -158,8 +158,35 @@ func (w *Writer) Write(record interface{}) error {
 				}
 			}
 		}
+	case reflect.Slice:
+		if rec, ok := record.([]string); ok {
+			if len(rec) == 0 {
+				return nil
+			}
+			return w.Writer.Write(r)
+		} else if d, ok := record.(D); ok {
+			for i, field := range w.fields {
+				for _, e := range d {
+					if field.name == e.Key {
+						if s, ok := e.Value.(string); ok {
+							r[i] = s
+						} else if e.Value != nil {
+							b, _ := json.Marshal(e.Value)
+							r[i] = string(b)
+						}
+						break
+					}
+				}
+			}
+			break
+		}
+		fallthrough
 	default:
 		return fmt.Errorf("not support record format: %s", v.Kind())
+	}
+
+	if reflect.DeepEqual(r, make([]string, len(w.fields))) {
+		return nil
 	}
 
 	return w.Writer.Write(r)
