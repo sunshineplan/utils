@@ -118,6 +118,10 @@ func runMap(limit int, i interface{}, f func(interface{}, interface{})) error {
 }
 
 func runRange(limit, start, end int, f func(int)) error {
+	if start > end {
+		return nil
+	}
+
 	if limit == 0 {
 		limit = NumCPU()
 	} else if limit < 0 {
