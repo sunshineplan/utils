@@ -9,6 +9,9 @@ import (
 
 func TestWriteFields(t *testing.T) {
 	w := NewWriter(io.Discard, false)
+	if err := w.Write(map[string]string{"test": "test"}); err == nil {
+		t.Error("gave nil error; want error")
+	}
 	if err := w.WriteFields(map[string]string{"test": "test"}); err == nil {
 		t.Error("gave nil error; want error")
 	}
