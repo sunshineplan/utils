@@ -69,9 +69,9 @@ func runSlice(limit int, i interface{}, f func(int, interface{})) error {
 		limit = values.Len()
 	}
 
-	c := make(chan bool, limit)
+	c := make(chan struct{}, limit)
 	for i := 0; i < values.Len(); i++ {
-		c <- true
+		c <- struct{}{}
 		go func(index int, value interface{}) {
 			defer func() { <-c }()
 			f(index, value)
@@ -79,7 +79,7 @@ func runSlice(limit int, i interface{}, f func(int, interface{})) error {
 	}
 
 	for i := 0; i < limit; i++ {
-		c <- true
+		c <- struct{}{}
 	}
 
 	return nil
@@ -99,11 +99,11 @@ func runMap(limit int, i interface{}, f func(interface{}, interface{})) error {
 	}
 
 	iter := value.MapRange()
-	c := make(chan bool, limit)
+	c := make(chan struct{}, limit)
 	for iter.Next() {
 		k := iter.Key()
 		v := iter.Value()
-		c <- true
+		c <- struct{}{}
 		go func(k, v interface{}) {
 			defer func() { <-c }()
 			f(k, v)
@@ -111,7 +111,7 @@ func runMap(limit int, i interface{}, f func(interface{}, interface{})) error {
 	}
 
 	for i := 0; i < limit; i++ {
-		c <- true
+		c <- struct{}{}
 	}
 
 	return nil
@@ -124,9 +124,9 @@ func runRange(limit, start, end int, f func(int)) error {
 		limit = end - start + 1
 	}
 
-	c := make(chan bool, limit)
+	c := make(chan struct{}, limit)
 	for i := start; i <= end; i++ {
-		c <- true
+		c <- struct{}{}
 		go func(num int) {
 			defer func() { <-c }()
 			f(num)
@@ -134,7 +134,7 @@ func runRange(limit, start, end int, f func(int)) error {
 	}
 
 	for i := 0; i < limit; i++ {
-		c <- true
+		c <- struct{}{}
 	}
 
 	return nil
