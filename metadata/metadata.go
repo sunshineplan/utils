@@ -19,11 +19,7 @@ type Server struct {
 
 // Get queries metadata from the metadata server.
 func (s *Server) Get(metadata string, data interface{}) error {
-	return s.GetWithClient(
-		metadata,
-		data,
-		&http.Client{Transport: &http.Transport{Proxy: nil}},
-	)
+	return s.GetWithClient(metadata, data, http.DefaultClient)
 }
 
 // GetWithClient queries metadata from the metadata server
