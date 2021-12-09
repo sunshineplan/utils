@@ -1,127 +1,85 @@
 package csv
 
 import (
-	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
 )
 
+// A Reader reads records from a CSV-encoded file.
+type Reader struct {
+	*csv.Reader
+	next    []string
+	nextErr error
+}
+
+// NewReader returns a new Reader that reads from r.
+func NewReader(r io.Reader) *Reader {
+	return &Reader{Reader: csv.NewReader(r)}
+}
+
+// Next prepares the next result row for reading with the Scan method.
+func (r *Reader) Next() bool {
+	r.next, r.nextErr = r.Read()
+	return r.nextErr == nil
+}
+
+// Scan copies the columns in the current record into the values pointed at by dest.
+// The number of values in dest must be the same as the number of columns in record.
+func (r *Reader) Scan(dest ...interface{}) error {
+	if r.next == nil && r.nextErr == nil {
+		return fmt.Errorf("Scan called without calling Next")
+	}
+
+	if r.nextErr != nil {
+		return r.nextErr
+	}
+	if len(dest) != len(r.next) {
+		return fmt.Errorf("expected %d destination arguments in Scan, not %d", len(r.next), len(dest))
+	}
+
+	for i, v := range r.next {
+		if err := convertAssign(dest[i], v); err != nil {
+			return fmt.Errorf("Scan error on field index %d: %v", i, err)
+		}
+	}
+
+	return nil
+}
+
 // Rows is the records of a csv file. Its cursor starts before
 // the first row of the result set. Use Next to advance from row to row.
 type Rows struct {
-	fields   []string
-	records  chan []string
-	lastcols []string
-	closed   bool
+	*Reader
+	io.Closer
 }
 
-func lineCounter(r io.Reader) (count int, err error) {
-	buf := make([]byte, 32*1024)
-
-	for {
-		var c int
-		c, err = r.Read(buf)
-		if err == io.EOF {
-			err = nil
-			return
-		}
-		if err != nil {
-			return
-		}
-		count += bytes.Count(buf[:c], []byte{'\n'})
+// FromReader returns Rows reads from r.
+func FromReader(r io.Reader) *Rows {
+	if closer, ok := r.(io.Closer); ok {
+		return &Rows{NewReader(r), closer}
 	}
+	return &Rows{NewReader(r), io.NopCloser(r)}
 }
 
-// ReadAll reads all the records from r.
-func ReadAll(r io.Reader) (*Rows, error) {
-	var buf bytes.Buffer
-	count, err := lineCounter(io.TeeReader(r, &buf))
-	if err != nil {
-		return nil, err
-	}
-
-	reader := csv.NewReader(&buf)
-	rs := &Rows{records: make(chan []string, count+1)}
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		rs.records <- record
-	}
-
-	switch len(rs.records) {
-	case 0:
-		return nil, fmt.Errorf("empty csv file")
-	case 1:
-		rs.fields = <-rs.records
-		close(rs.records)
-		rs.closed = true
-	default:
-		rs.fields = <-rs.records
-	}
-
-	return rs, nil
-}
-
-// ReadFile reads all records from file.
+// ReadFile returns Rows reads from file.
 func ReadFile(file string) (*Rows, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
-	return ReadAll(f)
-}
-
-// Fields returns the fieldnames.
-func (rs *Rows) Fields() []string {
-	return rs.fields
+	return FromReader(f), nil
 }
 
 // Next prepares the next result row for reading with the Scan method.
 func (rs *Rows) Next() bool {
-	if rs.closed {
-		return false
-	}
-
-	if len(rs.records) > 0 {
-		rs.lastcols = <-rs.records
-		return true
-	}
-
-	close(rs.records)
-	rs.closed = true
-
-	return false
+	return rs.Reader.Next()
 }
 
 // Scan copies the columns in the current row into the values pointed at by dest.
 // The number of values in dest must be the same as the number of columns in Rows.
 func (rs *Rows) Scan(dest ...interface{}) error {
-	if rs.closed {
-		return fmt.Errorf("Rows are closed")
-	}
-
-	if len(dest) != len(rs.fields) {
-		return fmt.Errorf("expected %d destination arguments in Scan, not %d", len(rs.fields), len(dest))
-	}
-
-	if rs.lastcols == nil {
-		return fmt.Errorf("Scan called without calling Next")
-	}
-
-	for i, v := range rs.lastcols {
-		if err := convertAssign(dest[i], v); err != nil {
-			return fmt.Errorf("Scan error on field index %d, name %q: %v", i, rs.Fields()[i], err)
-		}
-	}
-
-	return nil
+	return rs.Reader.Scan(dest...)
 }

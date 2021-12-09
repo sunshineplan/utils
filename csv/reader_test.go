@@ -17,12 +17,12 @@ func TestReader(t *testing.T) {
 a,1,"[1,2]"
 b,2,"[3,4]"
 `
-	rs, err := ReadAll(strings.NewReader(csv))
+	rs := FromReader(strings.NewReader(csv))
+
+	fields, err := rs.Read()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	fields := rs.Fields()
 	if expect := []string{"A", "B", "C"}; !reflect.DeepEqual(expect, fields) {
 		t.Errorf("expected %v; got %v", expect, fields)
 	}
