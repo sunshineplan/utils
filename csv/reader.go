@@ -22,7 +22,7 @@ func NewReader(r io.Reader) *Reader {
 // Next prepares the next result row for reading with the Scan method.
 func (r *Reader) Next() bool {
 	r.next, r.nextErr = r.Read()
-	return r.nextErr == nil
+	return r.nextErr != io.EOF
 }
 
 // Scan copies the columns in the current record into the values pointed at by dest.
