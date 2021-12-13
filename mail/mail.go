@@ -13,7 +13,7 @@ import (
 
 // Dialer is a dialer to an SMTP server.
 type Dialer struct {
-	Host     string
+	Server   string
 	Port     int
 	Account  string
 	Password string
@@ -42,8 +42,8 @@ type Attachment struct {
 // messages is accomplished by including an email address in the to
 // parameter but not including it in the msg headers.
 func (d *Dialer) SendMail(ctx context.Context, from string, to []string, msg []byte) error {
-	addr := fmt.Sprintf("%s:%d", d.Host, d.Port)
-	auth := smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Host: d.Host}
+	addr := fmt.Sprintf("%s:%d", d.Server, d.Port)
+	auth := smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}
 	return smtp.SendMail(ctx, addr, auth, from, to, bytes.NewReader(msg))
 }
 

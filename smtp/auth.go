@@ -9,15 +9,15 @@ import (
 var _ smtp.Auth = &loginAuth{}
 
 type loginAuth struct {
-	username, password, host string
+	username, password, server string
 }
 
 func (a *loginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
 	if !server.TLS && !isLocalhost(server.Name) {
 		return "", nil, errors.New("unencrypted connection")
 	}
-	if server.Name != a.host {
-		return "", nil, errors.New("wrong host name")
+	if server.Name != a.server {
+		return "", nil, errors.New("wrong server name")
 	}
 	resp := []byte(a.username)
 	return "LOGIN", resp, nil

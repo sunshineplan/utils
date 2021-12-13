@@ -196,7 +196,7 @@ type Auth struct {
 	Identity string
 	Username string
 	Password string
-	Host     string
+	Server   string
 }
 
 // Auth authenticates a client using the provided authentication mechanism.
@@ -217,9 +217,9 @@ func (c *Client) Auth(auth Auth) error {
 	if strings.Contains(auths, "CRAM-MD5") {
 		a = smtp.CRAMMD5Auth(auth.Username, auth.Password)
 	} else if strings.Contains(auths, "PLAIN") {
-		a = smtp.PlainAuth(auth.Identity, auth.Username, auth.Password, auth.Host)
+		a = smtp.PlainAuth(auth.Identity, auth.Username, auth.Password, auth.Server)
 	} else {
-		a = &loginAuth{auth.Username, auth.Password, auth.Host}
+		a = &loginAuth{auth.Username, auth.Password, auth.Server}
 
 	}
 
