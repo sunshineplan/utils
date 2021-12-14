@@ -1,6 +1,7 @@
 package pop3
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -33,36 +34,46 @@ const (
 	respContinue = "+ "
 )
 
-func NewClient(addr string, isTLS bool) (c *Client, err error) {
+func Dial(ctx context.Context, addr string) (*Client, error) {
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(conn)
+}
+
+func DialTLS(ctx context.Context, addr string) (*Client, error) {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	var conn net.Conn
-	if isTLS {
-		conn, err = tls.Dial("tcp", addr, &tls.Config{ServerName: host})
-	} else {
-		conn, err = net.Dial("tcp", addr)
-	}
+	d := &tls.Dialer{Config: &tls.Config{ServerName: host}}
+	conn, err := d.DialContext(ctx, "tcp", addr)
 	if err != nil {
-		return
+		return nil, err
 	}
-	c = &Client{textproto.NewConn(conn)}
+	return NewClient(conn)
+}
 
+func NewClient(conn net.Conn) (*Client, error) {
+	c := &Client{textproto.NewConn(conn)}
 	s, err := c.ReadLine()
 	if err != nil {
-		return
+		return nil, err
 	}
+
 	if debug {
 		log.Println("<", s)
 	}
 
 	if _, err = parseResp(s); err != nil {
 		c.Close()
+		return nil, err
 	}
 
-	return
+	return c, nil
 }
 
 // Stat returns the number of messages and their total size in bytes in the inbox.
