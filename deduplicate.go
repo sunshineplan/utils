@@ -24,3 +24,15 @@ func Deduplicate(slice interface{}) interface{} {
 	}
 	return unique.Interface()
 }
+
+// 1.18
+// func Deduplicate[T comparable](s []T) (res []T) {
+// 	m := make(map[T]struct{})
+// 	for _, i := range s {
+// 		if _, ok := m[i]; !ok {
+// 			m[i] = struct{}{}
+// 			res = append(res, i)
+// 		}
+// 	}
+// 	return
+// }
