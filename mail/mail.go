@@ -1,7 +1,6 @@
 package mail
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -43,8 +42,8 @@ type Attachment struct {
 // parameter but not including it in the msg headers.
 func (d *Dialer) SendMail(ctx context.Context, from string, to []string, msg []byte) error {
 	addr := fmt.Sprintf("%s:%d", d.Server, d.Port)
-	auth := smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}
-	return smtp.SendMail(ctx, addr, auth, from, to, bytes.NewReader(msg))
+	auth := &smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}
+	return smtp.SendMail(ctx, addr, auth, from, to, msg)
 }
 
 // Send sends the given messages.
