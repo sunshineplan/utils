@@ -64,6 +64,17 @@ type Auth struct {
 // A failed authentication closes the connection.
 // Only servers that advertise the AUTH extension support this function.
 func (c *Client) Auth(auth *Auth) error {
+	if auth == nil {
+		return errors.New("auth is nil")
+	}
+
+	if ok, _ := c.Extension("STARTTLS"); ok {
+		config := &tls.Config{ServerName: c.serverName}
+		if err := c.StartTLS(config); err != nil {
+			return err
+		}
+	}
+
 	// Auto select auth mode
 	ok, auths := c.Extension("AUTH")
 	if !ok {
@@ -83,21 +94,9 @@ func (c *Client) Auth(auth *Auth) error {
 	return c.Client.Auth(a)
 }
 
-// SendMail sends an email from address from, to addresses to, with
+// Send sends an email from address from, to addresses to, with
 // message msg.
-func (c *Client) SendMail(auth *Auth, from string, to []string, msg []byte) error {
-	if ok, _ := c.Extension("STARTTLS"); ok {
-		config := &tls.Config{ServerName: c.serverName}
-		if err := c.StartTLS(config); err != nil {
-			return err
-		}
-	}
-	if auth != nil {
-		if err := c.Auth(auth); err != nil {
-			return err
-		}
-	}
-
+func (c *Client) Send(from string, to []string, msg []byte) error {
 	if err := c.Mail(from); err != nil {
 		return err
 	}
@@ -114,7 +113,13 @@ func (c *Client) SendMail(auth *Auth, from string, to []string, msg []byte) erro
 		return err
 	}
 
-	if err = w.Close(); err != nil {
+	return w.Close()
+}
+
+// SendMail sends an email from address from, to addresses to, with
+// message msg and quit.
+func (c *Client) SendMail(from string, to []string, msg []byte) error {
+	if err := c.Send(from, to, msg); err != nil {
 		return err
 	}
 	return c.Quit()
@@ -149,7 +154,11 @@ func SendMail(ctx context.Context, addr string, auth *Auth, from string, to []st
 	}
 	defer c.Close()
 
-	return c.SendMail(auth, from, to, msg)
+	if err = c.Auth(auth); err != nil {
+		return err
+	}
+
+	return c.SendMail(from, to, msg)
 }
 
 // validateLine checks to see if a line has CR or LF as per RFC 5321
