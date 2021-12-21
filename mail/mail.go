@@ -48,6 +48,23 @@ func (d *Dialer) SendMail(ctx context.Context, from string, to []string, msg []b
 
 // Send sends the given messages.
 func (d *Dialer) Send(msg ...*Message) error {
+	if d.Timeout == 0 {
+		d.Timeout = 3 * time.Minute
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
+	defer cancel()
+
+	smtpClient, err := smtp.Dial(ctx, fmt.Sprintf("%s:%d", d.Server, d.Port))
+	if err != nil {
+		return err
+	}
+	defer smtpClient.Quit()
+
+	if err = smtpClient.Auth(&smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}); err != nil {
+		return err
+	}
+
 	for _, m := range msg {
 		if m.From == "" {
 			m.From = d.Account
@@ -71,19 +88,12 @@ func (d *Dialer) Send(msg ...*Message) error {
 			}
 		}
 
-		if d.Timeout == 0 {
-			d.Timeout = 3 * time.Minute
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
-		defer cancel()
-
 		c := make(chan error, 1)
-		go func() { c <- d.SendMail(ctx, m.From, m.RcptList(), m.Bytes()) }()
+		go func() { c <- smtpClient.Send(m.From, m.RcptList(), m.Bytes()) }()
 
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-time.After(d.Timeout):
+			return fmt.Errorf("timeout")
 		case err := <-c:
 			if err != nil {
 				return err
