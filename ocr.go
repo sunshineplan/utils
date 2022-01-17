@@ -12,7 +12,11 @@ import (
 const (
 	ocrAPI    = "https://api.ocr.space/parse/image"
 	ocrAPIKey = "5a64d478-9c89-43d8-88e3-c65de9999580"
+
+	ocrAPI2 = "https://ocr-example.herokuapp.com/file"
 )
+
+var errNoResult = errors.New("no ocr result")
 
 // OCR reads image from reader r and converts it into string.
 func OCR(r io.Reader) (string, error) {
@@ -24,7 +28,6 @@ func OCR(r io.Reader) (string, error) {
 func OCRWithClient(r io.Reader, client *http.Client) (string, error) {
 	var body bytes.Buffer
 	w := multipart.NewWriter(&body)
-	defer w.Close()
 
 	part, _ := w.CreateFormFile("file", "pic.jpg")
 	if _, err := io.Copy(part, r); err != nil {
@@ -37,6 +40,7 @@ func OCRWithClient(r io.Reader, client *http.Client) (string, error) {
 	for k, v := range params {
 		w.WriteField(k, v)
 	}
+	w.Close()
 
 	req, _ := http.NewRequest("POST", ocrAPI, &body)
 	req.Header.Set("Content-Type", w.FormDataContentType())
@@ -52,16 +56,59 @@ func OCRWithClient(r io.Reader, client *http.Client) (string, error) {
 		return "", err
 	}
 
-	var results struct {
+	var res struct {
 		ParsedResults []struct {
 			ParsedText string
 		}
 	}
-	if err := json.Unmarshal(b, &results); err != nil {
+	if err := json.Unmarshal(b, &res); err != nil {
 		return "", err
 	}
-	if len(results.ParsedResults) == 0 {
-		return "", errors.New("no ocr result")
+	if len(res.ParsedResults) == 0 {
+		return "", errNoResult
 	}
-	return results.ParsedResults[0].ParsedText, nil
+	return res.ParsedResults[0].ParsedText, nil
+}
+
+// OCR2 reads image from reader r and converts it into string.
+func OCR2(r io.Reader) (string, error) {
+	return OCR2WithClient(r, http.DefaultClient)
+}
+
+// OCR2WithClient reads image from reader r and converts it into string
+// with custom http.Client.
+func OCR2WithClient(r io.Reader, client *http.Client) (string, error) {
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+
+	part, _ := w.CreateFormFile("file", "pic.jpg")
+	if _, err := io.Copy(part, r); err != nil {
+		return "", err
+	}
+	w.Close()
+
+	req, _ := http.NewRequest("POST", ocrAPI2, &body)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var res struct {
+		Result  string
+		Version string
+	}
+	if err := json.Unmarshal(b, &res); err != nil {
+		return "", err
+	}
+	if res.Result == "" {
+		return "", errNoResult
+	}
+	return res.Result, nil
 }
