@@ -144,7 +144,7 @@ func runRange(limit, start, end int, f func(int)) error {
 	return nil
 }
 
-//func runSlice[Slice ~[]E, E any](limit int, s Slice, f func(int, E)) {
+//func runSlice[E any](limit int, s []E, f func(int, E)) {
 //	if limit == 0 {
 //		limit = NumCPU()
 //	} else if limit < 0 {
@@ -165,7 +165,7 @@ func runRange(limit, start, end int, f func(int)) error {
 //	}
 //}
 //
-//func runMap[Map ~map[K]V, K comparable, V any](limit int, m Map, f func(K, V)) {
+//func runMap[K comparable, V any](limit int, m map[K]V, f func(K, V)) {
 //	if limit == 0 {
 //		limit = NumCPU()
 //	} else if limit < 0 {
