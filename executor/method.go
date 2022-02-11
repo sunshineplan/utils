@@ -84,11 +84,11 @@ func Execute(argMethod, fnMethod Method, limit int, arg interface{}, fn ...func(
 		lasterr := make(chan error, 1)
 
 		if nilArg {
-			ctx := newArgContext(len(fn), nil)
+			ctx := newContext(len(fn), 0, nil)
 			defer ctx.cancel()
 
-			ws.Slice(fn, func(_ int, f interface{}) {
-				ctx.run(f.(func(interface{}) (interface{}, error)), result, lasterr)
+			ws.Slice(fn, func(_ int, fn interface{}) {
+				ctx.runFn(fn.(func(interface{}) (interface{}, error)), result, lasterr)
 			})
 
 			if err := <-lasterr; err != nil {
@@ -99,9 +99,9 @@ func Execute(argMethod, fnMethod Method, limit int, arg interface{}, fn ...func(
 		}
 
 		for i := 0; i < count; i++ {
-			ctx := newArgContext(len(fn), v.Index(i).Interface())
-			ws.Slice(fn, func(_ int, f interface{}) {
-				ctx.run(f.(func(interface{}) (interface{}, error)), result, lasterr)
+			ctx := newContext(len(fn), argKey, v.Index(i).Interface())
+			ws.Slice(fn, func(_ int, fn interface{}) {
+				ctx.runFn(fn.(func(interface{}) (interface{}, error)), result, lasterr)
 			})
 
 			if err := <-lasterr; err == nil {
@@ -116,9 +116,9 @@ func Execute(argMethod, fnMethod Method, limit int, arg interface{}, fn ...func(
 			result := make(chan interface{}, 1)
 			lasterr := make(chan error, 1)
 
-			ctx := newFnContext(count, f)
+			ctx := newContext(count, fnKey, f)
 			if nilArg {
-				ctx.run(nil, result, lasterr)
+				ctx.runArg(nil, result, lasterr)
 			} else {
 				if argMethod == Random {
 					rand.Shuffle(count, func(i, j int) {
@@ -139,7 +139,7 @@ func Execute(argMethod, fnMethod Method, limit int, arg interface{}, fn ...func(
 					return nil, errors.New("unknown arg method")
 				}
 				worker.Slice(v.Interface(), func(_ int, i interface{}) {
-					ctx.run(i, result, lasterr)
+					ctx.runArg(i, result, lasterr)
 				})
 			}
 

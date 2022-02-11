@@ -5,40 +5,45 @@ import (
 	"sync"
 )
 
-type fnContext struct {
-	context.Context
-	cancel func()
+type key int
 
-	sync.Mutex
+const (
+	fnKey key = iota + 1
+	argKey
+)
+
+type Context struct {
+	context.Context
+	cancel context.CancelFunc
+
+	mu sync.Mutex
 
 	count int
-	fn    func(interface{}) (interface{}, error)
 }
 
-func newFnContext(count int, fn func(interface{}) (interface{}, error)) fnContext {
+func newContext(count int, key key, value interface{}) *Context {
 	ctx, cancel := context.WithCancel(context.Background())
-	return fnContext{ctx, cancel, sync.Mutex{}, count, fn}
+	if value != nil {
+		ctx = context.WithValue(ctx, key, value)
+	}
+	return &Context{ctx, cancel, sync.Mutex{}, count}
 }
 
-func (ctx *fnContext) run(arg interface{}, rc chan<- interface{}, ec chan<- error) {
+func (ctx *Context) run(executor func(chan<- interface{}, chan<- error), rc chan<- interface{}, ec chan<- error) {
 	if ctx.Err() != nil {
 		return
 	}
 
-	var r interface{}
-	var err error
+	r := make(chan interface{}, 1)
 	c := make(chan error, 1)
-	go func() {
-		r, err = ctx.fn(arg)
-		c <- err
-	}()
+	go executor(r, c)
 
 	select {
 	case <-ctx.Done():
 		return
 	case err := <-c:
-		ctx.Lock()
-		defer ctx.Unlock()
+		ctx.mu.Lock()
+		defer ctx.mu.Unlock()
 
 		if err != nil {
 			if ctx.count == 1 {
@@ -49,58 +54,24 @@ func (ctx *fnContext) run(arg interface{}, rc chan<- interface{}, ec chan<- erro
 		} else {
 			ctx.cancel()
 
-			rc <- r
+			rc <- <-r
 			ec <- nil
 		}
 	}
 }
 
-type argContext struct {
-	context.Context
-	cancel func()
-
-	sync.Mutex
-
-	count int
-	arg   interface{}
+func (ctx *Context) runArg(arg interface{}, rc chan<- interface{}, ec chan<- error) {
+	ctx.run(func(c1 chan<- interface{}, c2 chan<- error) {
+		r, err := (ctx.Value(fnKey).(func(interface{}) (interface{}, error)))(arg)
+		c1 <- r
+		c2 <- err
+	}, rc, ec)
 }
 
-func newArgContext(count int, arg interface{}) argContext {
-	ctx, cancel := context.WithCancel(context.Background())
-	return argContext{ctx, cancel, sync.Mutex{}, count, arg}
-}
-
-func (ctx *argContext) run(fn func(interface{}) (interface{}, error), rc chan<- interface{}, ec chan<- error) {
-	if ctx.Err() != nil {
-		return
-	}
-
-	var r interface{}
-	var err error
-	c := make(chan error, 1)
-	go func() {
-		r, err = fn(ctx.arg)
-		c <- err
-	}()
-
-	select {
-	case <-ctx.Done():
-		return
-	case err := <-c:
-		ctx.Lock()
-		defer ctx.Unlock()
-
-		if err != nil {
-			if ctx.count == 1 {
-				rc <- nil
-				ec <- err
-			}
-			ctx.count--
-		} else {
-			ctx.cancel()
-
-			rc <- r
-			ec <- nil
-		}
-	}
+func (ctx *Context) runFn(fn func(interface{}) (interface{}, error), rc chan<- interface{}, ec chan<- error) {
+	ctx.run(func(c1 chan<- interface{}, c2 chan<- error) {
+		r, err := fn(ctx.Value(argKey))
+		c1 <- r
+		c2 <- err
+	}, rc, ec)
 }
