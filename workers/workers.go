@@ -143,3 +143,45 @@ func runRange(limit, start, end int, f func(int)) error {
 
 	return nil
 }
+
+//func runSlice[Slice ~[]E, E any](limit int, s Slice, f func(int, E)) {
+//	if limit == 0 {
+//		limit = NumCPU()
+//	} else if limit < 0 {
+//		limit = len(s)
+//	}
+//
+//	c := make(chan struct{}, limit)
+//	for i := 0; i < len(s); i++ {
+//		c <- struct{}{}
+//		go func(index int, value E) {
+//			defer func() { <-c }()
+//			f(index, value)
+//		}(i, s[i])
+//	}
+//
+//	for i := 0; i < limit; i++ {
+//		c <- struct{}{}
+//	}
+//}
+//
+//func runMap[Map ~map[K]V, K comparable, V any](limit int, m Map, f func(K, V)) {
+//	if limit == 0 {
+//		limit = NumCPU()
+//	} else if limit < 0 {
+//		limit = len(m)
+//	}
+//
+//	c := make(chan struct{}, limit)
+//	for k, v := range m {
+//		c <- struct{}{}
+//		go func(k K, v V) {
+//			defer func() { <-c }()
+//			f(k, v)
+//		}(k, v)
+//	}
+//
+//	for i := 0; i < limit; i++ {
+//		c <- struct{}{}
+//	}
+//}
