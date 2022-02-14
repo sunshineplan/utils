@@ -13,7 +13,7 @@ func Pack(w io.Writer, format Format, files ...File) error {
 	case TAR:
 		return packTar(w, files...)
 	default:
-		return errors.New("unknow format")
+		return errors.New("unknown format")
 	}
 }
 
