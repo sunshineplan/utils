@@ -22,6 +22,14 @@ func TestExport(t *testing.T) {
 			},
 		},
 		{
+			name:       "pointer map slice",
+			fieldnames: []string{"A", "B"},
+			slice: []*map[string]interface{}{
+				{"A": "a", "B": "b"},
+				{"A": "aa", "B": nil},
+			},
+		},
+		{
 			name:       "struct slice",
 			fieldnames: []string{"A", "B"},
 			slice:      []test{{A: "a", B: "b"}, {A: "aa", B: nil}},
@@ -30,6 +38,11 @@ func TestExport(t *testing.T) {
 			name:       "struct slice without fieldnames",
 			fieldnames: nil,
 			slice:      []test{{A: "a", B: "b"}, {A: "aa", B: nil}},
+		},
+		{
+			name:       "pointer struct slice without fieldnames",
+			fieldnames: nil,
+			slice:      []*test{{A: "a", B: "b"}, nil, {A: "aa", B: nil}},
 		},
 		{
 			name:       "D slice",

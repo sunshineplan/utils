@@ -41,6 +41,12 @@ func (w *Writer) WriteFields(fields interface{}) error {
 	}
 
 	v := reflect.ValueOf(fields)
+	if v.Kind() == reflect.Ptr {
+		v = reflect.Indirect(v)
+		if !v.IsValid() {
+			return fmt.Errorf("can not get fieldnames from nil pointer struct")
+		}
+	}
 	switch v.Kind() {
 	case reflect.Struct:
 		if v.NumField() == 0 {
@@ -116,6 +122,13 @@ func (w *Writer) Write(record interface{}) error {
 	if v.Kind() == reflect.Interface {
 		v = v.Elem()
 	}
+	if v.Kind() == reflect.Ptr {
+		v = reflect.Indirect(v)
+		if !v.IsValid() {
+			return nil
+		}
+	}
+
 	r := make([]string, len(w.fields))
 	switch v.Kind() {
 	case reflect.Map:
