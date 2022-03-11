@@ -5,10 +5,27 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 )
 
 var errNilPtr = errors.New("destination pointer is nil") // embedded in descriptive error
+
+func convert(src string) interface{} {
+	if i64, err := strconv.ParseInt(src, 10, 64); err == nil {
+		return i64
+	}
+	if f64, err := strconv.ParseFloat(src, 64); err == nil {
+		return f64
+	}
+	if bv, err := strconv.ParseBool(src); err == nil {
+		return bv
+	}
+	if regexp.MustCompile(`^\s*\[.*\]\s*$`).MatchString(src) {
+		return json.RawMessage(src)
+	}
+	return src
+}
 
 // convertAssign copies to dest the value in src, converting it if possible.
 // An error is returned if the copy would result in loss of information.

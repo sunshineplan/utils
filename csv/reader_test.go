@@ -18,20 +18,27 @@ test
 a,1,"[1,2]"
 b,2,"[3,4]"
 `
-	rs := FromReader(strings.NewReader(csv))
-
-	fields, err := rs.Read()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if expect := []string{"A", "B", "C"}; !reflect.DeepEqual(expect, fields) {
-		t.Errorf("expected %v; got %v", expect, fields)
+	rs := NewReader(strings.NewReader(csv), true)
+	if expect := []string{"A", "B", "C"}; !reflect.DeepEqual(expect, rs.fields) {
+		t.Errorf("expected %v; got %v", expect, rs.fields)
 	}
 
 	var results []result
 	for rs.Next() {
 		var result result
 		if err := rs.Scan(&result.A, &result.B, &result.C); err == nil {
+			results = append(results, result)
+		}
+	}
+	if expect := []result{{"a", 1, []int{1, 2}}, {"b", 2, []int{3, 4}}}; !reflect.DeepEqual(expect, results) {
+		t.Errorf("expected %v; got %v", expect, results)
+	}
+
+	rs = NewReader(strings.NewReader(csv), true)
+	results = nil
+	for rs.Next() {
+		var result result
+		if err := rs.Decode(&result); err == nil {
 			results = append(results, result)
 		}
 	}
