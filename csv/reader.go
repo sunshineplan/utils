@@ -47,6 +47,10 @@ func ReadFile(file string, hasFields bool) (*Reader, error) {
 	return NewReader(f, hasFields), nil
 }
 
+func (r *Reader) SetFields(fields []string) {
+	r.fields = fields
+}
+
 // Next prepares the next record for reading with the Scan or Decode method.
 func (r *Reader) Next() bool {
 	r.next, r.nextErr = r.Read()
@@ -105,3 +109,27 @@ func (r *Reader) Decode(dest interface{}) error {
 
 	return json.Unmarshal(b, dest)
 }
+
+// DecodeAll decodes each record from r into dest.
+//func DecodeAll[T any](r io.Reader, dest *[]T) (err error) {
+//	defer func() {
+//		if e := recover(); e != nil {
+//			err = fmt.Errorf("%v", e)
+//		}
+//	}()
+//
+//	reader := NewReader(r, true)
+//	defer reader.Close()
+//
+//	var res []T
+//	for reader.Next() {
+//		var t T
+//		if err = reader.Decode(&t); err != nil {
+//			return
+//		}
+//		res = append(res, t)
+//	}
+//	*dest = res
+//
+//	return
+//}
