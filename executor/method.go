@@ -3,7 +3,6 @@ package executor
 import (
 	"errors"
 	"math/rand"
-	"reflect"
 	"time"
 
 	"github.com/sunshineplan/utils/workers"
@@ -36,48 +35,31 @@ func SetLimit(n int) {
 
 // Execute gets the result from the functions with several args by specified method.
 // If both argMethod and fnMethod is Concurrent, fnMethod will be first.
-func Execute(argMethod, fnMethod Method, limit int, arg interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
+func Execute(argMethod, fnMethod Method, limit int, arg []interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
 	if len(fn) == 0 {
 		return nil, errors.New("no function provided")
 	}
 
-	src := reflect.ValueOf(arg)
-
-	var v reflect.Value
+	var v []interface{}
 	var count int
 	var nilArg bool
-	switch {
-	case arg == nil:
+	switch len(arg) {
+	case 0:
 		count = 1
 		nilArg = true
-	case reflect.TypeOf(arg).Kind() == reflect.Slice:
-		count = src.Len()
-		if count == 0 {
-			return nil, errors.New("arg can not be empty slice")
-		}
-		v = reflect.MakeSlice(src.Type(), count, count)
-		reflect.Copy(v, src)
-
-		if argMethod == Random {
-			rand.Shuffle(count, func(i, j int) {
-				a := v.Index(i).Interface()
-				b := v.Index(j).Interface()
-				v.Index(j).Set(reflect.ValueOf(a))
-				v.Index(i).Set(reflect.ValueOf(b))
-			})
-		}
 	default:
-		count = 1
-		v = reflect.MakeSlice(reflect.SliceOf(src.Type()), 0, 0)
-		v = reflect.Append(v, src)
+		count = len(arg)
+		v = make([]interface{}, count)
+		copy(v, arg)
+		if argMethod == Random {
+			rand.Shuffle(len(v), func(i, j int) { v[i], v[j] = v[j], v[i] })
+		}
 	}
 
 	if fnMethod == Random {
 		rand.Shuffle(len(fn), func(i, j int) { fn[i], fn[j] = fn[j], fn[i] })
 	}
 
-	ws := workers.New(limit)
-	single := workers.New(1)
 	switch fnMethod {
 	case Concurrent:
 		result := make(chan interface{}, 1)
@@ -87,8 +69,8 @@ func Execute(argMethod, fnMethod Method, limit int, arg interface{}, fn ...func(
 			ctx := newContext(len(fn), 0, nil)
 			defer ctx.cancel()
 
-			ws.Slice(fn, func(_ int, fn interface{}) {
-				ctx.runFn(fn.(func(interface{}) (interface{}, error)), result, lasterr)
+			workers.RunSlice(limit, fn, func(_ int, fn func(interface{}) (interface{}, error)) {
+				ctx.runFn(fn, result, lasterr)
 			})
 
 			if err := <-lasterr; err != nil {
@@ -99,9 +81,9 @@ func Execute(argMethod, fnMethod Method, limit int, arg interface{}, fn ...func(
 		}
 
 		for i := 0; i < count; i++ {
-			ctx := newContext(len(fn), argKey, v.Index(i).Interface())
-			ws.Slice(fn, func(_ int, fn interface{}) {
-				ctx.runFn(fn.(func(interface{}) (interface{}, error)), result, lasterr)
+			ctx := newContext(len(fn), argKey, v[i])
+			workers.RunSlice(limit, fn, func(_ int, fn func(interface{}) (interface{}, error)) {
+				ctx.runFn(fn, result, lasterr)
 			})
 
 			if err := <-lasterr; err == nil {
@@ -121,24 +103,19 @@ func Execute(argMethod, fnMethod Method, limit int, arg interface{}, fn ...func(
 				ctx.runArg(nil, result, lasterr)
 			} else {
 				if argMethod == Random {
-					rand.Shuffle(count, func(i, j int) {
-						a := v.Index(i).Interface()
-						b := v.Index(j).Interface()
-						v.Index(j).Set(reflect.ValueOf(a))
-						v.Index(i).Set(reflect.ValueOf(b))
-					})
+					rand.Shuffle(count, func(i, j int) { v[i], v[j] = v[j], v[i] })
 				}
 
-				var worker *workers.Workers
+				var worker int
 				switch argMethod {
 				case Concurrent:
-					worker = ws
+					worker = limit
 				case Serial, Random:
-					worker = single
+					worker = 1
 				default:
 					return nil, errors.New("unknown arg method")
 				}
-				worker.Slice(v.Interface(), func(_ int, i interface{}) {
+				workers.RunSlice(worker, v, func(_ int, i interface{}) {
 					ctx.runArg(i, result, lasterr)
 				})
 			}
@@ -158,21 +135,21 @@ func Execute(argMethod, fnMethod Method, limit int, arg interface{}, fn ...func(
 }
 
 // ExecuteConcurrentArg gets the fastest result from the functions with args, args will be run concurrently.
-func ExecuteConcurrentArg(arg interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
+func ExecuteConcurrentArg(arg []interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
 	return Execute(Concurrent, Serial, defaultLimit, arg, fn...)
 }
 
 // ExecuteConcurrentFn gets the fastest result from the functions with args, functions will be run concurrently.
-func ExecuteConcurrentFn(arg interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
+func ExecuteConcurrentFn(arg []interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
 	return Execute(Serial, Concurrent, defaultLimit, arg, fn...)
 }
 
 // ExecuteSerial gets the result until success from the functions with args in order.
-func ExecuteSerial(arg interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
+func ExecuteSerial(arg []interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
 	return Execute(Serial, Serial, defaultLimit, arg, fn...)
 }
 
 // ExecuteRandom gets the result until success from the functions with args randomly.
-func ExecuteRandom(arg interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
+func ExecuteRandom(arg []interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
 	return Execute(Random, Random, defaultLimit, arg, fn...)
 }

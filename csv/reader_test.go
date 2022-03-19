@@ -6,13 +6,12 @@ import (
 	"testing"
 )
 
-type result struct {
-	A string
-	B int
-	C []int
-}
-
 func TestReader(t *testing.T) {
+	type result struct {
+		A string
+		B int
+		C []int
+	}
 	csv := `A,B,C
 test
 a,1,"[1,2]"
@@ -41,6 +40,18 @@ b,2,"[3,4]"
 		if err := r.Decode(&result); err == nil {
 			results = append(results, result)
 		}
+	}
+	if expect := []result{{"a", 1, []int{1, 2}}, {"b", 2, []int{3, 4}}}; !reflect.DeepEqual(expect, results) {
+		t.Errorf("expected %v; got %v", expect, results)
+	}
+
+	csv = `A,B,C
+a,1,"[1,2]"
+b,2,"[3,4]"
+`
+	results = nil
+	if err := DecodeAll(strings.NewReader(csv), &results); err != nil {
+		t.Fatal(err)
 	}
 	if expect := []result{{"a", 1, []int{1, 2}}, {"b", 2, []int{3, 4}}}; !reflect.DeepEqual(expect, results) {
 		t.Errorf("expected %v; got %v", expect, results)

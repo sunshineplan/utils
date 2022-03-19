@@ -10,7 +10,7 @@ import (
 
 func TestExecuteConcurrent1(t *testing.T) {
 	result, err := ExecuteConcurrentArg(
-		[]int{0, 1, 2},
+		[]interface{}{0, 1, 2},
 		func(n interface{}) (interface{}, error) {
 			time.Sleep(time.Second * time.Duration(n.(int)))
 			return n.(int) * 2, nil
@@ -24,7 +24,7 @@ func TestExecuteConcurrent1(t *testing.T) {
 	}
 
 	_, err = ExecuteConcurrentArg(
-		[]int{0, 1, 2},
+		[]interface{}{0, 1, 2},
 		func(n interface{}) (interface{}, error) {
 			time.Sleep(time.Second * time.Duration(n.(int)))
 			return nil, fmt.Errorf("%v", n.(int)*2)
@@ -37,7 +37,7 @@ func TestExecuteConcurrent1(t *testing.T) {
 
 func TestExecuteConcurrent2(t *testing.T) {
 	result, err := ExecuteConcurrentFn(
-		1,
+		[]interface{}{1},
 		func(n interface{}) (interface{}, error) {
 			return n.(int) * 0 * 2, nil
 		},
@@ -58,7 +58,7 @@ func TestExecuteConcurrent2(t *testing.T) {
 	}
 
 	_, err = ExecuteConcurrentFn(
-		1,
+		[]interface{}{1},
 		func(n interface{}) (interface{}, error) {
 			return nil, fmt.Errorf("%v", n.(int)*0*2)
 		},
@@ -78,7 +78,7 @@ func TestExecuteConcurrent2(t *testing.T) {
 
 func TestExecuteSerial1(t *testing.T) {
 	result, err := ExecuteSerial(
-		[]int{0, 1, 2},
+		[]interface{}{0, 1, 2},
 		func(n interface{}) (interface{}, error) {
 			time.Sleep(time.Second * time.Duration(n.(int)))
 			return n.(int) * 2, nil
@@ -92,7 +92,7 @@ func TestExecuteSerial1(t *testing.T) {
 	}
 
 	_, err = ExecuteSerial(
-		[]int{0, 1, 2},
+		[]interface{}{0, 1, 2},
 		func(n interface{}) (interface{}, error) {
 			time.Sleep(time.Second * time.Duration(n.(int)))
 			return nil, fmt.Errorf("%v", n.(int)*2)
@@ -105,7 +105,7 @@ func TestExecuteSerial1(t *testing.T) {
 
 func TestExecuteSerial2(t *testing.T) {
 	result, err := ExecuteSerial(
-		1,
+		[]interface{}{1},
 		func(n interface{}) (interface{}, error) {
 			return n.(int) * 0 * 2, nil
 		},
@@ -126,7 +126,7 @@ func TestExecuteSerial2(t *testing.T) {
 	}
 
 	_, err = ExecuteSerial(
-		1,
+		[]interface{}{1},
 		func(n interface{}) (interface{}, error) {
 			return nil, fmt.Errorf("%v", n.(int)*0*2)
 		},
@@ -145,12 +145,12 @@ func TestExecuteSerial2(t *testing.T) {
 }
 
 func TestExecuteRandom1(t *testing.T) {
-	testcase := []string{"a", "b", "c", "d", "e", "f", "g"}
-	var result []string
+	testcase := []interface{}{"a", "b", "c", "d", "e", "f", "g"}
+	var result []interface{}
 	_, err := ExecuteRandom(
 		testcase,
 		func(i interface{}) (interface{}, error) {
-			result = append(result, i.(string))
+			result = append(result, i)
 			return nil, fmt.Errorf("%v", i)
 		},
 	)
@@ -160,9 +160,9 @@ func TestExecuteRandom1(t *testing.T) {
 	if reflect.DeepEqual(testcase, result) {
 		t.Error("expected not equal; got equal")
 	}
-	sort.Strings(result)
+	sort.Slice(result, func(i, j int) bool { return result[i].(string) < result[j].(string) })
 	if !reflect.DeepEqual(testcase, result) {
-		t.Error("expected equal; got not equal")
+		t.Errorf("expected %v; got %v", testcase, result)
 	}
 }
 
@@ -218,7 +218,7 @@ func TestLimit(t *testing.T) {
 		Serial,
 		Concurrent,
 		defaultLimit,
-		1,
+		[]interface{}{1},
 		func(n interface{}) (interface{}, error) {
 			return nil, fmt.Errorf("%v", n.(int)*0*2)
 		},
@@ -239,7 +239,7 @@ func TestLimit(t *testing.T) {
 		Serial,
 		Concurrent,
 		1,
-		1,
+		[]interface{}{1},
 		func(n interface{}) (interface{}, error) {
 			return nil, fmt.Errorf("%v", n.(int)*0*2)
 		},

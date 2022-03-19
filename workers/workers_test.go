@@ -18,11 +18,9 @@ func TestSlice(t *testing.T) {
 	slice := []test{{"a", 1}, {"b", 2}, {"c", 3}}
 
 	result := make([]string, len(slice))
-	if err := Slice(slice, func(i int, item interface{}) {
-		result[i] = strings.Repeat(item.(test).char, item.(test).times)
-	}); err != nil {
-		t.Fatal(err)
-	}
+	Slice(slice, func(i int, item test) {
+		result[i] = strings.Repeat(item.char, item.times)
+	})
 
 	if expect := []string{"a", "bb", "ccc"}; !reflect.DeepEqual(expect, result) {
 		t.Errorf("expected %v; got %v", expect, result)
@@ -32,13 +30,11 @@ func TestSlice(t *testing.T) {
 func TestMap(t *testing.T) {
 	var m sync.Mutex
 	var result []string
-	if err := Map(map[string]int{"a": 1, "b": 2, "c": 3}, func(k, v interface{}) {
+	Map(map[string]int{"a": 1, "b": 2, "c": 3}, func(k string, v int) {
 		m.Lock()
-		result = append(result, strings.Repeat(k.(string), v.(int)))
+		result = append(result, strings.Repeat(k, v))
 		m.Unlock()
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 
 	sort.Strings(result)
 	if expect := []string{"a", "bb", "ccc"}; !reflect.DeepEqual(expect, result) {
@@ -50,11 +46,9 @@ func TestRange(t *testing.T) {
 	end := 3
 	items := []string{"a", "b", "c"}
 	result := make([]string, end)
-	if err := Range(1, end, func(num int) {
+	Range(1, end, func(num int) {
 		result[num-1] = strings.Repeat(items[num-1], num)
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 
 	if expect := []string{"a", "bb", "ccc"}; !reflect.DeepEqual(expect, result) {
 		t.Errorf("expected %v; got %v", expect, result)
@@ -77,7 +71,7 @@ func TestLimit(t *testing.T) {
 			select {}
 		}
 	})
-	go New(0).Range(1, limit, func(_ int) {
+	go RunRange(0, 1, limit, func(_ int) {
 		mu2.Lock()
 		count2++
 		mu2.Unlock()
@@ -85,7 +79,7 @@ func TestLimit(t *testing.T) {
 			select {}
 		}
 	})
-	go New(-1).Range(1, limit, func(_ int) {
+	go RunRange(-1, 1, limit, func(_ int) {
 		mu3.Lock()
 		count3++
 		mu3.Unlock()
@@ -93,7 +87,7 @@ func TestLimit(t *testing.T) {
 			select {}
 		}
 	})
-	go New(workers).Range(1, limit, func(_ int) {
+	go RunRange(workers, 1, limit, func(_ int) {
 		mu4.Lock()
 		count4++
 		mu4.Unlock()
@@ -125,12 +119,12 @@ func TestLimit(t *testing.T) {
 
 func TestSetLimit(t *testing.T) {
 	SetLimit(5)
-	if limit := defaultWorkers.limit; limit != 5 {
-		t.Errorf("expected %d; got %d", 5, limit)
+	if defaultWorkers != 5 {
+		t.Errorf("expected %d; got %d", 5, defaultWorkers)
 	}
 
 	SetLimit(100)
-	if limit := defaultWorkers.limit; limit != 100 {
-		t.Errorf("expected %d; got %d", 100, limit)
+	if defaultWorkers != 100 {
+		t.Errorf("expected %d; got %d", 100, defaultWorkers)
 	}
 }

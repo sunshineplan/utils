@@ -2,7 +2,6 @@ package csv
 
 import (
 	"bytes"
-	"reflect"
 	"testing"
 )
 
@@ -106,7 +105,7 @@ a,b
 		t.Error(err)
 	}
 	c := b.Bytes()
-	if !reflect.DeepEqual(utf8bom, c[:3]) {
+	if !bytes.Equal(utf8bom, c[:3]) {
 		t.Errorf("expected %q; got %q", utf8bom, c[:3])
 	}
 	if r := string(c[3:]); r != result {

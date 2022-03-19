@@ -111,25 +111,25 @@ func (r *Reader) Decode(dest interface{}) error {
 }
 
 // DecodeAll decodes each record from r into dest.
-//func DecodeAll[T any](r io.Reader, dest *[]T) (err error) {
-//	defer func() {
-//		if e := recover(); e != nil {
-//			err = fmt.Errorf("%v", e)
-//		}
-//	}()
-//
-//	reader := NewReader(r, true)
-//	defer reader.Close()
-//
-//	var res []T
-//	for reader.Next() {
-//		var t T
-//		if err = reader.Decode(&t); err != nil {
-//			return
-//		}
-//		res = append(res, t)
-//	}
-//	*dest = res
-//
-//	return
-//}
+func DecodeAll[T any](r io.Reader, dest *[]T) (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+
+	reader := NewReader(r, true)
+	defer reader.Close()
+
+	var res []T
+	for reader.Next() {
+		var t T
+		if err = reader.Decode(&t); err != nil {
+			return
+		}
+		res = append(res, t)
+	}
+	*dest = res
+
+	return
+}
