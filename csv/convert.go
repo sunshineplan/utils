@@ -11,7 +11,7 @@ import (
 
 var errNilPtr = errors.New("destination pointer is nil") // embedded in descriptive error
 
-func convert(src string) interface{} {
+func convert(src string) any {
 	if i64, err := strconv.ParseInt(src, 10, 64); err == nil {
 		return i64
 	}
@@ -31,7 +31,7 @@ func convert(src string) interface{} {
 // An error is returned if the copy would result in loss of information.
 // dest should be a pointer type.
 // https://golang.org/src/database/sql/convert.go?h=convertAssignRows#L219
-func convertAssign(dest interface{}, src string) error {
+func convertAssign(dest any, src string) error {
 	// Common cases, without reflect.
 	switch d := dest.(type) {
 	case *string:
@@ -52,7 +52,7 @@ func convertAssign(dest interface{}, src string) error {
 			*d = bv
 		}
 		return err
-	case *interface{}:
+	case *any:
 		*d = src
 		return nil
 	}

@@ -60,7 +60,7 @@ func (r *Reader) Next() bool {
 
 // Scan copies the columns in the current record into the values pointed at by dest.
 // The number of values in dest must be the same as the number of columns in record.
-func (r *Reader) Scan(dest ...interface{}) error {
+func (r *Reader) Scan(dest ...any) error {
 	if r.next == nil && r.nextErr == nil {
 		return fmt.Errorf("Scan called without calling Next")
 	}
@@ -83,7 +83,7 @@ func (r *Reader) Scan(dest ...interface{}) error {
 
 // Decode will unmarshal the current record into dest.
 // If column's value is like "[...]", it will be treated as slice.
-func (r *Reader) Decode(dest interface{}) error {
+func (r *Reader) Decode(dest any) error {
 	if len(r.fields) == 0 {
 		return fmt.Errorf("csv fields is not parsed")
 	}
@@ -96,7 +96,7 @@ func (r *Reader) Decode(dest interface{}) error {
 		return r.nextErr
 	}
 
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	for i, field := range r.fields {
 		if len(r.next) > i {
 			m[field] = convert(r.next[i])

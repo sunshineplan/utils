@@ -117,7 +117,7 @@ func (s *Server) run() error {
 	return nil
 }
 
-func (s *Server) loadCertificate() (interface{}, error) {
+func (s *Server) loadCertificate() (any, error) {
 	cert, err := tls.LoadX509KeyPair(s.certFile, s.keyFile)
 	if err != nil {
 		return nil, err

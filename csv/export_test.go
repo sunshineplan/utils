@@ -22,23 +22,23 @@ func testExport[T any](t *testing.T, tc testcase[T], result string) {
 }
 
 func TestExport(t *testing.T) {
-	type test struct{ A, B interface{} }
+	type test struct{ A, B any }
 	result := `A,B
 a,b
 aa,
 `
-	testExport(t, testcase[map[string]interface{}]{
+	testExport(t, testcase[map[string]any]{
 		name:       "map slice",
 		fieldnames: []string{"A", "B"},
-		slice: []map[string]interface{}{
+		slice: []map[string]any{
 			{"A": "a", "B": "b"},
 			{"A": "aa", "B": nil},
 		},
 	}, result)
-	testExport(t, testcase[*map[string]interface{}]{
+	testExport(t, testcase[*map[string]any]{
 		name:       "pointer map slice",
 		fieldnames: []string{"A", "B"},
-		slice: []*map[string]interface{}{
+		slice: []*map[string]any{
 			{"A": "a", "B": "b"},
 			{"A": "aa", "B": nil},
 		},
@@ -68,12 +68,12 @@ aa,
 		fieldnames: nil,
 		slice:      []D{{{"A", "a"}, {"B", "b"}}, {{"A", "aa"}, {"B", nil}}},
 	}, result)
-	testExport(t, testcase[interface{}]{
+	testExport(t, testcase[any]{
 		name:       "interface slice",
 		fieldnames: []string{"A", "B"},
-		slice: []interface{}{
+		slice: []any{
 			test{A: "a", B: "b"},
-			map[string]interface{}{"A": "aa", "B": nil},
+			map[string]any{"A": "aa", "B": nil},
 		},
 	}, result)
 }
@@ -101,7 +101,7 @@ func TestExportUTF8(t *testing.T) {
 a,b
 `
 	var b bytes.Buffer
-	if err := ExportUTF8([]string{"A", "B"}, []interface{}{map[string]string{"A": "a", "B": "b"}}, &b); err != nil {
+	if err := ExportUTF8([]string{"A", "B"}, []any{map[string]string{"A": "a", "B": "b"}}, &b); err != nil {
 		t.Error(err)
 	}
 	c := b.Bytes()

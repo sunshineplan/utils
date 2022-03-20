@@ -35,7 +35,7 @@ func NewWriter(w io.Writer, utf8bom bool) *Writer {
 // WriteFields writes fieldnames to w along with necessary utf8bom bytes. The fields must be a
 // non-zero field struct or a non-zero length string slice, otherwise an error will be return.
 // It can be run only once.
-func (w *Writer) WriteFields(fields interface{}) error {
+func (w *Writer) WriteFields(fields any) error {
 	if w.fieldsWritten {
 		return fmt.Errorf("fieldnames already be written")
 	}
@@ -113,7 +113,7 @@ func (w *Writer) WriteFields(fields interface{}) error {
 // Write writes a single CSV record to w along with any necessary quoting after fieldnames is written.
 // A record is a map of strings or a struct. Writes are buffered, so Flush must eventually be called to
 // ensure that the record is written to the underlying io.Writer.
-func (w *Writer) Write(record interface{}) error {
+func (w *Writer) Write(record any) error {
 	if !w.fieldsWritten {
 		return fmt.Errorf("fieldnames has not be written yet")
 	}
@@ -206,7 +206,7 @@ func (w *Writer) Write(record interface{}) error {
 }
 
 // WriteAll writes multiple CSV records to w using Write and then calls Flush, returning any error from the Flush.
-func (w *Writer) WriteAll(records interface{}) error {
+func (w *Writer) WriteAll(records any) error {
 	if reflect.TypeOf(records).Kind() != reflect.Slice {
 		return fmt.Errorf("records is not slice")
 	}

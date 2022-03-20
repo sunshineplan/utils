@@ -8,10 +8,10 @@ import (
 
 type item struct {
 	sync.Mutex
-	Value      interface{}
+	Value      any
 	Duration   time.Duration
 	Expiration int64
-	Regenerate func() (interface{}, error)
+	Regenerate func() (any, error)
 }
 
 func (i *item) Expired() bool {
@@ -40,7 +40,7 @@ func New(autoClean bool) *Cache {
 }
 
 // Set sets cache value for a key, if f is presented, this value will regenerate when expired.
-func (c *Cache) Set(key, value interface{}, d time.Duration, f func() (interface{}, error)) {
+func (c *Cache) Set(key, value any, d time.Duration, f func() (any, error)) {
 	c.cache.Store(key, &item{
 		Value:      value,
 		Duration:   d,
@@ -51,11 +51,10 @@ func (c *Cache) Set(key, value interface{}, d time.Duration, f func() (interface
 
 func (c *Cache) regenerate(i *item) {
 	i.Expiration = 0
-	f := i.Regenerate
 	i.Unlock()
 
 	go func() {
-		value, err := f()
+		value, err := i.Regenerate()
 
 		i.Lock()
 		defer i.Unlock()
@@ -70,21 +69,17 @@ func (c *Cache) regenerate(i *item) {
 }
 
 // Get gets cache value by key and whether value was found.
-func (c *Cache) Get(key interface{}) (interface{}, bool) {
+func (c *Cache) Get(key any) (any, bool) {
 	value, ok := c.cache.Load(key)
 	if !ok {
 		return nil, false
 	}
 
 	i := value.(*item)
-
 	i.Lock()
-	v := i.Value
-	expired := i.Expired()
-	f := i.Regenerate
 
-	if expired && !c.autoClean {
-		if f == nil {
+	if i.Expired() && !c.autoClean {
+		if i.Regenerate == nil {
 			c.cache.Delete(key)
 			i.Unlock()
 
@@ -93,22 +88,22 @@ func (c *Cache) Get(key interface{}) (interface{}, bool) {
 
 		defer c.regenerate(i)
 
-		return v, true
+		return i.Value, true
 	}
 
 	i.Unlock()
 
-	return v, true
+	return i.Value, true
 }
 
 // Delete deletes the value for a key.
-func (c *Cache) Delete(key interface{}) {
+func (c *Cache) Delete(key any) {
 	c.cache.Delete(key)
 }
 
 // Empty deletes all values in cache.
 func (c *Cache) Empty() {
-	c.cache.Range(func(key, _ interface{}) bool {
+	c.cache.Range(func(key, _ any) bool {
 		c.cache.Delete(key)
 		return true
 	})
@@ -119,15 +114,12 @@ func (c *Cache) check() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		c.cache.Range(func(key, value interface{}) bool {
+		c.cache.Range(func(key, value any) bool {
 			i := value.(*item)
-
 			i.Lock()
-			expired := i.Expired()
-			f := i.Regenerate
 
-			if expired {
-				if f == nil {
+			if i.Expired() {
+				if i.Regenerate == nil {
 					c.cache.Delete(key)
 					i.Unlock()
 				} else {

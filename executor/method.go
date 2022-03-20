@@ -35,7 +35,7 @@ func SetLimit(n int) {
 
 // Execute gets the result from the functions with several args by specified method.
 // If both argMethod and fnMethod is Concurrent, fnMethod will be first.
-func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(T) (interface{}, error)) (interface{}, error) {
+func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(T) (any, error)) (any, error) {
 	if len(fn) == 0 {
 		return nil, errors.New("no function provided")
 	}
@@ -54,14 +54,14 @@ func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(
 
 	switch fnMethod {
 	case Concurrent:
-		result := make(chan interface{}, 1)
+		result := make(chan any, 1)
 		lasterr := make(chan error, 1)
 
 		if nilArg {
 			ctx := argContext(len(fn), *new(T))
 			defer ctx.cancel()
 
-			workers.RunSlice(limit, fn, func(_ int, fn func(T) (interface{}, error)) {
+			workers.RunSlice(limit, fn, func(_ int, fn func(T) (any, error)) {
 				ctx.runFn(fn, result, lasterr)
 			})
 
@@ -78,7 +78,7 @@ func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(
 
 		for i := 0; i < count; i++ {
 			ctx := argContext(len(fn), clone[i])
-			workers.RunSlice(limit, fn, func(_ int, fn func(T) (interface{}, error)) {
+			workers.RunSlice(limit, fn, func(_ int, fn func(T) (any, error)) {
 				ctx.runFn(fn, result, lasterr)
 			})
 
@@ -95,7 +95,7 @@ func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(
 		}
 
 		for i, f := range fn {
-			result := make(chan interface{}, 1)
+			result := make(chan any, 1)
 			lasterr := make(chan error, 1)
 
 			ctx := fnContext(count, f)
@@ -136,21 +136,21 @@ func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(
 }
 
 // ExecuteConcurrentArg gets the fastest result from the functions with args, args will be run concurrently.
-func ExecuteConcurrentArg[T any](arg []T, fn ...func(T) (interface{}, error)) (interface{}, error) {
+func ExecuteConcurrentArg[T any](arg []T, fn ...func(T) (any, error)) (any, error) {
 	return Execute(Concurrent, Serial, defaultLimit, arg, fn...)
 }
 
 // ExecuteConcurrentFn gets the fastest result from the functions with args, functions will be run concurrently.
-func ExecuteConcurrentFn[T any](arg []T, fn ...func(T) (interface{}, error)) (interface{}, error) {
+func ExecuteConcurrentFn[T any](arg []T, fn ...func(T) (any, error)) (any, error) {
 	return Execute(Serial, Concurrent, defaultLimit, arg, fn...)
 }
 
 // ExecuteSerial gets the result until success from the functions with args in order.
-func ExecuteSerial[T any](arg []T, fn ...func(T) (interface{}, error)) (interface{}, error) {
+func ExecuteSerial[T any](arg []T, fn ...func(T) (any, error)) (any, error) {
 	return Execute(Serial, Serial, defaultLimit, arg, fn...)
 }
 
 // ExecuteRandom gets the result until success from the functions with args randomly.
-func ExecuteRandom[T any](arg []T, fn ...func(T) (interface{}, error)) (interface{}, error) {
+func ExecuteRandom[T any](arg []T, fn ...func(T) (any, error)) (any, error) {
 	return Execute(Random, Random, defaultLimit, arg, fn...)
 }

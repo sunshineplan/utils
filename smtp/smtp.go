@@ -39,7 +39,7 @@ func NewClient(conn net.Conn, host string) (*Client, error) {
 }
 
 // Cmd is a convenience function that sends a command and returns the response.
-func (c *Client) Cmd(expectCode int, format string, args ...interface{}) (int, string, error) {
+func (c *Client) Cmd(expectCode int, format string, args ...any) (int, string, error) {
 	log.Printf("CMD: "+format, args...)
 	id, err := c.Text.Cmd(format, args...)
 	if err != nil {

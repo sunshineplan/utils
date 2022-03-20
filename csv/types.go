@@ -6,5 +6,5 @@ type D []E
 // E represents a element for a D. It is usually used inside a D.
 type E struct {
 	Key   string
-	Value interface{}
+	Value any
 }

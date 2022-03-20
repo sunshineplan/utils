@@ -13,7 +13,7 @@ const (
 )
 
 type fn[T any] interface {
-	func(T) (interface{}, error)
+	func(T) (any, error)
 }
 
 type Context[T any] struct {
@@ -38,12 +38,12 @@ func argContext[T any](count int, arg T) *Context[T] {
 	return newContext[T](context.WithValue(context.Background(), argKey, arg), count)
 }
 
-func (ctx *Context[T]) run(executor func(chan<- interface{}, chan<- error), rc chan<- interface{}, ec chan<- error) {
+func (ctx *Context[T]) run(executor func(chan<- any, chan<- error), rc chan<- any, ec chan<- error) {
 	if ctx.Err() != nil {
 		return
 	}
 
-	r := make(chan interface{}, 1)
+	r := make(chan any, 1)
 	c := make(chan error, 1)
 	go executor(r, c)
 
@@ -69,16 +69,16 @@ func (ctx *Context[T]) run(executor func(chan<- interface{}, chan<- error), rc c
 	}
 }
 
-func (ctx *Context[T]) runArg(arg T, rc chan<- interface{}, ec chan<- error) {
-	ctx.run(func(c1 chan<- interface{}, c2 chan<- error) {
-		r, err := (ctx.Value(fnKey).(func(T) (interface{}, error)))(arg)
+func (ctx *Context[T]) runArg(arg T, rc chan<- any, ec chan<- error) {
+	ctx.run(func(c1 chan<- any, c2 chan<- error) {
+		r, err := (ctx.Value(fnKey).(func(T) (any, error)))(arg)
 		c1 <- r
 		c2 <- err
 	}, rc, ec)
 }
 
-func (ctx *Context[T]) runFn(fn func(T) (interface{}, error), rc chan<- interface{}, ec chan<- error) {
-	ctx.run(func(c1 chan<- interface{}, c2 chan<- error) {
+func (ctx *Context[T]) runFn(fn func(T) (any, error), rc chan<- any, ec chan<- error) {
+	ctx.run(func(c1 chan<- any, c2 chan<- error) {
 		r, err := fn(ctx.Value(argKey).(T))
 		c1 <- r
 		c2 <- err

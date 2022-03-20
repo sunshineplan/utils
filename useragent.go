@@ -15,7 +15,7 @@ const uaCDNAPI = "https://cdn.jsdelivr.net/gh/sunshineplan/useragent/user-agent"
 func UserAgentString() (string, error) {
 	result, err := executor.ExecuteConcurrentArg(
 		[]string{uaAPI, uaCDNAPI},
-		func(url string) (interface{}, error) {
+		func(url string) (any, error) {
 			return http.Get(url)
 		},
 	)

@@ -53,7 +53,7 @@ func TestAutoCleanRegenerate(t *testing.T) {
 	cache := New(true)
 
 	done := make(chan bool)
-	cache.Set("regenerate", "old", 2*time.Second, func() (interface{}, error) {
+	cache.Set("regenerate", "old", 2*time.Second, func() (any, error) {
 		defer func() { done <- true }()
 		return "new", nil
 	})

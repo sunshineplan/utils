@@ -247,7 +247,7 @@ func (c *Client) Quit() error {
 	return c.Close()
 }
 
-func (c *Client) Cmd(s string, isMulti bool, args ...interface{}) (string, error) {
+func (c *Client) Cmd(s string, isMulti bool, args ...any) (string, error) {
 	if debug {
 		log.Println(">", fmt.Sprintf(s, args...))
 	}

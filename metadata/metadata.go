@@ -18,13 +18,13 @@ type Server struct {
 }
 
 // Get queries metadata from the metadata server.
-func (s *Server) Get(metadata string, data interface{}) error {
+func (s *Server) Get(metadata string, data any) error {
 	return s.GetWithClient(metadata, data, http.DefaultClient)
 }
 
 // GetWithClient queries metadata from the metadata server
 // with custom http.Client.
-func (s *Server) GetWithClient(metadata string, data interface{}, client *http.Client) error {
+func (s *Server) GetWithClient(metadata string, data any, client *http.Client) error {
 	url := s.Addr + "/" + metadata
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
