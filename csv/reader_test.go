@@ -45,6 +45,10 @@ b,2,"[3,4]"
 		t.Errorf("expected %v; got %v", expect, results)
 	}
 
+	if err := DecodeAll(strings.NewReader(csv), &results); err == nil {
+		t.Error("expected non-nil error; got nil")
+	}
+
 	csv = `A,B,C
 a,1,"[1,2]"
 b,2,"[3,4]"

@@ -47,6 +47,7 @@ func ReadFile(file string, hasFields bool) (*Reader, error) {
 	return NewReader(f, hasFields), nil
 }
 
+// SetFields sets csv fields.
 func (r *Reader) SetFields(fields []string) {
 	r.fields = fields
 }
@@ -132,4 +133,13 @@ func DecodeAll[T any](r io.Reader, dest *[]T) (err error) {
 	*dest = res
 
 	return
+}
+
+// DecodeFile decodes each record from file into dest.
+func DecodeFile[T any](file string, dest *[]T) error {
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	return DecodeAll(f, dest)
 }

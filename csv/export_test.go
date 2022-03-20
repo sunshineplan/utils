@@ -5,77 +5,77 @@ import (
 	"testing"
 )
 
+type testcase[T any] struct {
+	name       string
+	fieldnames []string
+	slice      []T
+}
+
+func testExport[T any](t *testing.T, tc testcase[T], result string) {
+	var b bytes.Buffer
+	if err := Export(tc.fieldnames, tc.slice, &b); err != nil {
+		t.Error(tc.name, err)
+	}
+	if r := b.String(); r != result {
+		t.Errorf("%s expected %q; got %q", tc.name, result, r)
+	}
+}
+
 func TestExport(t *testing.T) {
 	type test struct{ A, B interface{} }
-	testcase := []struct {
-		name       string
-		fieldnames []string
-		slice      interface{}
-	}{
-		{
-			name:       "map slice",
-			fieldnames: []string{"A", "B"},
-			slice: []map[string]interface{}{
-				{"A": "a", "B": "b"},
-				{"A": "aa", "B": nil},
-			},
-		},
-		{
-			name:       "pointer map slice",
-			fieldnames: []string{"A", "B"},
-			slice: []*map[string]interface{}{
-				{"A": "a", "B": "b"},
-				{"A": "aa", "B": nil},
-			},
-		},
-		{
-			name:       "struct slice",
-			fieldnames: []string{"A", "B"},
-			slice:      []test{{A: "a", B: "b"}, {A: "aa", B: nil}},
-		},
-		{
-			name:       "struct slice without fieldnames",
-			fieldnames: nil,
-			slice:      []test{{A: "a", B: "b"}, {A: "aa", B: nil}},
-		},
-		{
-			name:       "pointer struct slice without fieldnames",
-			fieldnames: nil,
-			slice:      []*test{{A: "a", B: "b"}, nil, {A: "aa", B: nil}},
-		},
-		{
-			name:       "D slice",
-			fieldnames: []string{"A", "B"},
-			slice:      []D{{{"A", "a"}, {"B", "b"}}, {{"A", "aa"}, {"B", nil}}},
-		},
-		{
-			name:       "D slice without fieldnames",
-			fieldnames: nil,
-			slice:      []D{{{"A", "a"}, {"B", "b"}}, {{"A", "aa"}, {"B", nil}}},
-		},
-		{
-			name:       "interface slice",
-			fieldnames: []string{"A", "B"},
-			slice: []interface{}{
-				test{A: "a", B: "b"},
-				map[string]interface{}{"A": "aa", "B": nil},
-			},
-		},
-	}
 	result := `A,B
 a,b
 aa,
 `
-
-	for _, tc := range testcase {
-		var b bytes.Buffer
-		if err := Export(tc.fieldnames, tc.slice, &b); err != nil {
-			t.Error(tc.name, err)
-		}
-		if r := b.String(); r != result {
-			t.Errorf("%s expected %q; got %q", tc.name, result, r)
-		}
-	}
+	testExport(t, testcase[map[string]interface{}]{
+		name:       "map slice",
+		fieldnames: []string{"A", "B"},
+		slice: []map[string]interface{}{
+			{"A": "a", "B": "b"},
+			{"A": "aa", "B": nil},
+		},
+	}, result)
+	testExport(t, testcase[*map[string]interface{}]{
+		name:       "pointer map slice",
+		fieldnames: []string{"A", "B"},
+		slice: []*map[string]interface{}{
+			{"A": "a", "B": "b"},
+			{"A": "aa", "B": nil},
+		},
+	}, result)
+	testExport(t, testcase[test]{
+		name:       "struct slice",
+		fieldnames: []string{"A", "B"},
+		slice:      []test{{A: "a", B: "b"}, {A: "aa", B: nil}},
+	}, result)
+	testExport(t, testcase[test]{
+		name:       "struct slice without fieldnames",
+		fieldnames: nil,
+		slice:      []test{{A: "a", B: "b"}, {A: "aa", B: nil}},
+	}, result)
+	testExport(t, testcase[*test]{
+		name:       "pointer struct slice without fieldnames",
+		fieldnames: nil,
+		slice:      []*test{{A: "a", B: "b"}, nil, {A: "aa", B: nil}},
+	}, result)
+	testExport(t, testcase[D]{
+		name:       "D slice",
+		fieldnames: []string{"A", "B"},
+		slice:      []D{{{"A", "a"}, {"B", "b"}}, {{"A", "aa"}, {"B", nil}}},
+	}, result)
+	testExport(t, testcase[D]{
+		name:       "D slice without fieldnames",
+		fieldnames: nil,
+		slice:      []D{{{"A", "a"}, {"B", "b"}}, {{"A", "aa"}, {"B", nil}}},
+	}, result)
+	testExport(t, testcase[interface{}]{
+		name:       "interface slice",
+		fieldnames: []string{"A", "B"},
+		slice: []interface{}{
+			test{A: "a", B: "b"},
+			map[string]interface{}{"A": "aa", "B": nil},
+		},
+	}, result)
 }
 
 func TestExportStruct(t *testing.T) {
