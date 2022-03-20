@@ -10,10 +10,10 @@ import (
 
 func TestExecuteConcurrent1(t *testing.T) {
 	result, err := ExecuteConcurrentArg(
-		[]interface{}{0, 1, 2},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * time.Duration(n.(int)))
-			return n.(int) * 2, nil
+		[]int{0, 1, 2},
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * time.Duration(n))
+			return n * 2, nil
 		},
 	)
 	if err != nil {
@@ -24,10 +24,10 @@ func TestExecuteConcurrent1(t *testing.T) {
 	}
 
 	_, err = ExecuteConcurrentArg(
-		[]interface{}{0, 1, 2},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * time.Duration(n.(int)))
-			return nil, fmt.Errorf("%v", n.(int)*2)
+		[]int{0, 1, 2},
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * time.Duration(n))
+			return nil, fmt.Errorf("%v", n*2)
 		},
 	)
 	if expect := "4"; err.Error() != expect {
@@ -37,17 +37,17 @@ func TestExecuteConcurrent1(t *testing.T) {
 
 func TestExecuteConcurrent2(t *testing.T) {
 	result, err := ExecuteConcurrentFn(
-		[]interface{}{1},
-		func(n interface{}) (interface{}, error) {
-			return n.(int) * 0 * 2, nil
+		[]int{1},
+		func(n int) (interface{}, error) {
+			return n * 0 * 2, nil
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 1 * time.Duration(n.(int)))
-			return n.(int) * 1 * 2, nil
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 1 * time.Duration(n))
+			return n * 1 * 2, nil
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 2 * time.Duration(n.(int)))
-			return n.(int) * 2 * 2, nil
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 2 * time.Duration(n))
+			return n * 2 * 2, nil
 		},
 	)
 	if err != nil {
@@ -58,17 +58,17 @@ func TestExecuteConcurrent2(t *testing.T) {
 	}
 
 	_, err = ExecuteConcurrentFn(
-		[]interface{}{1},
-		func(n interface{}) (interface{}, error) {
-			return nil, fmt.Errorf("%v", n.(int)*0*2)
+		[]int{1},
+		func(n int) (interface{}, error) {
+			return nil, fmt.Errorf("%v", n*0*2)
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 1 * time.Duration(n.(int)))
-			return nil, fmt.Errorf("%v", n.(int)*1*2)
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 1 * time.Duration(n))
+			return nil, fmt.Errorf("%v", n*1*2)
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 2 * time.Duration(n.(int)))
-			return nil, fmt.Errorf("%v", n.(int)*2*2)
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 2 * time.Duration(n))
+			return nil, fmt.Errorf("%v", n*2*2)
 		},
 	)
 	if expect := "4"; err.Error() != expect {
@@ -78,10 +78,10 @@ func TestExecuteConcurrent2(t *testing.T) {
 
 func TestExecuteSerial1(t *testing.T) {
 	result, err := ExecuteSerial(
-		[]interface{}{0, 1, 2},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * time.Duration(n.(int)))
-			return n.(int) * 2, nil
+		[]int{0, 1, 2},
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * time.Duration(n))
+			return n * 2, nil
 		},
 	)
 	if err != nil {
@@ -92,10 +92,10 @@ func TestExecuteSerial1(t *testing.T) {
 	}
 
 	_, err = ExecuteSerial(
-		[]interface{}{0, 1, 2},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * time.Duration(n.(int)))
-			return nil, fmt.Errorf("%v", n.(int)*2)
+		[]int{0, 1, 2},
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * time.Duration(n))
+			return nil, fmt.Errorf("%v", n*2)
 		},
 	)
 	if expect := "4"; err.Error() != expect {
@@ -105,17 +105,17 @@ func TestExecuteSerial1(t *testing.T) {
 
 func TestExecuteSerial2(t *testing.T) {
 	result, err := ExecuteSerial(
-		[]interface{}{1},
-		func(n interface{}) (interface{}, error) {
-			return n.(int) * 0 * 2, nil
+		[]int{1},
+		func(n int) (interface{}, error) {
+			return n * 0 * 2, nil
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 1 * time.Duration(n.(int)))
-			return n.(int) * 1 * 2, nil
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 1 * time.Duration(n))
+			return n * 1 * 2, nil
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 2 * time.Duration(n.(int)))
-			return n.(int) * 2 * 2, nil
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 2 * time.Duration(n))
+			return n * 2 * 2, nil
 		},
 	)
 	if err != nil {
@@ -126,17 +126,17 @@ func TestExecuteSerial2(t *testing.T) {
 	}
 
 	_, err = ExecuteSerial(
-		[]interface{}{1},
-		func(n interface{}) (interface{}, error) {
-			return nil, fmt.Errorf("%v", n.(int)*0*2)
+		[]int{1},
+		func(n int) (interface{}, error) {
+			return nil, fmt.Errorf("%v", n*0*2)
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 1 * time.Duration(n.(int)))
-			return nil, fmt.Errorf("%v", n.(int)*1*2)
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 1 * time.Duration(n))
+			return nil, fmt.Errorf("%v", n*1*2)
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 2 * time.Duration(n.(int)))
-			return nil, fmt.Errorf("%v", n.(int)*2*2)
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 2 * time.Duration(n))
+			return nil, fmt.Errorf("%v", n*2*2)
 		},
 	)
 	if expect := "4"; err.Error() != expect {
@@ -218,17 +218,17 @@ func TestLimit(t *testing.T) {
 		Serial,
 		Concurrent,
 		defaultLimit,
-		[]interface{}{1},
-		func(n interface{}) (interface{}, error) {
-			return nil, fmt.Errorf("%v", n.(int)*0*2)
+		[]int{1},
+		func(n int) (interface{}, error) {
+			return nil, fmt.Errorf("%v", n*0*2)
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 1 * time.Duration(n.(int)))
-			return nil, fmt.Errorf("%v", n.(int)*1*2)
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 1 * time.Duration(n))
+			return nil, fmt.Errorf("%v", n*1*2)
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 2 * time.Duration(n.(int)))
-			return nil, fmt.Errorf("%v", n.(int)*2*2)
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 2 * time.Duration(n))
+			return nil, fmt.Errorf("%v", n*2*2)
 		},
 	)
 	if expect := "4"; err.Error() != expect {
@@ -239,17 +239,17 @@ func TestLimit(t *testing.T) {
 		Serial,
 		Concurrent,
 		1,
-		[]interface{}{1},
-		func(n interface{}) (interface{}, error) {
-			return nil, fmt.Errorf("%v", n.(int)*0*2)
+		[]int{1},
+		func(n int) (interface{}, error) {
+			return nil, fmt.Errorf("%v", n*0*2)
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 1 * time.Duration(n.(int)))
-			return nil, fmt.Errorf("%v", n.(int)*1*2)
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 1 * time.Duration(n))
+			return nil, fmt.Errorf("%v", n*1*2)
 		},
-		func(n interface{}) (interface{}, error) {
-			time.Sleep(time.Second * 2 * time.Duration(n.(int)))
-			return nil, fmt.Errorf("%v", n.(int)*2*2)
+		func(n int) (interface{}, error) {
+			time.Sleep(time.Second * 2 * time.Duration(n))
+			return nil, fmt.Errorf("%v", n*2*2)
 		},
 	)
 	if expect := "4"; err.Error() != expect {

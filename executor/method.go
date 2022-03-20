@@ -35,29 +35,21 @@ func SetLimit(n int) {
 
 // Execute gets the result from the functions with several args by specified method.
 // If both argMethod and fnMethod is Concurrent, fnMethod will be first.
-func Execute(argMethod, fnMethod Method, limit int, arg []interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
+func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(T) (interface{}, error)) (interface{}, error) {
 	if len(fn) == 0 {
 		return nil, errors.New("no function provided")
 	}
 
-	var v []interface{}
+	var clone []T
 	var count int
 	var nilArg bool
-	switch len(arg) {
+	switch len(args) {
 	case 0:
-		count = 1
 		nilArg = true
 	default:
-		count = len(arg)
-		v = make([]interface{}, count)
-		copy(v, arg)
-		if argMethod == Random {
-			rand.Shuffle(len(v), func(i, j int) { v[i], v[j] = v[j], v[i] })
-		}
-	}
-
-	if fnMethod == Random {
-		rand.Shuffle(len(fn), func(i, j int) { fn[i], fn[j] = fn[j], fn[i] })
+		count = len(args)
+		clone = make([]T, count)
+		copy(clone, args)
 	}
 
 	switch fnMethod {
@@ -66,10 +58,10 @@ func Execute(argMethod, fnMethod Method, limit int, arg []interface{}, fn ...fun
 		lasterr := make(chan error, 1)
 
 		if nilArg {
-			ctx := newContext(len(fn), 0, nil)
+			ctx := argContext(len(fn), *new(T))
 			defer ctx.cancel()
 
-			workers.RunSlice(limit, fn, func(_ int, fn func(interface{}) (interface{}, error)) {
+			workers.RunSlice(limit, fn, func(_ int, fn func(T) (interface{}, error)) {
 				ctx.runFn(fn, result, lasterr)
 			})
 
@@ -80,9 +72,13 @@ func Execute(argMethod, fnMethod Method, limit int, arg []interface{}, fn ...fun
 			return <-result, nil
 		}
 
+		if argMethod == Random {
+			rand.Shuffle(count, func(i, j int) { clone[i], clone[j] = clone[j], clone[i] })
+		}
+
 		for i := 0; i < count; i++ {
-			ctx := newContext(len(fn), argKey, v[i])
-			workers.RunSlice(limit, fn, func(_ int, fn func(interface{}) (interface{}, error)) {
+			ctx := argContext(len(fn), clone[i])
+			workers.RunSlice(limit, fn, func(_ int, fn func(T) (interface{}, error)) {
 				ctx.runFn(fn, result, lasterr)
 			})
 
@@ -94,18 +90,18 @@ func Execute(argMethod, fnMethod Method, limit int, arg []interface{}, fn ...fun
 			ctx.cancel()
 		}
 	case Serial, Random:
+		if fnMethod == Random {
+			rand.Shuffle(len(fn), func(i, j int) { fn[i], fn[j] = fn[j], fn[i] })
+		}
+
 		for i, f := range fn {
 			result := make(chan interface{}, 1)
 			lasterr := make(chan error, 1)
 
-			ctx := newContext(count, fnKey, f)
+			ctx := fnContext(count, f)
 			if nilArg {
-				ctx.runArg(nil, result, lasterr)
+				ctx.runArg(*new(T), result, lasterr)
 			} else {
-				if argMethod == Random {
-					rand.Shuffle(count, func(i, j int) { v[i], v[j] = v[j], v[i] })
-				}
-
 				var worker int
 				switch argMethod {
 				case Concurrent:
@@ -115,8 +111,13 @@ func Execute(argMethod, fnMethod Method, limit int, arg []interface{}, fn ...fun
 				default:
 					return nil, errors.New("unknown arg method")
 				}
-				workers.RunSlice(worker, v, func(_ int, i interface{}) {
-					ctx.runArg(i, result, lasterr)
+
+				if argMethod == Random {
+					rand.Shuffle(count, func(i, j int) { clone[i], clone[j] = clone[j], clone[i] })
+				}
+
+				workers.RunSlice(worker, clone, func(_ int, arg T) {
+					ctx.runArg(arg, result, lasterr)
 				})
 			}
 
@@ -135,21 +136,21 @@ func Execute(argMethod, fnMethod Method, limit int, arg []interface{}, fn ...fun
 }
 
 // ExecuteConcurrentArg gets the fastest result from the functions with args, args will be run concurrently.
-func ExecuteConcurrentArg(arg []interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
+func ExecuteConcurrentArg[T any](arg []T, fn ...func(T) (interface{}, error)) (interface{}, error) {
 	return Execute(Concurrent, Serial, defaultLimit, arg, fn...)
 }
 
 // ExecuteConcurrentFn gets the fastest result from the functions with args, functions will be run concurrently.
-func ExecuteConcurrentFn(arg []interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
+func ExecuteConcurrentFn[T any](arg []T, fn ...func(T) (interface{}, error)) (interface{}, error) {
 	return Execute(Serial, Concurrent, defaultLimit, arg, fn...)
 }
 
 // ExecuteSerial gets the result until success from the functions with args in order.
-func ExecuteSerial(arg []interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
+func ExecuteSerial[T any](arg []T, fn ...func(T) (interface{}, error)) (interface{}, error) {
 	return Execute(Serial, Serial, defaultLimit, arg, fn...)
 }
 
 // ExecuteRandom gets the result until success from the functions with args randomly.
-func ExecuteRandom(arg []interface{}, fn ...func(interface{}) (interface{}, error)) (interface{}, error) {
+func ExecuteRandom[T any](arg []T, fn ...func(T) (interface{}, error)) (interface{}, error) {
 	return Execute(Random, Random, defaultLimit, arg, fn...)
 }

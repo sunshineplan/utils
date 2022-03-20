@@ -12,7 +12,11 @@ const (
 	argKey
 )
 
-type Context struct {
+type fn[T any] interface {
+	func(T) (interface{}, error)
+}
+
+type Context[T any] struct {
 	context.Context
 	cancel context.CancelFunc
 
@@ -21,15 +25,20 @@ type Context struct {
 	count int
 }
 
-func newContext(count int, key key, value interface{}) *Context {
-	ctx, cancel := context.WithCancel(context.Background())
-	if value != nil {
-		ctx = context.WithValue(ctx, key, value)
-	}
-	return &Context{ctx, cancel, sync.Mutex{}, count}
+func newContext[T any](ctx context.Context, count int) *Context[T] {
+	ctx, cancel := context.WithCancel(ctx)
+	return &Context[T]{ctx, cancel, sync.Mutex{}, count}
 }
 
-func (ctx *Context) run(executor func(chan<- interface{}, chan<- error), rc chan<- interface{}, ec chan<- error) {
+func fnContext[T any, Fn fn[T]](count int, fn Fn) *Context[T] {
+	return newContext[T](context.WithValue(context.Background(), fnKey, fn), count)
+}
+
+func argContext[T any](count int, arg T) *Context[T] {
+	return newContext[T](context.WithValue(context.Background(), argKey, arg), count)
+}
+
+func (ctx *Context[T]) run(executor func(chan<- interface{}, chan<- error), rc chan<- interface{}, ec chan<- error) {
 	if ctx.Err() != nil {
 		return
 	}
@@ -46,7 +55,7 @@ func (ctx *Context) run(executor func(chan<- interface{}, chan<- error), rc chan
 		defer ctx.mu.Unlock()
 
 		if err != nil {
-			if ctx.count == 1 {
+			if ctx.count <= 1 {
 				rc <- nil
 				ec <- err
 			}
@@ -60,17 +69,17 @@ func (ctx *Context) run(executor func(chan<- interface{}, chan<- error), rc chan
 	}
 }
 
-func (ctx *Context) runArg(arg interface{}, rc chan<- interface{}, ec chan<- error) {
+func (ctx *Context[T]) runArg(arg T, rc chan<- interface{}, ec chan<- error) {
 	ctx.run(func(c1 chan<- interface{}, c2 chan<- error) {
-		r, err := (ctx.Value(fnKey).(func(interface{}) (interface{}, error)))(arg)
+		r, err := (ctx.Value(fnKey).(func(T) (interface{}, error)))(arg)
 		c1 <- r
 		c2 <- err
 	}, rc, ec)
 }
 
-func (ctx *Context) runFn(fn func(interface{}) (interface{}, error), rc chan<- interface{}, ec chan<- error) {
+func (ctx *Context[T]) runFn(fn func(T) (interface{}, error), rc chan<- interface{}, ec chan<- error) {
 	ctx.run(func(c1 chan<- interface{}, c2 chan<- error) {
-		r, err := fn(ctx.Value(argKey))
+		r, err := fn(ctx.Value(argKey).(T))
 		c1 <- r
 		c2 <- err
 	}, rc, ec)
