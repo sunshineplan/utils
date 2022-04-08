@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-type testcase[T any] struct {
+type testcase[E any] struct {
 	name       string
 	fieldnames []string
-	slice      []T
+	slice      []E
 }
 
-func testExport[T any](t *testing.T, tc testcase[T], result string) {
+func testExport[E any](t *testing.T, tc testcase[E], result string) {
 	var b bytes.Buffer
 	if err := Export(tc.fieldnames, tc.slice, &b); err != nil {
 		t.Error(tc.name, err)

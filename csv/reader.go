@@ -112,7 +112,7 @@ func (r *Reader) Decode(dest any) error {
 }
 
 // DecodeAll decodes each record from r into dest.
-func DecodeAll[T any](r io.Reader, dest *[]T) (err error) {
+func DecodeAll[S ~[]E, E any](r io.Reader, dest *S) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			err = fmt.Errorf("%v", e)
@@ -122,9 +122,9 @@ func DecodeAll[T any](r io.Reader, dest *[]T) (err error) {
 	reader := NewReader(r, true)
 	defer reader.Close()
 
-	var res []T
+	var res S
 	for reader.Next() {
-		var t T
+		var t E
 		if err = reader.Decode(&t); err != nil {
 			return
 		}
@@ -136,7 +136,7 @@ func DecodeAll[T any](r io.Reader, dest *[]T) (err error) {
 }
 
 // DecodeFile decodes each record from file into dest.
-func DecodeFile[T any](file string, dest *[]T) error {
+func DecodeFile[S ~[]E, E any](file string, dest *S) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
