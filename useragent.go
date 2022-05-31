@@ -8,13 +8,14 @@ import (
 	"github.com/sunshineplan/utils/executor"
 )
 
-const uaAPI = "https://raw.githubusercontent.com/sunshineplan/useragent/main/user-agent"
-const uaCDNAPI = "https://cdn.jsdelivr.net/gh/sunshineplan/useragent/user-agent"
-
 // UserAgentString gets latest chrome user agent string.
 func UserAgentString() (string, error) {
 	result, err := executor.ExecuteConcurrentArg(
-		[]string{uaAPI, uaCDNAPI},
+		[]string{
+			"https://raw.githubusercontent.com/sunshineplan/useragent/main/user-agent",
+			"https://cdn.jsdelivr.net/gh/sunshineplan/useragent/user-agent",
+			"https://fastly.jsdelivr.net/gh/sunshineplan/useragent/user-agent",
+		},
 		func(url string) (any, error) {
 			return http.Get(url)
 		},
