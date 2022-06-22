@@ -2,7 +2,13 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"sync"
+)
+
+var (
+	SkipErr       = errors.New("skip")
+	AllSkippedErr = errors.New("all skipped")
 )
 
 type key int
@@ -20,14 +26,15 @@ type Context[T any] struct {
 	context.Context
 	cancel context.CancelFunc
 
-	mu sync.Mutex
+	mu  sync.Mutex
+	res []error
 
 	count int
 }
 
 func newContext[T any](ctx context.Context, count int) *Context[T] {
 	ctx, cancel := context.WithCancel(ctx)
-	return &Context[T]{ctx, cancel, sync.Mutex{}, count}
+	return &Context[T]{ctx, cancel, sync.Mutex{}, nil, count}
 }
 
 func fnContext[T any, Fn fn[T]](count int, fn Fn) *Context[T] {
@@ -55,9 +62,17 @@ func (ctx *Context[T]) run(executor func(chan<- any, chan<- error), rc chan<- an
 		defer ctx.mu.Unlock()
 
 		if err != nil {
+			if err != SkipErr {
+				ctx.res = append(ctx.res, err)
+			}
+
 			if ctx.count <= 1 {
 				rc <- nil
-				ec <- err
+				if l := len(ctx.res); l > 0 {
+					ec <- ctx.res[l-1]
+				} else {
+					ec <- AllSkippedErr
+				}
 			}
 			ctx.count--
 		} else {
