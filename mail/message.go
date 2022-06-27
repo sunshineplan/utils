@@ -11,6 +11,7 @@ import (
 	"mime"
 	"net/mail"
 	"net/textproto"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -68,12 +69,26 @@ func (m *Message) RcptList() []string {
 	return rcptList
 }
 
-func (m *Message) Bytes() []byte {
+func (m *Message) Bytes(id string) []byte {
+	if id == "" {
+		e, err := ParseAddress(m.From)
+		if err != nil {
+			if hostname, _ := os.Hostname(); hostname != "" {
+				id = generateMsgID(hostname)
+			} else {
+				id = generateMsgID("localhost")
+			}
+		} else {
+			id = generateMsgID(e.Address)
+		}
+	}
+
 	var buf bytes.Buffer
 	w := textproto.NewWriter(bufio.NewWriter(&buf))
 
 	w.PrintfLine("MIME-Version: 1.0")
 	w.PrintfLine("Date: " + time.Now().Format(time.RFC1123Z))
+	w.PrintfLine("Message-ID: <%s>", id)
 	w.PrintfLine("Subject: =?UTF-8?B?%s?=", toBase64(m.Subject))
 	w.PrintfLine("From: " + m.From)
 	w.PrintfLine("To: " + strings.Join(m.To, ","))
@@ -81,14 +96,14 @@ func (m *Message) Bytes() []byte {
 		w.PrintfLine("Cc: " + strings.Join(m.Cc, ","))
 	}
 
-	boundary := randomBoundary()
+	boundary := randomString(16)
 	if len(m.Attachments) > 0 {
-		w.PrintfLine("Content-Type: multipart/mixed; boundary=" + boundary)
+		w.PrintfLine("Content-Type: multipart/mixed; boundary=%q", boundary)
 		w.PrintfLine("")
 		w.PrintfLine("--" + boundary)
 	}
 
-	w.PrintfLine("Content-Type: %s; charset=utf-8", m.ContentType)
+	w.PrintfLine(`Content-Type: %s; charset="UTF-8"`, m.ContentType)
 	w.PrintfLine("Content-Transfer-Encoding: base64")
 	w.PrintfLine("")
 	w.PrintfLine(toBase64(m.Body))
@@ -137,10 +152,15 @@ func toBase64(str string) string {
 	return base64.StdEncoding.EncodeToString([]byte(str))
 }
 
-func randomBoundary() string {
-	b := make([]byte, 16)
+func randomString(n int) string {
+	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
 	return fmt.Sprintf("%x", b)
+}
+
+func generateMsgID(ref string) string {
+	s := strings.Split(ref, "@")
+	return fmt.Sprintf("%s@%s", randomString(16), s[len(s)-1])
 }

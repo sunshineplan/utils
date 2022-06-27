@@ -19,12 +19,24 @@ type Dialer struct {
 	Timeout  time.Duration
 }
 
-// Attachment represents an email attachment
-type Attachment struct {
-	Filename string
-	Path     string
-	Bytes    []byte
-	Inline   bool
+func (d *Dialer) Dial() (*smtp.Client, error) {
+	if d.Timeout == 0 {
+		d.Timeout = 3 * time.Minute
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
+	defer cancel()
+
+	client, err := smtp.Dial(ctx, fmt.Sprintf("%s:%d", d.Server, d.Port))
+	if err != nil {
+		return nil, err
+	}
+	if err = client.Auth(&smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}); err != nil {
+		client.Quit()
+		return nil, err
+	}
+
+	return client, nil
 }
 
 // SendMail connects to the server at Dialer's addr, switches to TLS if
@@ -46,24 +58,21 @@ func (d *Dialer) SendMail(ctx context.Context, from string, to []string, msg []b
 	return smtp.SendMail(ctx, addr, auth, from, to, msg)
 }
 
+// Attachment represents an email attachment
+type Attachment struct {
+	Filename string
+	Path     string
+	Bytes    []byte
+	Inline   bool
+}
+
 // Send sends the given messages.
 func (d *Dialer) Send(msg ...*Message) error {
-	if d.Timeout == 0 {
-		d.Timeout = 3 * time.Minute
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
-	defer cancel()
-
-	smtpClient, err := smtp.Dial(ctx, fmt.Sprintf("%s:%d", d.Server, d.Port))
+	smtpClient, err := d.Dial()
 	if err != nil {
 		return err
 	}
 	defer smtpClient.Quit()
-
-	if err = smtpClient.Auth(&smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}); err != nil {
-		return err
-	}
 
 	for _, m := range msg {
 		if m.From == "" {
@@ -89,11 +98,11 @@ func (d *Dialer) Send(msg ...*Message) error {
 		}
 
 		c := make(chan error, 1)
-		go func() { c <- smtpClient.Send(m.From, m.RcptList(), m.Bytes()) }()
+		go func() { c <- smtpClient.Send(m.From, m.RcptList(), m.Bytes(generateMsgID(d.Account))) }()
 
 		select {
 		case <-time.After(d.Timeout):
-			return fmt.Errorf("timeout")
+			return context.DeadlineExceeded
 		case err := <-c:
 			if err != nil {
 				return err
