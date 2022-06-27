@@ -2,12 +2,15 @@
 package mail
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"math"
 	"mime"
 	"net/mail"
+	"net/textproto"
 	"path/filepath"
 	"strings"
 	"time"
@@ -62,79 +65,75 @@ func (m *Message) RcptList() []string {
 
 func (m *Message) Bytes() []byte {
 	var buf bytes.Buffer
-	buf.WriteString("From: " + m.From + "\r\n")
+	w := textproto.NewWriter(bufio.NewWriter(&buf))
 
-	t := time.Now()
-	buf.WriteString("Date: " + t.Format(time.RFC1123Z) + "\r\n")
-
-	buf.WriteString("To: " + strings.Join(m.To, ",") + "\r\n")
+	w.PrintfLine("MIME-Version: 1.0")
+	w.PrintfLine("Date: " + time.Now().Format(time.RFC1123Z))
+	w.PrintfLine("Subject: =?UTF-8?B?%s?=", toBase64(m.Subject))
+	w.PrintfLine("From: " + m.From)
+	w.PrintfLine("To: " + strings.Join(m.To, ","))
 	if len(m.Cc) > 0 {
-		buf.WriteString("Cc: " + strings.Join(m.Cc, ",") + "\r\n")
+		w.PrintfLine("Cc: " + strings.Join(m.Cc, ","))
 	}
-
-	var coder = base64.StdEncoding
-	var subject = "=?UTF-8?B?" + coder.EncodeToString([]byte(m.Subject)) + "?="
-	buf.WriteString("Subject: " + subject + "\r\n")
-
-	buf.WriteString("MIME-Version: 1.0\r\n")
 
 	boundary := randomBoundary()
-
 	if len(m.Attachments) > 0 {
-		buf.WriteString("Content-Type: multipart/mixed; boundary=" + boundary + "\r\n")
-		buf.WriteString("\r\n--" + boundary + "\r\n")
+		w.PrintfLine("Content-Type: multipart/mixed; boundary=" + boundary)
+		w.PrintfLine("")
+		w.PrintfLine("--" + boundary)
 	}
 
-	buf.WriteString(fmt.Sprintf("Content-Type: %s; charset=utf-8\r\n\r\n", m.ContentType))
-	buf.WriteString(m.Body)
-	buf.WriteString("\r\n")
+	w.PrintfLine("Content-Type: %s; charset=utf-8", m.ContentType)
+	w.PrintfLine("Content-Transfer-Encoding: base64")
+	w.PrintfLine("")
+	w.PrintfLine(toBase64(m.Body))
 
-	if len(m.Attachments) > 0 {
-		for _, attachment := range m.Attachments {
-			buf.WriteString("\r\n\r\n--" + boundary + "\r\n")
-
+	if l := len(m.Attachments); l > 0 {
+		for i, attachment := range m.Attachments {
+			w.PrintfLine("--" + boundary)
 			if attachment.Inline {
-				buf.WriteString("Content-Type: message/rfc822\r\n")
-				buf.WriteString("Content-Disposition: inline; filename=\"" + attachment.Filename + "\"\r\n\r\n")
-
-				buf.Write(attachment.Bytes)
+				w.PrintfLine("Content-Type: message/rfc822")
+				w.PrintfLine(`Content-Disposition: inline; filename="=?UTF-8?B?%s?="`, toBase64(attachment.Filename))
 			} else {
-				ext := filepath.Ext(attachment.Filename)
-				mimetype := mime.TypeByExtension(ext)
-				if mimetype != "" {
-					buf.WriteString(fmt.Sprintf("Content-Type: %s\r\n", mimetype))
+				if mimetype := mime.TypeByExtension(filepath.Ext(attachment.Filename)); mimetype != "" {
+					w.PrintfLine("Content-Type: " + mimetype)
 				} else {
-					buf.WriteString("Content-Type: application/octet-stream\r\n")
+					w.PrintfLine("Content-Type: application/octet-stream")
 				}
-				buf.WriteString("Content-Transfer-Encoding: base64\r\n")
+				w.PrintfLine(`Content-Disposition: attachment; filename="=?UTF-8?B?%s?="`, toBase64(attachment.Filename))
+			}
+			w.PrintfLine("Content-Transfer-Encoding: base64")
+			w.PrintfLine("")
 
-				buf.WriteString("Content-Disposition: attachment; filename=\"=?UTF-8?B?")
-				buf.WriteString(coder.EncodeToString([]byte(attachment.Filename)))
-				buf.WriteString("?=\"\r\n\r\n")
+			b := make([]byte, base64.StdEncoding.EncodedLen(len(attachment.Bytes)))
+			base64.StdEncoding.Encode(b, attachment.Bytes)
 
-				b := make([]byte, base64.StdEncoding.EncodedLen(len(attachment.Bytes)))
-				base64.StdEncoding.Encode(b, attachment.Bytes)
-
-				// write base64 content in lines of up to 76 chars
-				for i, l := 0, len(b); i < l; i++ {
-					buf.WriteByte(b[i])
-					if (i+1)%76 == 0 {
-						buf.WriteString("\r\n")
-					}
+			// write base64 content in lines of up to 76 chars
+			for i, l := 0, int(math.Ceil(float64(len(b))/76)); i < l; i++ {
+				if i == l-1 {
+					w.PrintfLine(string(b[i*76:]))
+				} else {
+					w.PrintfLine(string(b[i*76 : (i+1)*76]))
 				}
 			}
 
-			buf.WriteString("\r\n--" + boundary)
+			if i < l-1 {
+				w.PrintfLine("--" + boundary)
+			} else {
+				w.PrintfLine("--" + boundary + "--")
+			}
 		}
-
-		buf.WriteString("--")
 	}
 
 	return buf.Bytes()
 }
 
+func toBase64(str string) string {
+	return base64.StdEncoding.EncodeToString([]byte(str))
+}
+
 func randomBoundary() string {
-	b := make([]byte, 30)
+	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
