@@ -38,6 +38,14 @@ func (contentType ContentType) String() string {
 	return contentTypes[contentType]
 }
 
+// Attachment represents an email attachment
+type Attachment struct {
+	Filename  string
+	Path      string
+	Bytes     []byte
+	ContentID string
+}
+
 // Message represents an email message
 type Message struct {
 	From        string
@@ -111,9 +119,10 @@ func (m *Message) Bytes(id string) []byte {
 	if l := len(m.Attachments); l > 0 {
 		for i, attachment := range m.Attachments {
 			w.PrintfLine("--" + boundary)
-			if attachment.Inline {
+			if attachment.ContentID != "" {
 				w.PrintfLine("Content-Type: message/rfc822")
 				w.PrintfLine(`Content-Disposition: inline; filename="=?UTF-8?B?%s?="`, toBase64(attachment.Filename))
+				w.PrintfLine("Content-ID: <%s>", attachment.ContentID)
 			} else {
 				if mimetype := mime.TypeByExtension(filepath.Ext(attachment.Filename)); mimetype != "" {
 					w.PrintfLine("Content-Type: " + mimetype)

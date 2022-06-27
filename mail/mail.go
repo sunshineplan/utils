@@ -58,14 +58,6 @@ func (d *Dialer) SendMail(ctx context.Context, from string, to []string, msg []b
 	return smtp.SendMail(ctx, addr, auth, from, to, msg)
 }
 
-// Attachment represents an email attachment
-type Attachment struct {
-	Filename string
-	Path     string
-	Bytes    []byte
-	Inline   bool
-}
-
 // Send sends the given messages.
 func (d *Dialer) Send(msg ...*Message) error {
 	smtpClient, err := d.Dial()
