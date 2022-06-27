@@ -16,6 +16,11 @@ import (
 	"time"
 )
 
+var (
+	ParseAddress     = mail.ParseAddress
+	ParseAddressList = mail.ParseAddressList
+)
+
 var contentTypes = [...]string{"text/plain", "text/html"}
 
 // ContentType represents content type
@@ -45,17 +50,17 @@ type Message struct {
 func (m *Message) RcptList() []string {
 	rcptList := []string{}
 
-	toList, _ := mail.ParseAddressList(strings.Join(m.To, ","))
+	toList, _ := ParseAddressList(strings.Join(m.To, ","))
 	for _, to := range toList {
 		rcptList = append(rcptList, to.Address)
 	}
 
-	ccList, _ := mail.ParseAddressList(strings.Join(m.Cc, ","))
+	ccList, _ := ParseAddressList(strings.Join(m.Cc, ","))
 	for _, cc := range ccList {
 		rcptList = append(rcptList, cc.Address)
 	}
 
-	bccList, _ := mail.ParseAddressList(strings.Join(m.Bcc, ","))
+	bccList, _ := ParseAddressList(strings.Join(m.Bcc, ","))
 	for _, bcc := range bccList {
 		rcptList = append(rcptList, bcc.Address)
 	}
