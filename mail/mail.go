@@ -10,6 +10,10 @@ import (
 	"github.com/sunshineplan/utils/smtp"
 )
 
+func SetDebug(b bool) {
+	smtp.SetDebug(b)
+}
+
 // Dialer is a dialer to an SMTP server.
 type Dialer struct {
 	Server   string
@@ -31,40 +35,29 @@ func (d *Dialer) Dial() (*smtp.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = client.Auth(&smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}); err != nil {
-		client.Quit()
-		return nil, err
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		if err := client.StartTLS(nil); err != nil {
+			client.Quit()
+			return nil, err
+		}
+	}
+	if ok, _ := client.Extension("AUTH"); ok {
+		if err = client.Auth2(&smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}); err != nil {
+			client.Quit()
+			return nil, err
+		}
 	}
 
 	return client, nil
 }
 
-// SendMail connects to the server at Dialer's addr, switches to TLS if
-// possible, authenticates with the optional mechanism a if possible,
-// and then sends an email from address from, to addresses to, with
-// message msg.
-//
-// The addresses in the to parameter are the SMTP RCPT addresses.
-//
-// The msg parameter should be an RFC 822-style email with headers
-// first, a blank line, and then the message body. The lines of msg
-// should be CRLF terminated. The msg headers should usually include
-// fields such as "From", "To", "Subject", and "Cc".  Sending "Bcc"
-// messages is accomplished by including an email address in the to
-// parameter but not including it in the msg headers.
-func (d *Dialer) SendMail(ctx context.Context, from string, to []string, msg []byte) error {
-	addr := fmt.Sprintf("%s:%d", d.Server, d.Port)
-	auth := &smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}
-	return smtp.SendMail(ctx, addr, auth, from, to, msg)
-}
-
 // Send sends the given messages.
 func (d *Dialer) Send(msg ...*Message) error {
-	smtpClient, err := d.Dial()
+	client, err := d.Dial()
 	if err != nil {
 		return err
 	}
-	defer smtpClient.Quit()
+	defer client.Quit()
 
 	for _, m := range msg {
 		if m.From == "" {
@@ -90,7 +83,7 @@ func (d *Dialer) Send(msg ...*Message) error {
 		}
 
 		c := make(chan error, 1)
-		go func() { c <- smtpClient.Send(m.From, m.RcptList(), m.Bytes(generateMsgID(d.Account))) }()
+		go func() { c <- client.SendMail(m.From, m.RcptList(), m.Bytes(generateMsgID(d.Account))) }()
 
 		select {
 		case <-time.After(d.Timeout):
@@ -103,4 +96,23 @@ func (d *Dialer) Send(msg ...*Message) error {
 	}
 
 	return nil
+}
+
+// SendMail connects to the server at Dialer's addr, switches to TLS if
+// possible, authenticates with the optional mechanism a if possible,
+// and then sends an email from address from, to addresses to, with
+// message msg.
+//
+// The addresses in the to parameter are the SMTP RCPT addresses.
+//
+// The msg parameter should be an RFC 822-style email with headers
+// first, a blank line, and then the message body. The lines of msg
+// should be CRLF terminated. The msg headers should usually include
+// fields such as "From", "To", "Subject", and "Cc".  Sending "Bcc"
+// messages is accomplished by including an email address in the to
+// parameter but not including it in the msg headers.
+func (d *Dialer) SendMail(ctx context.Context, from string, to []string, msg []byte) error {
+	addr := fmt.Sprintf("%s:%d", d.Server, d.Port)
+	auth := &smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}
+	return smtp.SendMail(ctx, addr, auth, from, to, msg)
 }

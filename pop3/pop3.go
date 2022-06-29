@@ -19,8 +19,6 @@ func SetDebug(b bool) {
 }
 
 type Client struct {
-	// Text is the textproto.Conn used by the Client. It is exported to allow for
-	// clients to add extensions.
 	*textproto.Conn
 }
 

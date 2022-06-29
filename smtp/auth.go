@@ -42,3 +42,29 @@ func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 func isLocalhost(name string) bool {
 	return name == "localhost" || name == "127.0.0.1" || name == "::1"
 }
+
+// Auth is an SMTP authentication information.
+type Auth struct {
+	Identity string
+	Username string
+	Password string
+	Server   string
+}
+
+// Auth2 authenticates a client using the provided authentication information.
+// A failed authentication closes the connection.
+// Only servers that advertise the AUTH extension support this function.
+func (c *Client) Auth2(auth *Auth) error {
+	// Auto select auth mode
+	var a smtp.Auth
+	if auths := strings.Join(c.auth, " "); strings.Contains(auths, "CRAM-MD5") {
+		a = smtp.CRAMMD5Auth(auth.Username, auth.Password)
+	} else if strings.Contains(auths, "PLAIN") {
+		a = smtp.PlainAuth(auth.Identity, auth.Username, auth.Password, auth.Server)
+	} else {
+		a = &loginAuth{auth.Username, auth.Password, auth.Server}
+
+	}
+
+	return c.Auth(a)
+}
