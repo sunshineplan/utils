@@ -283,7 +283,10 @@ type dataCloser struct {
 
 func (d *dataCloser) Close() error {
 	d.WriteCloser.Close()
-	_, _, err := d.c.ReadResponse(250)
+	code, msg, err := d.c.ReadResponse(250)
+	if debug {
+		log.Println("<", code, msg)
+	}
 	return err
 }
 
