@@ -23,6 +23,7 @@ func testExport[E any](t *testing.T, tc testcase[E], result string) {
 
 func TestExport(t *testing.T) {
 	type test struct{ A, B any }
+	type key string
 	result := `A,B
 a,b
 aa,
@@ -31,6 +32,14 @@ aa,
 		name:       "map slice",
 		fieldnames: []string{"A", "B"},
 		slice: []map[string]any{
+			{"A": "a", "B": "b"},
+			{"A": "aa", "B": nil},
+		},
+	}, result)
+	testExport(t, testcase[map[key]any]{
+		name:       "string kind key map slice",
+		fieldnames: []string{"A", "B"},
+		slice: []map[key]any{
 			{"A": "a", "B": "b"},
 			{"A": "aa", "B": nil},
 		},

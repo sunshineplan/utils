@@ -131,14 +131,16 @@ func (w *Writer) Write(record any) error {
 	r := make([]string, len(w.fields))
 	switch v.Kind() {
 	case reflect.Map:
-		if reflect.TypeOf(v.Interface()).Key().Name() == "string" {
+		if keyType := reflect.TypeOf(v.Interface()).Key(); keyType.Kind() == reflect.String {
 			for i, field := range w.fields {
-				if v := v.MapIndex(reflect.ValueOf(field.name)); v.IsValid() && v.Interface() != nil {
+				key := reflect.Indirect(reflect.New(keyType))
+				key.SetString(field.name)
+				if v := v.MapIndex(key); v.IsValid() && v.Interface() != nil {
 					r[i], _ = marshalText(v.Interface())
 				}
 			}
 		} else {
-			return fmt.Errorf("only can write record from map which is string")
+			return fmt.Errorf("only can write record from map which is string kind")
 		}
 	case reflect.Struct:
 		for i, field := range w.fields {
