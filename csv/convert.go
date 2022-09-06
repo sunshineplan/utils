@@ -1,6 +1,7 @@
 package csv
 
 import (
+	"encoding"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,22 @@ import (
 )
 
 var errNilPtr = errors.New("destination pointer is nil") // embedded in descriptive error
+
+func marshalText(i any) (text string, err error) {
+	var b []byte
+	switch v := i.(type) {
+	case nil:
+	case string:
+		text = v
+	case encoding.TextMarshaler:
+		b, err = v.MarshalText()
+		text = string(b)
+	default:
+		b, err = json.Marshal(v)
+		text = string(b)
+	}
+	return
+}
 
 func convert(src string) any {
 	if i64, err := strconv.ParseInt(src, 10, 64); err == nil {

@@ -2,7 +2,6 @@ package csv
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
@@ -135,12 +134,7 @@ func (w *Writer) Write(record any) error {
 		if reflect.TypeOf(v.Interface()).Key().Name() == "string" {
 			for i, field := range w.fields {
 				if v := v.MapIndex(reflect.ValueOf(field.name)); v.IsValid() && v.Interface() != nil {
-					if vi := v.Interface(); reflect.TypeOf(vi).Kind() == reflect.String {
-						r[i] = vi.(string)
-					} else {
-						b, _ := json.Marshal(vi)
-						r[i] = string(b)
-					}
+					r[i], _ = marshalText(v.Interface())
 				}
 			}
 		} else {
@@ -163,12 +157,7 @@ func (w *Writer) Write(record any) error {
 				}
 			}
 			if found {
-				if v := val.Interface(); reflect.TypeOf(v).Kind() == reflect.String {
-					r[i] = v.(string)
-				} else {
-					b, _ := json.Marshal(v)
-					r[i] = string(b)
-				}
+				r[i], _ = marshalText(val.Interface())
 			}
 		}
 	case reflect.Slice:
@@ -181,12 +170,7 @@ func (w *Writer) Write(record any) error {
 			for i, field := range w.fields {
 				for _, e := range d {
 					if field.name == e.Key {
-						if s, ok := e.Value.(string); ok {
-							r[i] = s
-						} else if e.Value != nil {
-							b, _ := json.Marshal(e.Value)
-							r[i] = string(b)
-						}
+						r[i], _ = marshalText(e.Value)
 						break
 					}
 				}
