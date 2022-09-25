@@ -12,9 +12,9 @@ import (
 func UserAgentString() (string, error) {
 	result, err := executor.ExecuteConcurrentArg(
 		[]string{
-			"https://raw.githubusercontent.com/sunshineplan/useragent/main/user-agent",
-			"https://cdn.jsdelivr.net/gh/sunshineplan/useragent/user-agent",
-			"https://fastly.jsdelivr.net/gh/sunshineplan/useragent/user-agent",
+			"https://raw.githubusercontent.com/sunshineplan/useragent/main/README.md",
+			"https://cdn.jsdelivr.net/gh/sunshineplan/useragent/README.md",
+			"https://fastly.jsdelivr.net/gh/sunshineplan/useragent/README.md",
 		},
 		func(url string) (any, error) {
 			return http.Get(url)
