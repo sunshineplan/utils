@@ -12,16 +12,16 @@ func init() {
 }
 
 type random[E any] struct {
-	items []*E
+	items []E
 }
 
-func Random[E any](items ...*E) (LoadBalancer[E], error) {
+func Random[E any](items ...E) (LoadBalancer[E], error) {
 	if len(items) == 0 {
 		return nil, ErrEmptyLoadBalancer
 	}
 	return &random[E]{items: items}, nil
 }
 
-func (r *random[E]) Next() *E {
+func (r *random[E]) Next() E {
 	return r.items[rand.Intn(len(r.items))]
 }
