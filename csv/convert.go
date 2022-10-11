@@ -64,14 +64,30 @@ func convertAssign(dest any, src string) error {
 		*d = []byte(src)
 		return nil
 	case *bool:
+		if d == nil {
+			return errNilPtr
+		}
 		bv, err := strconv.ParseBool(src)
 		if err == nil {
 			*d = bv
 		}
 		return err
 	case *any:
+		if d == nil {
+			return errNilPtr
+		}
 		*d = src
 		return nil
+	case json.Unmarshaler:
+		if d == nil {
+			return errNilPtr
+		}
+		return d.UnmarshalJSON([]byte(src))
+	case encoding.TextUnmarshaler:
+		if d == nil {
+			return errNilPtr
+		}
+		return d.UnmarshalText([]byte(src))
 	}
 
 	dpv := reflect.ValueOf(dest)
@@ -125,17 +141,14 @@ func convertAssign(dest any, src string) error {
 		}
 		dv.SetFloat(f64)
 		return nil
-	case reflect.String:
-		dv.SetString(src)
-		return nil
 	}
 
 	return json.Unmarshal([]byte(src), dest)
 }
 
 func strconvErr(err error) error {
-	if ne, ok := err.(*strconv.NumError); ok {
-		return ne.Err
+	if numError, ok := err.(*strconv.NumError); ok {
+		return numError.Err
 	}
 	return err
 }
