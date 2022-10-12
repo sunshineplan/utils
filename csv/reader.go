@@ -1,6 +1,7 @@
 package csv
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -33,6 +34,7 @@ func NewReader(r io.Reader, hasFields bool) *Reader {
 		if err != nil {
 			panic(err)
 		}
+		reader.fields[0] = string(bytes.TrimPrefix([]byte(reader.fields[0]), utf8bom))
 	}
 	return reader
 }
