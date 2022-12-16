@@ -1,14 +1,31 @@
 package workers
 
 import (
+	"context"
 	"math/rand"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
+
+func TestFunction(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	var n uint32
+	Function(ctx, func(ctx context.Context) {
+		if ctx.Err() == nil {
+			atomic.AddUint32(&n, 1)
+			time.Sleep(2 * time.Second)
+		}
+	})
+	if expect := uint32(defaultWorkers); n != expect {
+		t.Errorf("expected %v; got %v", expect, n)
+	}
+}
 
 func TestSlice(t *testing.T) {
 	type test struct {
