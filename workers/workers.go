@@ -1,7 +1,9 @@
 package workers
 
 import (
+	"context"
 	"runtime"
+	"time"
 )
 
 // NumCPU returns the number of logical CPUs usable by the current process.
@@ -19,6 +21,11 @@ func SetLimit(n int) {
 	defaultWorkers = n
 }
 
+// Function runs the function f with default workers limit until ctx.Done is closed.
+func Function(ctx context.Context, f func(context.Context)) {
+	RunFunction(ctx, defaultWorkers, f)
+}
+
 // Slice runs the slice with default workers limit.
 func Slice[E any](s []E, f func(int, E)) {
 	RunSlice(defaultWorkers, s, f)
@@ -32,6 +39,27 @@ func Map[K comparable, V any](m map[K]V, f func(K, V)) {
 // Range runs the range with default workers limit.
 func Range[Int Integer](start, end Int, f func(Int)) {
 	RunRange(defaultWorkers, start, end, f)
+}
+
+// RunFunction runs the function f with limit until ctx.Done is closed.
+func RunFunction(ctx context.Context, limit int, f func(context.Context)) {
+	if limit <= 0 {
+		limit = NumCPU()
+	}
+
+	c := make(chan struct{}, limit)
+	for ctx.Err() == nil {
+		c <- struct{}{}
+		go func() {
+			defer func() { <-c }()
+			f(ctx)
+		}()
+	}
+
+	for len(c) > 0 {
+		time.Sleep(time.Second)
+	}
+	close(c)
 }
 
 // RunSlice runs the slice with limit.
@@ -54,6 +82,7 @@ func RunSlice[E any](limit int, s []E, f func(int, E)) {
 	for i := 0; i < limit; i++ {
 		c <- struct{}{}
 	}
+	close(c)
 }
 
 // RunMap runs the map with limit.
@@ -76,6 +105,7 @@ func RunMap[K comparable, V any](limit int, m map[K]V, f func(K, V)) {
 	for i := 0; i < limit; i++ {
 		c <- struct{}{}
 	}
+	close(c)
 }
 
 // RunRange runs the range with limit.
@@ -102,4 +132,5 @@ func RunRange[Int Integer](limit int, start, end Int, f func(Int)) {
 	for i := 0; i < limit; i++ {
 		c <- struct{}{}
 	}
+	close(c)
 }
