@@ -1,12 +1,12 @@
 package csv
 
 import (
-	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"sync"
 )
 
 // A Reader reads records from a CSV-encoded file.
@@ -34,7 +34,6 @@ func NewReader(r io.Reader, hasFields bool) *Reader {
 		if err != nil {
 			panic(err)
 		}
-		reader.fields[0] = string(bytes.TrimPrefix([]byte(reader.fields[0]), utf8bom))
 	}
 	return reader
 }
@@ -47,6 +46,22 @@ func ReadFile(file string, hasFields bool) (*Reader, error) {
 	}
 
 	return NewReader(f, hasFields), nil
+}
+
+var once sync.Once
+
+func (r *Reader) Read() (record []string, err error) {
+	record, err = r.Reader.Read()
+	if err != nil {
+		once.Do(func() {
+			if s := record[0]; len(s) >= 3 {
+				if b := s[:3]; b == string(utf8bom) {
+					record[0] = s[3:]
+				}
+			}
+		})
+	}
+	return
 }
 
 // SetFields sets csv fields.
