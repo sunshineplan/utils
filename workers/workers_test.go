@@ -22,7 +22,7 @@ func TestFunction(t *testing.T) {
 			time.Sleep(2 * time.Second)
 		}
 	})
-	if expect := uint32(defaultWorkers); n != expect {
+	if expect, n := uint32(defaultWorkers), atomic.LoadUint32(&n); n != expect {
 		t.Errorf("expected %v; got %v", expect, n)
 	}
 }
