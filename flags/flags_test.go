@@ -23,4 +23,12 @@ func TestParse(t *testing.T) {
 	if *var2 != "" {
 		t.Errorf("expected %q; got %q", "", *var2)
 	}
+
+	UseStrict(true)
+	defer func() {
+		if err := recover(); err == nil {
+			t.Error("gave no panic; want panic")
+		}
+	}()
+	Parse()
 }

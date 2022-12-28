@@ -10,11 +10,13 @@ import (
 	"github.com/sunshineplan/utils/txt"
 )
 
+var Strict bool
+
 var config string
 
 func SetConfigFile(path string) { config = path }
 
-func getArgs() (args []string) {
+func getArgs(strict bool) (args []string) {
 	lines, err := txt.ReadFile(config)
 	if err != nil {
 		panic(err)
@@ -26,9 +28,17 @@ func getArgs() (args []string) {
 		}
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
-			panic(fmt.Sprintln("cannot parse", line))
+			panic(fmt.Sprintf("cannot parse %q", line))
 		}
-		args = append(args, fmt.Sprintf("-%s=%s", strings.TrimSpace(parts[0]), unquote(parts[1])))
+		if key := strings.TrimSpace(parts[0]); flag.Lookup(key) != nil {
+			args = append(args, fmt.Sprintf("-%s=%s", key, unquote(parts[1])))
+		} else {
+			if err := fmt.Sprintf("undefined flag %q", key); strict {
+				panic(err)
+			} else {
+				fmt.Println("[Warning]", err)
+			}
+		}
 	}
 	return
 }
@@ -41,10 +51,22 @@ func unquote(s string) string {
 	return s
 }
 
-func Parse() {
+func parse(strict bool) {
 	if config != "" {
-		flag.CommandLine.Parse(append(getArgs(), os.Args[1:]...))
+		flag.CommandLine.Parse(append(getArgs(strict), os.Args[1:]...))
 		return
 	}
 	flag.Parse()
+}
+
+func UseStrict(strict bool) {
+	Strict = strict
+}
+
+func Parse() {
+	parse(Strict)
+}
+
+func ParseStrict() {
+	parse(true)
 }
