@@ -24,17 +24,4 @@ func TestOCR(t *testing.T) {
 	if expect := "OCR Space\r\n"; r1 != expect {
 		t.Errorf("expected %q; got %q", expect, r1)
 	}
-
-	r2, err := OCR2(bytes.NewReader(b))
-	if err != nil {
-		if err == errNoResult {
-			log.Print("maybe ocr api is down")
-		} else {
-			log.Print(err)
-		}
-		return
-	}
-	if expect := "|OCR |"; r2 != expect {
-		t.Errorf("expected %q; got %q", expect, r2)
-	}
 }
