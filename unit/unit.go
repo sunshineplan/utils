@@ -16,29 +16,24 @@ func FormatBytes(n uint64) (result string) {
 	default:
 		result = fmt.Sprintf("%d B", n)
 	}
-
 	return
 }
 
 func FormatDuration(d time.Duration) (result string) {
-	if d > time.Hour*24 {
+	if d >= time.Hour*24 {
 		result = fmt.Sprintf("%dd", d/24/time.Hour)
 		d -= (d / time.Hour / 24) * (time.Hour * 24)
 	}
-
-	if d > time.Hour {
+	if d >= time.Hour {
 		result = fmt.Sprintf("%s%dh", result, d/time.Hour)
 		d -= d / time.Hour * time.Hour
 	}
-
-	if d > time.Minute {
+	if d >= time.Minute {
 		result = fmt.Sprintf("%s%dm", result, d/time.Minute)
 		d -= d / time.Minute * time.Minute
 	}
-
-	s := d / time.Second
-
-	result = fmt.Sprintf("%s%ds", result, s)
-
+	if s := d / time.Second; s > 0 {
+		result = fmt.Sprintf("%s%ds", result, s)
+	}
 	return
 }
