@@ -1,8 +1,10 @@
 package flags
 
 import (
+	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
@@ -19,6 +21,10 @@ func SetConfigFile(path string) { config = path }
 func getArgs(strict bool) (args []string) {
 	lines, err := txt.ReadFile(config)
 	if err != nil {
+		if !strict && errors.Is(err, fs.ErrNotExist) {
+			fmt.Println("config file is missing")
+			return
+		}
 		panic(err)
 	}
 	for _, line := range lines {
