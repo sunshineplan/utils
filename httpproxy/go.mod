@@ -1,5 +1,5 @@
 module github.com/sunshineplan/utils/httpproxy
 
-go 1.18
+go 1.19
 
-require golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f
+require golang.org/x/net v0.5.0
