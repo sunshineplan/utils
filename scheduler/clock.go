@@ -10,28 +10,28 @@ type Clock struct {
 }
 
 func AtClock(hour, min, sec int) *Clock {
-	if hour > 23 || hour < 0 ||
-		min > 59 || min < 0 ||
-		sec > 59 || sec < 0 {
+	if hour > 23 || hour < -1 ||
+		min > 59 || min < -1 ||
+		sec > 59 || sec < -1 {
 		panic(fmt.Sprintf("invalid clock: hour(%d) min(%d) sec(%d)", hour, min, sec))
 	}
 	return &Clock{hour, min, sec}
 }
 
-func Hour(hour int) *Clock {
+func AtHour(hour int) *Clock {
 	return AtClock(hour, 0, 0)
 }
 
-func Minute(min int) *Clock {
-	return AtClock(0, min, 0)
+func AtMinute(min int) *Clock {
+	return AtClock(-1, min, 0)
 }
 
-func Second(sec int) *Clock {
-	return AtClock(0, 0, sec)
+func AtSecond(sec int) *Clock {
+	return AtClock(-1, -1, sec)
 }
 
 func (c *Clock) Hour(hour int) *Clock {
-	if hour > 23 || hour < 0 {
+	if hour > 23 || hour < -1 {
 		panic(fmt.Sprintln("invalid hour", hour))
 	}
 	c.Hr = hour
@@ -39,7 +39,7 @@ func (c *Clock) Hour(hour int) *Clock {
 }
 
 func (c *Clock) Minute(min int) *Clock {
-	if min > 59 || min < 0 {
+	if min > 59 || min < -1 {
 		panic(fmt.Sprintln("invalid minute", min))
 	}
 	c.Min = min
@@ -47,7 +47,7 @@ func (c *Clock) Minute(min int) *Clock {
 }
 
 func (c *Clock) Second(sec int) *Clock {
-	if sec > 59 || sec < 0 {
+	if sec > 59 || sec < -1 {
 		panic(fmt.Sprintln("invalid second", sec))
 	}
 	c.Sec = sec
@@ -56,5 +56,7 @@ func (c *Clock) Second(sec int) *Clock {
 
 func (c Clock) IsMatched(t time.Time) bool {
 	hour, min, sec := t.Clock()
-	return c.Hr == hour && c.Min == min && c.Sec == sec
+	return (c.Hr == -1 || c.Hr == hour) &&
+		(c.Min == -1 || c.Min == min) &&
+		(c.Sec == -1 || c.Sec == sec)
 }
