@@ -14,9 +14,10 @@ var (
 )
 
 type Scheduler struct {
-	sync.Mutex
-	ticker    *time.Ticker
-	schedules []Time
+	mu sync.Mutex
+
+	ticker *time.Ticker
+	sched  multiSched
 
 	fn     func(time.Time)
 	ctx    context.Context
@@ -28,43 +29,38 @@ func NewScheduler() *Scheduler {
 }
 
 func (sched *Scheduler) At(schedules ...Time) *Scheduler {
-	sched.Lock()
-	defer sched.Unlock()
-	sched.schedules = append(sched.schedules, schedules...)
+	sched.mu.Lock()
+	defer sched.mu.Unlock()
+	sched.sched = append(sched.sched, schedules...)
 	return sched
 }
 
 func (sched *Scheduler) Clear() {
-	sched.Lock()
-	defer sched.Unlock()
-	sched.schedules = nil
+	sched.mu.Lock()
+	defer sched.mu.Unlock()
+	sched.sched = nil
 }
 
 func (sched *Scheduler) Run(fn func(time.Time)) *Scheduler {
-	sched.Lock()
-	defer sched.Unlock()
+	sched.mu.Lock()
+	defer sched.mu.Unlock()
 	sched.fn = fn
 	return sched
 }
 
 func (sched *Scheduler) init(fn bool) error {
-	sched.Lock()
-	defer sched.Unlock()
+	sched.mu.Lock()
+	defer sched.mu.Unlock()
 
 	if fn && sched.fn == nil {
 		return ErrNoFunction
-	} else if len(sched.schedules) == 0 {
+	} else if len(sched.sched) == 0 {
 		return ErrNoSchedule
 	}
 	if sched.ctx == nil || sched.ctx.Err() != nil {
 		sched.ticker = time.NewTicker(time.Second)
 		sched.ctx, sched.cancel = context.WithCancel(context.Background())
-		now := time.Now()
-		for _, i := range sched.schedules {
-			if i, ok := i.(*tickerSched); ok {
-				i.start = now
-			}
-		}
+		sched.sched.init(time.Now())
 		return nil
 	}
 	return ErrAlreadyRunning
@@ -78,14 +74,11 @@ func (sched *Scheduler) start(fn func(time.Time)) {
 		for {
 			select {
 			case t := <-sched.ticker.C:
-				sched.Lock()
-				for _, i := range sched.schedules {
-					if i.IsMatched(t) {
-						go fn(t)
-						break
-					}
+				sched.mu.Lock()
+				if sched.sched.IsMatched(t) {
+					go fn(t)
 				}
-				sched.Unlock()
+				sched.mu.Unlock()
 			case <-sched.ctx.Done():
 				return
 			}
@@ -132,16 +125,14 @@ func (sched *Scheduler) Once() <-chan error {
 	go func() {
 		select {
 		case t := <-sched.ticker.C:
-			sched.Lock()
-			defer sched.Unlock()
-			for _, i := range sched.schedules {
-				if i.IsMatched(t) {
-					go func() {
-						sched.fn(t)
-						done <- nil
-					}()
-					return
-				}
+			sched.mu.Lock()
+			defer sched.mu.Unlock()
+			if sched.sched.IsMatched(t) {
+				go func() {
+					sched.fn(t)
+					done <- nil
+				}()
+				return
 			}
 		case <-sched.ctx.Done():
 			done <- sched.ctx.Err()
