@@ -2,17 +2,15 @@ package scheduler
 
 import "time"
 
-type Time interface {
+type Schedule interface {
 	IsMatched(time.Time) bool
 }
 
 var (
-	_ Time = sched{}
-	_ Time = Clock{}
-	_ Time = weekSched{}
-	_ Time = weekdaySched{}
-	_ Time = tickerSched{}
-	_ Time = multiSched{}
+	_ Schedule = sched{}
+	_ Schedule = weekSched{}
+	_ Schedule = weekdaySched{}
+	_ Schedule = tickerSched{}
 )
 
 var (
@@ -27,7 +25,7 @@ var (
 	}
 )
 
-func ScheduleFromString(str ...string) Time {
+func ScheduleFromString(str ...string) Schedule {
 	var s multiSched
 	for _, str := range str {
 		if t, err := parseTime(str, clockLayout); err == nil {
@@ -51,11 +49,11 @@ type sched struct {
 	clock *Clock
 }
 
-func Schedule(year int, month time.Month, day int, clock *Clock) Time {
+func NewSchedule(year int, month time.Month, day int, clock *Clock) Schedule {
 	return sched{year, month, day, clock}
 }
 
-func TimeSchedule(t ...time.Time) Time {
+func TimeSchedule(t ...time.Time) Schedule {
 	var s multiSched
 	for _, t := range t {
 		year, month, day := t.Date()
@@ -84,7 +82,7 @@ type weekSched struct {
 	clock      *Clock
 }
 
-func ISOWeekSchedule(year int, week int, weekday *time.Weekday, clock *Clock) Time {
+func ISOWeekSchedule(year int, week int, weekday *time.Weekday, clock *Clock) Schedule {
 	return weekSched{year, week, weekday, clock}
 }
 
@@ -110,9 +108,26 @@ type weekdaySched struct {
 	clock   *Clock
 }
 
-func WeekdaySchedule(year int, month time.Month, weekday *time.Weekday, clock *Clock) Time {
+func WeekdaySchedule(year int, month time.Month, weekday *time.Weekday, clock *Clock) Schedule {
 	return weekdaySched{year, month, weekday, clock}
 }
+
+func ptrWeekday(weekday time.Weekday) *time.Weekday {
+	return &weekday
+}
+
+var Workdays = MultiSchedule(
+	WeekdaySchedule(0, 0, ptrWeekday(time.Monday), FullClock),
+	WeekdaySchedule(0, 0, ptrWeekday(time.Tuesday), FullClock),
+	WeekdaySchedule(0, 0, ptrWeekday(time.Wednesday), FullClock),
+	WeekdaySchedule(0, 0, ptrWeekday(time.Thursday), FullClock),
+	WeekdaySchedule(0, 0, ptrWeekday(time.Friday), FullClock),
+)
+
+var Weekends = MultiSchedule(
+	WeekdaySchedule(0, 0, ptrWeekday(time.Saturday), FullClock),
+	WeekdaySchedule(0, 0, ptrWeekday(time.Sunday), FullClock),
+)
 
 func (s weekdaySched) IsMatched(t time.Time) bool {
 	year, month, _ := t.Date()
@@ -134,7 +149,7 @@ type tickerSched struct {
 	start time.Time
 }
 
-func Every(d ...time.Duration) Time {
+func Every(d ...time.Duration) Schedule {
 	var s multiSched
 	for _, d := range d {
 		if d < time.Second || d%time.Second != 0 {
@@ -150,60 +165,4 @@ func (s tickerSched) IsMatched(t time.Time) bool {
 		return false
 	}
 	return t.Truncate(time.Second).Sub(s.start.Truncate(time.Second))%s.d == 0
-}
-
-type multiSched []Time
-
-func HourSchedule(hour ...int) Time {
-	var s multiSched
-	for _, hour := range hour {
-		s = append(s, AtHour(hour))
-	}
-	return s
-}
-
-func MinuteSchedule(min ...int) Time {
-	var s multiSched
-	for _, min := range min {
-		s = append(s, AtMinute(min))
-	}
-	return s
-}
-
-func SecondSchedule(sec ...int) Time {
-	var s multiSched
-	for _, sec := range sec {
-		s = append(s, AtSecond(sec))
-	}
-	return s
-}
-
-func ClockRange(start, end *Clock, d time.Duration) Time {
-	if d < time.Second || d%time.Second != 0 {
-		panic("the minimum duration is one second and must be a multiple of seconds")
-	}
-	var s multiSched
-	for t, end := start.Time(), end.Time(); t.Before(end) || t.Equal(end); t = t.Add(d) {
-		s = append(s, AtClock(t.Clock()))
-	}
-	return s
-}
-
-func (s *multiSched) init(t time.Time) {
-	for _, s := range *s {
-		if i, ok := s.(multiSched); ok {
-			i.init(t)
-		} else if i, ok := s.(*tickerSched); ok {
-			i.start = t
-		}
-	}
-}
-
-func (s multiSched) IsMatched(t time.Time) bool {
-	for _, i := range s {
-		if i.IsMatched(t) {
-			return true
-		}
-	}
-	return false
 }

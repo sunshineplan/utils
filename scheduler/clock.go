@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+var (
+	_ Schedule = Clock{}
+	_ Schedule = clockSched{}
+)
+
 type Clock struct {
 	hour, min, sec int
 }
@@ -18,6 +23,8 @@ func AtClock(hour, min, sec int) *Clock {
 	return &Clock{hour, min, sec}
 }
 
+var FullClock = AtClock(-1, -1, -1)
+
 func AtHour(hour int) *Clock {
 	return AtClock(hour, 0, 0)
 }
@@ -28,6 +35,30 @@ func AtMinute(min int) *Clock {
 
 func AtSecond(sec int) *Clock {
 	return AtClock(-1, -1, sec)
+}
+
+func HourSchedule(hour ...int) Schedule {
+	var s multiSched
+	for _, hour := range hour {
+		s = append(s, AtHour(hour))
+	}
+	return s
+}
+
+func MinuteSchedule(min ...int) Schedule {
+	var s multiSched
+	for _, min := range min {
+		s = append(s, AtMinute(min))
+	}
+	return s
+}
+
+func SecondSchedule(sec ...int) Schedule {
+	var s multiSched
+	for _, sec := range sec {
+		s = append(s, AtSecond(sec))
+	}
+	return s
 }
 
 func (c *Clock) Hour(hour int) *Clock {
@@ -77,4 +108,21 @@ func (c Clock) String() string {
 func (c Clock) Time() time.Time {
 	t, _ := time.Parse("15:04:05", c.String())
 	return t
+}
+
+type clockSched struct {
+	start, end *Clock
+	d          time.Duration
+}
+
+func ClockSchedule(start, end *Clock, d time.Duration) Schedule {
+	if d < time.Second || d%time.Second != 0 {
+		panic("the minimum duration is one second and must be a multiple of seconds")
+	}
+	return clockSched{start, end, d}
+}
+
+func (s clockSched) IsMatched(t time.Time) bool {
+	start, end, t := s.start.Time(), s.end.Time(), AtClock(t.Clock()).Time()
+	return (start.Equal(t) || start.Before(t) && end.After(t) || end.Equal(t)) && t.Sub(start)%s.d == 0
 }

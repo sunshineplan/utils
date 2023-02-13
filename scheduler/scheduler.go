@@ -17,7 +17,7 @@ type Scheduler struct {
 	mu sync.Mutex
 
 	ticker *time.Ticker
-	sched  multiSched
+	sched  complexSched
 
 	fn     func(time.Time)
 	ctx    context.Context
@@ -28,10 +28,17 @@ func NewScheduler() *Scheduler {
 	return &Scheduler{}
 }
 
-func (sched *Scheduler) At(schedules ...Time) *Scheduler {
+func (sched *Scheduler) At(schedules ...Schedule) *Scheduler {
 	sched.mu.Lock()
 	defer sched.mu.Unlock()
-	sched.sched = append(sched.sched, schedules...)
+	sched.sched = multiSched(schedules)
+	return sched
+}
+
+func (sched *Scheduler) AtCondition(schedules ...Schedule) *Scheduler {
+	sched.mu.Lock()
+	defer sched.mu.Unlock()
+	sched.sched = condSched(schedules)
 	return sched
 }
 
@@ -54,7 +61,7 @@ func (sched *Scheduler) init(fn bool) error {
 
 	if fn && sched.fn == nil {
 		return ErrNoFunction
-	} else if len(sched.sched) == 0 {
+	} else if sched.sched.len() == 0 {
 		return ErrNoSchedule
 	}
 	if sched.ctx == nil || sched.ctx.Err() != nil {
