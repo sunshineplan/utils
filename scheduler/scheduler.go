@@ -147,3 +147,7 @@ func (sched *Scheduler) Once() <-chan error {
 	}()
 	return done
 }
+
+func Forever() {
+	select {}
+}
