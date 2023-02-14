@@ -16,8 +16,11 @@ var (
 type Scheduler struct {
 	mu sync.Mutex
 
-	ticker *time.Ticker
-	sched  complexSched
+	ticker  *time.Ticker
+	tc      chan time.Time
+	running int
+
+	sched complexSched
 
 	fn     func(time.Time)
 	ctx    context.Context
@@ -25,7 +28,7 @@ type Scheduler struct {
 }
 
 func NewScheduler() *Scheduler {
-	return &Scheduler{}
+	return &Scheduler{tc: make(chan time.Time, 4)}
 }
 
 func (sched *Scheduler) At(schedules ...Schedule) *Scheduler {
@@ -65,22 +68,50 @@ func (sched *Scheduler) init(fn bool) error {
 		return ErrNoSchedule
 	}
 	if sched.ctx == nil || sched.ctx.Err() != nil {
-		sched.ticker = time.NewTicker(time.Second)
 		sched.ctx, sched.cancel = context.WithCancel(context.Background())
+		sched.ticker = time.NewTicker(time.Second)
+		go func() {
+			for {
+				select {
+				case t := <-sched.ticker.C:
+					sched.mu.Lock()
+					for i := 0; i < sched.running; i++ {
+						sched.tc <- t
+					}
+					sched.mu.Unlock()
+				case <-sched.ctx.Done():
+					return
+				}
+			}
+		}()
 		sched.sched.init(time.Now())
 		return nil
 	}
 	return ErrAlreadyRunning
 }
 
+func (sched *Scheduler) add(n int) {
+	sched.mu.Lock()
+	defer sched.mu.Unlock()
+
+	sched.running += n
+}
+
 func (sched *Scheduler) start(fn func(time.Time)) {
 	if fn == nil {
 		panic("function cannot be nil")
 	}
+
+	sched.add(1)
+	go func() {
+		<-sched.ctx.Done()
+		sched.add(-1)
+	}()
+
 	go func() {
 		for {
 			select {
-			case t := <-sched.ticker.C:
+			case t := <-sched.tc:
 				sched.mu.Lock()
 				if sched.sched.IsMatched(t) {
 					go fn(t)
@@ -106,14 +137,6 @@ func (sched *Scheduler) Stop() {
 	sched.cancel()
 }
 
-func (sched *Scheduler) Do(fn func(time.Time)) error {
-	if err := sched.init(false); err == ErrNoSchedule {
-		return err
-	}
-	sched.start(fn)
-	return nil
-}
-
 func (sched *Scheduler) Immediately() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
@@ -129,9 +152,19 @@ func (sched *Scheduler) Once() <-chan error {
 		done <- err
 		return done
 	}
+
+	sched.add(1)
 	go func() {
 		select {
-		case t := <-sched.ticker.C:
+		case <-done:
+		case <-sched.ctx.Done():
+		}
+		sched.add(-1)
+	}()
+
+	go func() {
+		select {
+		case t := <-sched.tc:
 			sched.mu.Lock()
 			defer sched.mu.Unlock()
 			if sched.sched.IsMatched(t) {
@@ -146,6 +179,14 @@ func (sched *Scheduler) Once() <-chan error {
 		}
 	}()
 	return done
+}
+
+func (sched *Scheduler) Do(fn func(time.Time)) error {
+	if err := sched.init(false); err == ErrNoSchedule {
+		return err
+	}
+	sched.start(fn)
+	return nil
 }
 
 func Forever() {
