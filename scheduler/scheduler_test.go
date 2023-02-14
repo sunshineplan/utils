@@ -26,16 +26,16 @@ func TestScheduler(t *testing.T) {
 func TestTickerScheduler(t *testing.T) {
 	s := NewScheduler().At(Every(time.Second))
 	defer s.Stop()
-	var n int32
-	if err := s.Do(func(_ time.Time) { atomic.AddInt32(&n, 1) }); err != nil {
+	var a, b int32
+	if err := s.Do(func(_ time.Time) { atomic.AddInt32(&a, 1) }); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Do(func(_ time.Time) { atomic.AddInt32(&n, 1) }); err != nil {
+	if err := s.Do(func(_ time.Time) { atomic.AddInt32(&b, 1) }); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(2500 * time.Millisecond)
-	if n := atomic.LoadInt32(&n); n != 4 {
-		t.Errorf("expected 4; got %d", n)
+	if a, b := atomic.LoadInt32(&a), atomic.LoadInt32(&b); a != 2 || b != 2 {
+		t.Errorf("expected 2 2; got %d %d", a, b)
 	}
 }
 

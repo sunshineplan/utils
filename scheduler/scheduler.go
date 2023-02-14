@@ -75,8 +75,10 @@ func (sched *Scheduler) init(fn bool) error {
 				select {
 				case t := <-sched.ticker.C:
 					sched.mu.Lock()
-					for i := 0; i < sched.running; i++ {
-						sched.tc <- t
+					if sched.sched.IsMatched(t) {
+						for i := 0; i < sched.running; i++ {
+							sched.tc <- t
+						}
 					}
 					sched.mu.Unlock()
 				case <-sched.ctx.Done():
@@ -112,11 +114,7 @@ func (sched *Scheduler) start(fn func(time.Time)) {
 		for {
 			select {
 			case t := <-sched.tc:
-				sched.mu.Lock()
-				if sched.sched.IsMatched(t) {
-					go fn(t)
-				}
-				sched.mu.Unlock()
+				go fn(t)
 			case <-sched.ctx.Done():
 				return
 			}
@@ -165,15 +163,10 @@ func (sched *Scheduler) Once() <-chan error {
 	go func() {
 		select {
 		case t := <-sched.tc:
-			sched.mu.Lock()
-			defer sched.mu.Unlock()
-			if sched.sched.IsMatched(t) {
-				go func() {
-					sched.fn(t)
-					done <- nil
-				}()
-				return
-			}
+			go func() {
+				sched.fn(t)
+				done <- nil
+			}()
 		case <-sched.ctx.Done():
 			done <- sched.ctx.Err()
 		}
