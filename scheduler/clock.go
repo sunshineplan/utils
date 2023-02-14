@@ -10,6 +10,11 @@ var (
 	_ Schedule = clockSched{}
 )
 
+var clockLayout = []string{
+	"15:04",
+	"15:04:05",
+}
+
 type Clock struct {
 	hour, min, sec int
 }
@@ -35,6 +40,14 @@ func AtMinute(min int) *Clock {
 
 func AtSecond(sec int) *Clock {
 	return AtClock(-1, -1, sec)
+}
+
+func ClockFromString(str string) *Clock {
+	t, err := parseTime(str, clockLayout)
+	if err != nil {
+		panic(err)
+	}
+	return AtClock(t.Clock())
 }
 
 func HourSchedule(hour ...int) Schedule {

@@ -28,9 +28,9 @@ func TestClockSchedule(t *testing.T) {
 		{AtClock(9, 30, 0), true},
 		{AtClock(15, 0, 0), true},
 		{AtClock(13, 0, 0), true},
-		{AtClock(9, 29, 0), false},
-		{AtClock(9, 31, 0), true},
-		{AtClock(16, 0, 0), false},
+		{ClockFromString("9:29"), false},
+		{ClockFromString("9:31"), true},
+		{ClockFromString("16:00:00"), false},
 	} {
 		if res := s.IsMatched(testcase.clock.Time()); res != testcase.expected {
 			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.expected, res)

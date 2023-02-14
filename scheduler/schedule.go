@@ -13,23 +13,17 @@ var (
 	_ Schedule = tickerSched{}
 )
 
-var (
-	clockLayout = []string{
-		"15:04",
-		"15:04:05",
-	}
-	datetimeLayout = []string{
-		"2006-01-02",
-		"2006-01-02 15:04",
-		"2006-01-02 15:04:05",
-	}
-)
+var datetimeLayout = []string{
+	"2006-01-02",
+	"2006-01-02 15:04",
+	"2006-01-02 15:04:05",
+}
 
 func ScheduleFromString(str ...string) Schedule {
 	var s multiSched
 	for _, str := range str {
-		if t, err := parseTime(str, clockLayout); err == nil {
-			s = append(s, AtClock(t.Clock()))
+		if _, err := parseTime(str, clockLayout); err == nil {
+			s = append(s, ClockFromString(str))
 			continue
 		}
 
