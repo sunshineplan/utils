@@ -12,8 +12,9 @@ import (
 // A Reader reads records from a CSV-encoded file.
 type Reader struct {
 	*csv.Reader
-	io.Closer
+	closer io.Closer
 
+	once   sync.Once
 	fields []string
 
 	next    []string
@@ -22,11 +23,10 @@ type Reader struct {
 
 // NewReader returns a new Reader that reads from r.
 func NewReader(r io.Reader, hasFields bool) *Reader {
-	var reader *Reader
+	reader := &Reader{Reader: csv.NewReader(r)}
 	if closer, ok := r.(io.Closer); ok {
-		reader = &Reader{Reader: csv.NewReader(r), Closer: closer}
+		reader.closer = closer
 	}
-	reader = &Reader{Reader: csv.NewReader(r), Closer: io.NopCloser(r)}
 
 	if hasFields {
 		var err error
@@ -44,19 +44,18 @@ func ReadFile(file string, hasFields bool) (*Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return NewReader(f, hasFields), nil
 }
 
-var once sync.Once
-
 func (r *Reader) Read() (record []string, err error) {
 	record, err = r.Reader.Read()
-	if err != nil {
-		once.Do(func() {
-			if s := record[0]; len(s) >= 3 {
-				if b := s[:3]; b == string(utf8bom) {
-					record[0] = s[3:]
+	if err == nil {
+		r.once.Do(func() {
+			if len(record) > 0 {
+				if s := record[0]; len(s) >= 3 {
+					if b := s[:3]; b == string(utf8bom) {
+						record[0] = s[3:]
+					}
 				}
 			}
 		})
@@ -94,7 +93,6 @@ func (r *Reader) Scan(dest ...any) error {
 			return fmt.Errorf("Scan error on field index %d: %v", i, err)
 		}
 	}
-
 	return nil
 }
 
@@ -104,11 +102,9 @@ func (r *Reader) Decode(dest any) error {
 	if len(r.fields) == 0 {
 		return fmt.Errorf("csv fields is not parsed")
 	}
-
 	if r.next == nil && r.nextErr == nil {
 		return fmt.Errorf("Decode called without calling Next")
 	}
-
 	if r.nextErr != nil {
 		return r.nextErr
 	}
@@ -124,8 +120,14 @@ func (r *Reader) Decode(dest any) error {
 	if err != nil {
 		return err
 	}
-
 	return json.Unmarshal(b, dest)
+}
+
+func (r *Reader) Close() error {
+	if r.closer != nil {
+		return r.closer.Close()
+	}
+	return nil
 }
 
 // DecodeAll decodes each record from r into dest.
