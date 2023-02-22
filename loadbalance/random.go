@@ -3,14 +3,9 @@ package loadbalance
 import (
 	"math/rand"
 	"sync"
-	"time"
 )
 
 var _ LoadBalancer[struct{}] = &random[struct{}]{}
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 type random[E any] struct {
 	sync.Mutex

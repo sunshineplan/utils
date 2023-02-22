@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	SkipErr       = errors.New("skip")
-	AllSkippedErr = errors.New("all skipped")
+	ErrSkip       = errors.New("skip")
+	ErrAllSkipped = errors.New("all skipped")
 )
 
 type key int
@@ -62,7 +62,7 @@ func (ctx *Context[T]) run(executor func(chan<- any, chan<- error), rc chan<- an
 		defer ctx.mu.Unlock()
 
 		if err != nil {
-			if err != SkipErr {
+			if err != ErrSkip {
 				ctx.res = append(ctx.res, err)
 			}
 
@@ -71,7 +71,7 @@ func (ctx *Context[T]) run(executor func(chan<- any, chan<- error), rc chan<- an
 				if l := len(ctx.res); l > 0 {
 					ec <- ctx.res[l-1]
 				} else {
-					ec <- AllSkippedErr
+					ec <- ErrAllSkipped
 				}
 			}
 			ctx.count--

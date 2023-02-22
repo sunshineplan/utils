@@ -13,7 +13,7 @@ func TestSkip(t *testing.T) {
 			if n == 0 {
 				return nil, tmp
 			}
-			return nil, SkipErr
+			return nil, ErrSkip
 		},
 	); err != tmp {
 		t.Errorf("expected %d; got %v", tmp, err)
@@ -22,9 +22,9 @@ func TestSkip(t *testing.T) {
 	if _, err := ExecuteSerial(
 		[]int{0, 1, 2},
 		func(n int) (any, error) {
-			return nil, SkipErr
+			return nil, ErrSkip
 		},
-	); err != AllSkippedErr {
-		t.Errorf("expected %s; got %v", AllSkippedErr, err)
+	); err != ErrAllSkipped {
+		t.Errorf("expected %s; got %v", ErrAllSkipped, err)
 	}
 }

@@ -3,7 +3,6 @@ package executor
 import (
 	"errors"
 	"math/rand"
-	"time"
 
 	"github.com/sunshineplan/utils/workers"
 )
@@ -21,10 +20,6 @@ const (
 )
 
 var defaultLimit = workers.NumCPU()
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // SetLimit sets default limit.
 // If n < 0, represents no limit.

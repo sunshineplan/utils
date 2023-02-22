@@ -73,8 +73,6 @@ func TestRange(t *testing.T) {
 }
 
 func TestLimit(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-
 	limit := rand.Intn(1000) + 51
 	workers := rand.Intn(50) + 1
 
