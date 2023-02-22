@@ -110,7 +110,7 @@ func ptrWeekday(weekday time.Weekday) *time.Weekday {
 	return &weekday
 }
 
-var Workdays = MultiSchedule(
+var Weekdays = MultiSchedule(
 	WeekdaySchedule(0, 0, ptrWeekday(time.Monday), FullClock),
 	WeekdaySchedule(0, 0, ptrWeekday(time.Tuesday), FullClock),
 	WeekdaySchedule(0, 0, ptrWeekday(time.Wednesday), FullClock),
