@@ -41,7 +41,7 @@ func (d *Dialer) Dial() (*smtp.Client, error) {
 			return nil, err
 		}
 	}
-	if ok, _ := client.Extension("AUTH"); ok {
+	if ok, _ := client.Extension("AUTH"); ok && d.Account != "" && d.Password != "" {
 		if err = client.Auth2(&smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}); err != nil {
 			client.Quit()
 			return nil, err
@@ -83,7 +83,7 @@ func (d *Dialer) Send(msg ...*Message) error {
 		}
 
 		c := make(chan error, 1)
-		go func() { c <- client.SendMail(m.From, m.RcptList(), m.Bytes(generateMsgID(d.Account))) }()
+		go func() { c <- client.SendMail(m.From, m.RcptList(), m.Bytes(d.Account)) }()
 
 		select {
 		case <-time.After(d.Timeout):

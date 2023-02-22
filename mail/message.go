@@ -82,14 +82,15 @@ func (m *Message) Bytes(id string) []byte {
 		e, err := ParseAddress(m.From)
 		if err != nil {
 			if hostname, _ := os.Hostname(); hostname != "" {
-				id = generateMsgID(hostname)
+				id = hostname
 			} else {
-				id = generateMsgID("localhost")
+				id = "localhost"
 			}
 		} else {
-			id = generateMsgID(e.Address)
+			id = e.Address
 		}
 	}
+	id = generateMsgID(id)
 
 	var buf bytes.Buffer
 	w := textproto.NewWriter(bufio.NewWriter(&buf))
