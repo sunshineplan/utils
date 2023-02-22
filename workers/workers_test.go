@@ -15,14 +15,14 @@ import (
 func TestFunction(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	var n uint32
+	var n atomic.Int32
 	Function(ctx, func(ctx context.Context) {
 		if ctx.Err() == nil {
-			atomic.AddUint32(&n, 1)
+			n.Add(1)
 			time.Sleep(2 * time.Second)
 		}
 	})
-	if expect, n := uint32(defaultWorkers), atomic.LoadUint32(&n); n != expect {
+	if expect, n := int32(defaultWorkers), n.Load(); n != expect {
 		t.Errorf("expected %v; got %v", expect, n)
 	}
 }

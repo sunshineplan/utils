@@ -12,8 +12,8 @@ var (
 
 type Listener struct {
 	net.Listener
-	read    uint64
-	written uint64
+	read    atomic.Int64
+	written atomic.Int64
 }
 
 func NewListener(l net.Listener) *Listener {
@@ -28,12 +28,12 @@ func (l *Listener) Accept() (net.Conn, error) {
 	return &conn{Conn: c, l: l}, nil
 }
 
-func (l *Listener) ReadCount() uint64 {
-	return atomic.LoadUint64(&l.read)
+func (l *Listener) ReadCount() int64 {
+	return l.read.Load()
 }
 
-func (l *Listener) WriteCount() uint64 {
-	return atomic.LoadUint64(&l.written)
+func (l *Listener) WriteCount() int64 {
+	return l.written.Load()
 }
 
 type conn struct {
@@ -46,7 +46,7 @@ func (conn *conn) Write(b []byte) (n int, err error) {
 	if err != nil {
 		return
 	}
-	atomic.AddUint64(&conn.l.written, uint64(n))
+	conn.l.written.Add(int64(n))
 	return
 }
 
@@ -55,6 +55,6 @@ func (conn *conn) Read(b []byte) (n int, err error) {
 	if err != nil {
 		return
 	}
-	atomic.AddUint64(&conn.l.read, uint64(n))
+	conn.l.read.Add(int64(n))
 	return
 }

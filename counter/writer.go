@@ -12,7 +12,7 @@ var (
 
 type Writer struct {
 	io.Writer
-	n uint64
+	n atomic.Int64
 }
 
 func NewWriter(w io.Writer) *Writer {
@@ -24,13 +24,12 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	if err != nil {
 		return
 	}
-
-	atomic.AddUint64(&w.n, uint64(n))
+	w.n.Add(int64(n))
 	return
 }
 
-func (w *Writer) Count() uint64 {
-	return atomic.LoadUint64(&w.n)
+func (w *Writer) Count() int64 {
+	return w.n.Load()
 }
 
 type WriteCloser struct {

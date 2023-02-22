@@ -12,7 +12,7 @@ var (
 
 type Reader struct {
 	io.Reader
-	n uint64
+	n atomic.Int64
 }
 
 func NewReader(r io.Reader) *Reader {
@@ -24,13 +24,12 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 	if err != nil {
 		return
 	}
-
-	atomic.AddUint64(&r.n, uint64(n))
+	r.n.Add(int64(n))
 	return
 }
 
-func (r *Reader) Count() uint64 {
-	return atomic.LoadUint64(&r.n)
+func (r *Reader) Count() int64 {
+	return r.n.Load()
 }
 
 type ReadCloser struct {

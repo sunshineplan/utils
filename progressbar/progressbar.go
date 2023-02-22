@@ -32,8 +32,8 @@ type ProgressBar struct {
 	blockWidth int
 	refresh    time.Duration
 	template   *template.Template
-	current    uint64
-	total      uint64
+	current    atomic.Int64
+	total      int64
 	lastWidth  int
 	speed      float64
 	unit       string
@@ -68,7 +68,7 @@ func New64(total int64) *ProgressBar {
 		blockWidth: 40,
 		refresh:    5 * time.Second,
 		template:   template.Must(template.New("ProgressBar").Parse(defaultTemplate)),
-		total:      uint64(total),
+		total:      int64(total),
 	}
 }
 
@@ -110,13 +110,13 @@ func (pb *ProgressBar) SetUnit(unit string) *ProgressBar {
 }
 
 // Add adds the specified amount to the progress bar.
-func (pb *ProgressBar) Add(n uint64) {
-	atomic.AddUint64(&pb.current, n)
+func (pb *ProgressBar) Add(n int64) {
+	pb.current.Add(n)
 }
 
-func (pb *ProgressBar) now() uint64 {
+func (pb *ProgressBar) now() int64 {
 	if pb.cw == nil {
-		return atomic.LoadUint64(&pb.current)
+		return pb.current.Load()
 	}
 	return pb.cw.Count()
 }
@@ -180,7 +180,7 @@ func (pb *ProgressBar) startCount() {
 			if now > pb.total {
 				now = pb.total
 			}
-			done := int(uint64(pb.blockWidth) * now / pb.total)
+			done := int(int64(pb.blockWidth) * now / pb.total)
 			percent := float64(now) * 100 / float64(pb.total)
 
 			var progressed string
@@ -202,9 +202,9 @@ func (pb *ProgressBar) startCount() {
 					Done:    progressed,
 					Undone:  strings.Repeat(" ", pb.blockWidth-done),
 					Speed:   unit.FormatBytes(uint64(pb.speed)) + "/s",
-					Current: unit.FormatBytes(now),
+					Current: unit.FormatBytes(uint64(now)),
 					Percent: fmt.Sprintf("%.2f%%", percent),
-					Total:   unit.FormatBytes(pb.total),
+					Total:   unit.FormatBytes(uint64(pb.total)),
 					Elapsed: fmt.Sprintf("Elapsed: %s", unit.FormatDuration(time.Since(pb.start))),
 					Left:    fmt.Sprintf("Left: %s", unit.FormatDuration(left)),
 				}
@@ -213,9 +213,9 @@ func (pb *ProgressBar) startCount() {
 					Done:    progressed,
 					Undone:  strings.Repeat(" ", pb.blockWidth-done),
 					Speed:   fmt.Sprintf("%.2f/s", pb.speed),
-					Current: strconv.FormatUint(now, 10),
+					Current: strconv.FormatInt(now, 10),
 					Percent: fmt.Sprintf("%.2f%%", percent),
-					Total:   strconv.FormatUint(pb.total, 10),
+					Total:   strconv.FormatInt(pb.total, 10),
 					Elapsed: fmt.Sprintf("Elapsed: %s", unit.FormatDuration(time.Since(pb.start))),
 					Left:    fmt.Sprintf("Left: %s", unit.FormatDuration(left)),
 				}

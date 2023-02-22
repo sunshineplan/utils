@@ -6,7 +6,7 @@ var _ LoadBalancer[struct{}] = &roundrobin[struct{}]{}
 
 type roundrobin[E any] struct {
 	items []E
-	next  uint32
+	next  atomic.Int64
 }
 
 func RoundRobin[E any](items ...E) (LoadBalancer[E], error) {
@@ -30,6 +30,6 @@ func WeightedRoundRobin[E any](items ...Weighted[E]) (LoadBalancer[E], error) {
 }
 
 func (r *roundrobin[E]) Next() E {
-	n := atomic.AddUint32(&r.next, 1)
+	n := r.next.Add(1)
 	return r.items[(int(n)-1)%len(r.items)]
 }

@@ -8,7 +8,7 @@ import (
 
 var data1 = []byte("Hello, World!")
 var data2 = []byte("Hello, Golang!")
-var dataLen = uint64(len(data1) + len(data2))
+var dataLen = int64(len(data1) + len(data2))
 
 func TestReader(t *testing.T) {
 	var buf bytes.Buffer

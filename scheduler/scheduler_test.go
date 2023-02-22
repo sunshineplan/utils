@@ -10,32 +10,45 @@ func TestScheduler(t *testing.T) {
 	now := time.Now()
 	s := NewScheduler().At(TimeSchedule(now.Add(time.Second)))
 	defer s.Stop()
-	var n int32
-	if err := s.Run(func(_ time.Time) { atomic.AddInt32(&n, 1) }).Start(); err != nil {
+	var n atomic.Int32
+	if err := s.Run(func(_ time.Time) { n.Add(1) }).Start(); err != nil {
 		t.Fatal(err)
 	}
-	if n := atomic.LoadInt32(&n); n != 0 {
+	if n := n.Load(); n != 0 {
 		t.Errorf("expected 0; got %d", n)
 	}
 	time.Sleep(1500 * time.Millisecond)
-	if n := atomic.LoadInt32(&n); n != 1 {
+	if n := n.Load(); n != 1 {
 		t.Errorf("expected 1; got %d", n)
 	}
 }
 
-func TestTickerScheduler(t *testing.T) {
+func TestTickerScheduler1(t *testing.T) {
 	s := NewScheduler().At(Every(time.Second))
 	defer s.Stop()
-	var a, b int32
-	if err := s.Do(func(_ time.Time) { atomic.AddInt32(&a, 1) }); err != nil {
+	var a, b atomic.Int32
+	if err := s.Do(func(_ time.Time) { a.Add(1) }); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Do(func(_ time.Time) { atomic.AddInt32(&b, 1) }); err != nil {
+	if err := s.Do(func(_ time.Time) { b.Add(1) }); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(2500 * time.Millisecond)
-	if a, b := atomic.LoadInt32(&a), atomic.LoadInt32(&b); a != 2 || b != 2 {
+	if a, b := a.Load(), b.Load(); a != 2 || b != 2 {
 		t.Errorf("expected 2 2; got %d %d", a, b)
+	}
+}
+
+func TestTickerScheduler2(t *testing.T) {
+	var n atomic.Int32
+	s := NewScheduler().At(Every(time.Minute)).Run(func(_ time.Time) { n.Add(1) })
+	defer s.Stop()
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1500 * time.Millisecond)
+	if n := n.Load(); n != 1 {
+		t.Errorf("expected 1; got %d", n)
 	}
 }
 
@@ -43,8 +56,8 @@ func TestOnce(t *testing.T) {
 	now := time.Now()
 	s := NewScheduler().At(TimeSchedule(now.Add(time.Second), now.Add(2*time.Second)))
 	defer s.Stop()
-	var n int32
-	done := s.Run(func(_ time.Time) { atomic.AddInt32(&n, 1) }).Once()
+	var n atomic.Int32
+	done := s.Run(func(_ time.Time) { n.Add(1) }).Once()
 	select {
 	case err := <-done:
 		if err != nil {
@@ -54,7 +67,7 @@ func TestOnce(t *testing.T) {
 		t.Fatal("timeout")
 	}
 	time.Sleep(1500 * time.Millisecond)
-	if n := atomic.LoadInt32(&n); n != 1 {
+	if n := n.Load(); n != 1 {
 		t.Errorf("expected 1; got %d", n)
 	}
 }

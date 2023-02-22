@@ -158,14 +158,14 @@ func (s *Server) RunTLS(certFile, keyFile string) error {
 	return s.run()
 }
 
-func (s *Server) ReadCount() uint64 {
+func (s *Server) ReadCount() int64 {
 	if s.l == nil {
 		return 0
 	}
 	return s.l.ReadCount()
 }
 
-func (s *Server) WriteCount() uint64 {
+func (s *Server) WriteCount() int64 {
 	if s.l == nil {
 		return 0
 	}

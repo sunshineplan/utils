@@ -16,13 +16,11 @@ type complexSched interface {
 	len() int
 }
 
-type multiSched []Schedule
-
-func MultiSchedule(schedules ...Schedule) Schedule {
-	return multiSched(schedules)
+type complex interface {
+	~[]Schedule
 }
 
-func (s multiSched) init(t time.Time) {
+func initComplexSched[sche complex](s sche, t time.Time) {
 	for _, s := range s {
 		if i, ok := s.(complexSched); ok {
 			i.init(t)
@@ -30,6 +28,16 @@ func (s multiSched) init(t time.Time) {
 			i.start = t
 		}
 	}
+}
+
+type multiSched []Schedule
+
+func MultiSchedule(schedules ...Schedule) Schedule {
+	return multiSched(schedules)
+}
+
+func (s multiSched) init(t time.Time) {
+	initComplexSched(s, t)
 }
 
 func (s multiSched) len() int {
@@ -52,13 +60,7 @@ func ConditionSchedule(schedules ...Schedule) Schedule {
 }
 
 func (s condSched) init(t time.Time) {
-	for _, s := range s {
-		if i, ok := s.(complexSched); ok {
-			i.init(t)
-		} else if i, ok := s.(*tickerSched); ok {
-			i.start = t
-		}
-	}
+	initComplexSched(s, t)
 }
 
 func (s condSched) len() int {
