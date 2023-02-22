@@ -86,7 +86,7 @@ func (sched *Scheduler) init(fn bool) error {
 				}
 			}
 		}()
-		sched.sched.init(time.Now())
+		sched.sched.init(time.Now().Add(time.Second))
 		return nil
 	}
 	return ErrAlreadyRunning
