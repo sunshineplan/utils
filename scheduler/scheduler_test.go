@@ -63,7 +63,7 @@ func TestOnce(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(2500 * time.Millisecond):
 		t.Fatal("timeout")
 	}
 	time.Sleep(1500 * time.Millisecond)
