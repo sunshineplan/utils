@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/sunshineplan/utils/cache"
 	"github.com/sunshineplan/utils/counter"
+	"github.com/sunshineplan/utils/log"
 )
 
 var certCache = cache.New(false)
@@ -23,6 +23,7 @@ var defaultReload = 24 * time.Hour
 // Server defines parameters for running an HTTP server.
 type Server struct {
 	*http.Server
+	*log.Logger
 	Unix string
 	Host string
 	Port string
@@ -37,7 +38,7 @@ type Server struct {
 
 // New creates an HTTP server.
 func New() *Server {
-	return &Server{Server: &http.Server{}}
+	return &Server{Server: &http.Server{}, Logger: log.Default()}
 }
 
 func (s *Server) SetReload(d time.Duration) {
@@ -47,31 +48,32 @@ func (s *Server) SetReload(d time.Duration) {
 // Run runs an HTTP server which can be gracefully shut down.
 func (s *Server) run() error {
 	idleConnsClosed := make(chan struct{})
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	go func() {
-		quit := make(chan os.Signal, 1)
-		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-		<-quit
-
-		if err := s.Shutdown(context.Background()); err != nil {
-			log.Println("Failed to close server:", err)
-		}
-		close(idleConnsClosed)
-	}()
-
-	go func() {
-		hup := make(chan os.Signal, 1)
-		signal.Notify(hup, syscall.SIGHUP)
-		for range hup {
-			if s.tls {
-				cert, err := s.loadCertificate()
-				if err != nil {
-					log.Println("Failed to reload certificate:", err)
-					continue
+		for {
+			switch <-c {
+			case syscall.SIGHUP:
+				s.Rotate()
+				if s.tls {
+					cert, err := s.loadCertificate()
+					if err != nil {
+						log.Println("Failed to reload certificate:", err)
+						continue
+					}
+					if s.reload == 0 {
+						s.reload = defaultReload
+					}
+					certCache.Set("cert", cert, s.reload, s.loadCertificate)
 				}
-				if s.reload == 0 {
-					s.reload = defaultReload
+			case syscall.SIGINT, syscall.SIGTERM:
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+				defer cancel()
+				if err := s.Shutdown(ctx); err != nil {
+					log.Println("Failed to close server:", err)
 				}
-				certCache.Set("cert", cert, s.reload, s.loadCertificate)
+				close(idleConnsClosed)
+				return
 			}
 		}
 	}()
