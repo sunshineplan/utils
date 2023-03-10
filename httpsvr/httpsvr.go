@@ -58,7 +58,7 @@ func (s *Server) run() error {
 				if s.tls {
 					cert, err := s.loadCertificate()
 					if err != nil {
-						log.Println("Failed to reload certificate:", err)
+						s.Println("Failed to reload certificate:", err)
 						continue
 					}
 					if s.reload == 0 {
@@ -70,7 +70,7 @@ func (s *Server) run() error {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 				defer cancel()
 				if err := s.Shutdown(ctx); err != nil {
-					log.Println("Failed to close server:", err)
+					s.Println("Failed to close server:", err)
 				}
 				close(idleConnsClosed)
 				return
