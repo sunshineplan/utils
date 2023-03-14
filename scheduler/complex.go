@@ -68,6 +68,9 @@ func (s condSched) len() int {
 }
 
 func (s condSched) IsMatched(t time.Time) bool {
+	if s.len() == 0 {
+		return false
+	}
 	for _, i := range s {
 		if !i.IsMatched(t) {
 			return false

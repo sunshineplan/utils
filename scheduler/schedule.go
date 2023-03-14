@@ -110,17 +110,17 @@ func ptrWeekday(weekday time.Weekday) *time.Weekday {
 	return &weekday
 }
 
-var Weekdays = MultiSchedule(
-	WeekdaySchedule(0, 0, ptrWeekday(time.Monday), FullClock),
-	WeekdaySchedule(0, 0, ptrWeekday(time.Tuesday), FullClock),
-	WeekdaySchedule(0, 0, ptrWeekday(time.Wednesday), FullClock),
-	WeekdaySchedule(0, 0, ptrWeekday(time.Thursday), FullClock),
-	WeekdaySchedule(0, 0, ptrWeekday(time.Friday), FullClock),
-)
+func Weekday(weekday ...time.Weekday) Schedule {
+	var s multiSched
+	for _, weekday := range weekday {
+		s = append(s, WeekdaySchedule(0, 0, ptrWeekday(weekday), FullClock))
+	}
+	return s
+}
 
-var Weekends = MultiSchedule(
-	WeekdaySchedule(0, 0, ptrWeekday(time.Saturday), FullClock),
-	WeekdaySchedule(0, 0, ptrWeekday(time.Sunday), FullClock),
+var (
+	Weekdays = Weekday(time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday)
+	Weekends = Weekday(time.Saturday, time.Sunday)
 )
 
 func (s weekdaySched) IsMatched(t time.Time) bool {
