@@ -60,8 +60,8 @@ func (d *Dialer) Send(msg ...*Message) error {
 	defer client.Quit()
 
 	for _, m := range msg {
-		if m.From == "" {
-			m.From = d.Account
+		if m.From == nil {
+			m.From = Receipt("", d.Account)
 		}
 
 		for _, i := range m.Attachments {
@@ -83,7 +83,7 @@ func (d *Dialer) Send(msg ...*Message) error {
 		}
 
 		c := make(chan error, 1)
-		go func() { c <- client.SendMail(m.From, m.RcptList(), m.Bytes(d.Account)) }()
+		go func() { c <- client.SendMail(m.From.Address, m.RcptList(), m.Bytes(d.Account)) }()
 
 		select {
 		case <-time.After(d.Timeout):

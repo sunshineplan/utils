@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
-	"encoding"
 	"encoding/base64"
 	"fmt"
 	"math"
@@ -17,42 +16,6 @@ import (
 	"strings"
 	"time"
 )
-
-var (
-	ParseAddress     = mail.ParseAddress
-	ParseAddressList = mail.ParseAddressList
-)
-
-var (
-	_ encoding.TextUnmarshaler = (*Receipts)(nil)
-	_ encoding.TextMarshaler   = Receipts{}
-)
-
-type Receipts []*mail.Address
-
-func (rcpts Receipts) String() string {
-	var b strings.Builder
-	for i, rcpt := range rcpts {
-		if i != 0 {
-			b.WriteString(", ")
-		}
-		fmt.Fprint(&b, rcpt)
-	}
-	return b.String()
-}
-
-func (rcpts *Receipts) UnmarshalText(text []byte) error {
-	addresses, err := ParseAddressList(string(text))
-	if err != nil {
-		return err
-	}
-	*rcpts = addresses
-	return nil
-}
-
-func (rcpts Receipts) MarshalText() ([]byte, error) {
-	return []byte(rcpts.String()), nil
-}
 
 var contentTypes = [...]string{"text/plain", "text/html"}
 
@@ -80,7 +43,7 @@ type Attachment struct {
 
 // Message represents an email message
 type Message struct {
-	From        string
+	From        *mail.Address
 	To, Cc, Bcc Receipts
 	Subject     string
 	Body        string
@@ -103,15 +66,14 @@ func (m *Message) RcptList() (rcpts []string) {
 
 func (m *Message) Bytes(id string) []byte {
 	if id == "" {
-		e, err := ParseAddress(m.From)
-		if err != nil {
+		if m.From != nil && m.From.Address != "" {
+			id = m.From.Address
+		} else {
 			if hostname, _ := os.Hostname(); hostname != "" {
 				id = hostname
 			} else {
 				id = "localhost"
 			}
-		} else {
-			id = e.Address
 		}
 	}
 	id = generateMsgID(id)
@@ -123,7 +85,7 @@ func (m *Message) Bytes(id string) []byte {
 	w.PrintfLine("Date: " + time.Now().Format(time.RFC1123Z))
 	w.PrintfLine("Message-ID: <%s>", id)
 	w.PrintfLine("Subject: =?UTF-8?B?%s?=", toBase64(m.Subject))
-	w.PrintfLine("From: " + m.From)
+	w.PrintfLine("From: " + m.From.String())
 	w.PrintfLine("To: " + m.To.String())
 	if len(m.Cc) > 0 {
 		w.PrintfLine("Cc: " + m.Cc.String())
