@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
+	"encoding"
 	"encoding/base64"
 	"fmt"
 	"math"
@@ -21,6 +22,37 @@ var (
 	ParseAddress     = mail.ParseAddress
 	ParseAddressList = mail.ParseAddressList
 )
+
+var (
+	_ encoding.TextUnmarshaler = (*Receipts)(nil)
+	_ encoding.TextMarshaler   = Receipts{}
+)
+
+type Receipts []*mail.Address
+
+func (rcpts Receipts) String() string {
+	var b strings.Builder
+	for i, rcpt := range rcpts {
+		if i != 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprint(&b, rcpt)
+	}
+	return b.String()
+}
+
+func (rcpts *Receipts) UnmarshalText(text []byte) error {
+	addresses, err := ParseAddressList(string(text))
+	if err != nil {
+		return err
+	}
+	*rcpts = addresses
+	return nil
+}
+
+func (rcpts Receipts) MarshalText() ([]byte, error) {
+	return []byte(rcpts.String()), nil
+}
 
 var contentTypes = [...]string{"text/plain", "text/html"}
 
@@ -49,32 +81,24 @@ type Attachment struct {
 // Message represents an email message
 type Message struct {
 	From        string
-	To, Cc, Bcc []string
+	To, Cc, Bcc Receipts
 	Subject     string
 	Body        string
 	ContentType ContentType
 	Attachments []*Attachment
 }
 
-func (m *Message) RcptList() []string {
-	rcptList := []string{}
-
-	toList, _ := ParseAddressList(strings.Join(m.To, ","))
-	for _, to := range toList {
-		rcptList = append(rcptList, to.Address)
+func (m *Message) RcptList() (rcpts []string) {
+	for _, to := range m.To {
+		rcpts = append(rcpts, to.Address)
 	}
-
-	ccList, _ := ParseAddressList(strings.Join(m.Cc, ","))
-	for _, cc := range ccList {
-		rcptList = append(rcptList, cc.Address)
+	for _, cc := range m.Cc {
+		rcpts = append(rcpts, cc.Address)
 	}
-
-	bccList, _ := ParseAddressList(strings.Join(m.Bcc, ","))
-	for _, bcc := range bccList {
-		rcptList = append(rcptList, bcc.Address)
+	for _, bcc := range m.Bcc {
+		rcpts = append(rcpts, bcc.Address)
 	}
-
-	return rcptList
+	return
 }
 
 func (m *Message) Bytes(id string) []byte {
@@ -100,9 +124,9 @@ func (m *Message) Bytes(id string) []byte {
 	w.PrintfLine("Message-ID: <%s>", id)
 	w.PrintfLine("Subject: =?UTF-8?B?%s?=", toBase64(m.Subject))
 	w.PrintfLine("From: " + m.From)
-	w.PrintfLine("To: " + strings.Join(m.To, ","))
+	w.PrintfLine("To: " + m.To.String())
 	if len(m.Cc) > 0 {
-		w.PrintfLine("Cc: " + strings.Join(m.Cc, ","))
+		w.PrintfLine("Cc: " + m.Cc.String())
 	}
 
 	boundary := randomString(16)
