@@ -4,6 +4,8 @@ import "time"
 
 type Schedule interface {
 	IsMatched(time.Time) bool
+	First(time.Time) time.Duration
+	TickerDuration() time.Duration
 }
 
 var (
@@ -62,12 +64,25 @@ func (s sched) IsMatched(t time.Time) bool {
 		(s.month == 0 || s.month == month) &&
 		(s.day == 0 || s.day == day) {
 		if s.clock == nil {
-			hour, min, sec := t.Clock()
-			return hour == 0 && min == 0 && sec == 0
+			s.clock = &Clock{}
 		}
 		return s.clock.IsMatched(t)
 	}
 	return false
+}
+
+func (s sched) First(t time.Time) time.Duration {
+	if s.clock == nil {
+		s.clock = &Clock{}
+	}
+	return s.clock.First(t)
+}
+
+func (s sched) TickerDuration() time.Duration {
+	if s.clock == nil {
+		return 24 * time.Hour
+	}
+	return s.clock.TickerDuration()
 }
 
 type weekSched struct {
@@ -87,12 +102,25 @@ func (s weekSched) IsMatched(t time.Time) bool {
 		(s.week == 0 || s.week == week) &&
 		(s.weekday == nil || *s.weekday == weekday) {
 		if s.clock == nil {
-			hour, min, sec := t.Clock()
-			return hour == 0 && min == 0 && sec == 0
+			s.clock = &Clock{}
 		}
 		return s.clock.IsMatched(t)
 	}
 	return false
+}
+
+func (s weekSched) First(t time.Time) time.Duration {
+	if s.clock == nil {
+		s.clock = &Clock{}
+	}
+	return s.clock.First(t)
+}
+
+func (s weekSched) TickerDuration() time.Duration {
+	if s.clock == nil {
+		return 24 * time.Hour
+	}
+	return s.clock.TickerDuration()
 }
 
 type weekdaySched struct {
@@ -130,12 +158,25 @@ func (s weekdaySched) IsMatched(t time.Time) bool {
 		(s.month == 0 || s.month == month) &&
 		(s.weekday == nil || *s.weekday == weekday) {
 		if s.clock == nil {
-			hour, min, sec := t.Clock()
-			return hour == 0 && min == 0 && sec == 0
+			s.clock = &Clock{}
 		}
 		return s.clock.IsMatched(t)
 	}
 	return false
+}
+
+func (s weekdaySched) First(t time.Time) time.Duration {
+	if s.clock == nil {
+		s.clock = &Clock{}
+	}
+	return s.clock.First(t)
+}
+
+func (s weekdaySched) TickerDuration() time.Duration {
+	if s.clock == nil {
+		return 24 * time.Hour
+	}
+	return s.clock.TickerDuration()
 }
 
 type tickerSched struct {
@@ -159,4 +200,12 @@ func (s tickerSched) IsMatched(t time.Time) bool {
 		return false
 	}
 	return t.Truncate(time.Second).Sub(s.start.Truncate(time.Second))%s.d == 0
+}
+
+func (s tickerSched) First(t time.Time) time.Duration {
+	return 0
+}
+
+func (s tickerSched) TickerDuration() time.Duration {
+	return s.d
 }

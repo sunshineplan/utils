@@ -16,6 +16,7 @@ var (
 type Scheduler struct {
 	mu sync.Mutex
 
+	timer  *time.Timer
 	ticker *time.Ticker
 	tc     chan time.Time
 	fn     []func(time.Time)
@@ -71,22 +72,36 @@ func (sched *Scheduler) init() error {
 	}
 	if sched.ctx == nil || sched.ctx.Err() != nil {
 		sched.ctx, sched.cancel = context.WithCancel(context.Background())
-		sched.ticker = time.NewTicker(time.Second)
-		go func() {
-			for {
-				select {
-				case t := <-sched.ticker.C:
-					sched.mu.Lock()
-					if sched.sched.IsMatched(t) {
-						sched.tc <- t
+		d, now := sched.sched.TickerDuration(), time.Now()
+		sched.sched.init(now)
+		sched.timer = time.AfterFunc(sched.sched.First(now), func() {
+			var t time.Time
+			sched.ticker, t = time.NewTicker(d), time.Now()
+			go func() {
+				for {
+					select {
+					case t := <-sched.ticker.C:
+						sched.mu.Lock()
+						if sched.sched.IsMatched(t) {
+							sched.tc <- t
+						}
+						sched.mu.Unlock()
+					case <-sched.ctx.Done():
+						sched.ticker.Stop()
+						return
 					}
-					sched.mu.Unlock()
-				case <-sched.ctx.Done():
-					return
 				}
+			}()
+			sched.mu.Lock()
+			defer sched.mu.Unlock()
+			if sched.sched.IsMatched(t) {
+				sched.tc <- t
 			}
+		})
+		go func() {
+			<-sched.ctx.Done()
+			sched.timer.Stop()
 		}()
-		sched.sched.init(time.Now().Add(time.Second))
 		return nil
 	}
 	return ErrAlreadyRunning
@@ -114,7 +129,6 @@ func (sched *Scheduler) Start() error {
 }
 
 func (sched *Scheduler) Stop() {
-	sched.ticker.Stop()
 	sched.cancel()
 }
 

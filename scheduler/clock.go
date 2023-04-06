@@ -98,11 +98,47 @@ func (c *Clock) Second(sec int) *Clock {
 	return c
 }
 
+func (c Clock) time(year int, month time.Month, day int) time.Time {
+	if c.hour == -1 {
+		c.hour = 0
+	}
+	if c.min == -1 {
+		c.min = 0
+	}
+	if c.sec == -1 {
+		c.sec = 0
+	}
+	return time.Date(year, month, day, c.hour, c.min, c.sec, 0, time.Local)
+}
+
 func (c Clock) IsMatched(t time.Time) bool {
 	hour, min, sec := t.Clock()
 	return (c.hour == -1 || c.hour == hour) &&
 		(c.min == -1 || c.min == min) &&
 		(c.sec == -1 || c.sec == sec)
+}
+
+func (c Clock) First(t time.Time) time.Duration {
+	return c.time(t.Date()).AddDate(0, 0, 1).Sub(t) % (24 * time.Hour)
+}
+
+func (c Clock) TickerDuration() time.Duration {
+	switch c.sec {
+	case -1:
+		return time.Second
+	default:
+		switch c.min {
+		case -1:
+			return time.Minute
+		default:
+			switch c.hour {
+			case -1:
+				return time.Hour
+			default:
+				return 24 * time.Hour
+			}
+		}
+	}
 }
 
 func (c Clock) String() string {
@@ -138,4 +174,15 @@ func ClockSchedule(start, end *Clock, d time.Duration) Schedule {
 func (s clockSched) IsMatched(t time.Time) bool {
 	start, end, t := s.start.Time(), s.end.Time(), AtClock(t.Clock()).Time()
 	return (start.Equal(t) || start.Before(t) && end.After(t) || end.Equal(t)) && t.Sub(start)%s.d == 0
+}
+
+func (s clockSched) First(t time.Time) time.Duration {
+	if s.IsMatched(t) {
+		return 0
+	}
+	return s.start.First(t)
+}
+
+func (s clockSched) TickerDuration() time.Duration {
+	return time.Second
 }

@@ -19,6 +19,24 @@ func TestClock(t *testing.T) {
 	}
 }
 
+func TestClockTickerDuration(t *testing.T) {
+	for _, testcase := range []struct {
+		clock    *Clock
+		expected time.Duration
+	}{
+		{AtClock(0, 0, 0), 24 * time.Hour},
+		{AtClock(-1, 0, 0), time.Hour},
+		{AtClock(0, -1, 0), time.Minute},
+		{AtClock(0, 0, -1), time.Second},
+		{AtClock(-1, 0, -1), time.Second},
+		{AtClock(-1, -1, -1), time.Second},
+	} {
+		if res := testcase.clock.TickerDuration(); res != testcase.expected {
+			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.expected, res)
+		}
+	}
+}
+
 func TestClockSchedule(t *testing.T) {
 	s := ClockSchedule(AtHour(9).Minute(30), AtHour(15), time.Second)
 	for _, testcase := range []struct {

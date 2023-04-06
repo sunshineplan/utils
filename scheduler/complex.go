@@ -11,6 +11,8 @@ var (
 
 type complexSched interface {
 	IsMatched(time.Time) bool
+	First(time.Time) time.Duration
+	TickerDuration() time.Duration
 
 	init(t time.Time)
 	len() int
@@ -53,6 +55,25 @@ func (s multiSched) IsMatched(t time.Time) bool {
 	return false
 }
 
+func (s multiSched) First(t time.Time) time.Duration {
+	var res time.Duration
+	for i, sched := range s {
+		if i == 0 {
+			res = sched.First(t)
+		} else if d := sched.First(t); d < res {
+			res = d
+		}
+	}
+	return res
+}
+
+func (s multiSched) TickerDuration() time.Duration {
+	if len(s) == 1 {
+		return s[0].TickerDuration()
+	}
+	return time.Second
+}
+
 type condSched []Schedule
 
 func ConditionSchedule(schedules ...Schedule) Schedule {
@@ -77,4 +98,18 @@ func (s condSched) IsMatched(t time.Time) bool {
 		}
 	}
 	return true
+}
+
+func (s condSched) First(t time.Time) time.Duration {
+	if len(s) == 1 {
+		return s[0].First(t)
+	}
+	return 0
+}
+
+func (s condSched) TickerDuration() time.Duration {
+	if len(s) == 1 {
+		return s[0].TickerDuration()
+	}
+	return time.Second
 }

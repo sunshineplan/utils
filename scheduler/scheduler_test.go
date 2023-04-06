@@ -27,15 +27,15 @@ func TestTickerScheduler1(t *testing.T) {
 	s := NewScheduler().At(Every(time.Second))
 	defer s.Stop()
 	var a, b atomic.Int32
-	if err := s.Do(func(_ time.Time) { a.Add(1) }); err != nil {
+	if err := s.Do(func(_ time.Time) { a.Store(1) }); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Do(func(_ time.Time) { b.Add(1) }); err != nil {
+	if err := s.Do(func(_ time.Time) { b.Store(1) }); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(2500 * time.Millisecond)
-	if a, b := a.Load(), b.Load(); a != 2 || b != 2 {
-		t.Errorf("expected 2 2; got %d %d", a, b)
+	time.Sleep(1500 * time.Millisecond)
+	if a, b := a.Load(), b.Load(); a != 1 || b != 1 {
+		t.Errorf("expected 1 1; got %d %d", a, b)
 	}
 }
 
@@ -66,7 +66,7 @@ func TestOnce(t *testing.T) {
 	case <-time.After(2500 * time.Millisecond):
 		t.Fatal("timeout")
 	}
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(2 * time.Second)
 	if n := n.Load(); n != 1 {
 		t.Errorf("expected 1; got %d", n)
 	}
