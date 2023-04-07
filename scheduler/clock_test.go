@@ -24,11 +24,11 @@ func TestClockTickerDuration(t *testing.T) {
 		clock    *Clock
 		expected time.Duration
 	}{
-		{AtClock(0, 0, 0), 24 * time.Hour},
-		{AtClock(-1, 0, 0), time.Hour},
-		{AtClock(0, -1, 0), time.Minute},
-		{AtClock(0, 0, -1), time.Second},
-		{AtClock(-1, 0, -1), time.Second},
+		{AtClock(1, 0, 0), 24 * time.Hour},
+		{AtClock(-1, 2, 0), time.Hour},
+		{AtClock(0, -1, 3), time.Minute},
+		{AtClock(4, 0, -1), time.Second},
+		{AtClock(-1, 5, -1), time.Second},
 		{AtClock(-1, -1, -1), time.Second},
 	} {
 		if res := testcase.clock.TickerDuration(); res != testcase.expected {

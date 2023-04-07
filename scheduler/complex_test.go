@@ -5,17 +5,48 @@ import (
 	"time"
 )
 
-func TestCondition(t *testing.T) {
-	now := time.Now()
-	hour, min, sec := now.Clock()
-	s := ConditionSchedule(AtHour(hour).Minute(-1).Second(-1), AtMinute(min).Second(-1), AtSecond(sec))
-	if !s.IsMatched(now) {
-		t.Error("expected true: got false")
+func TestMultiSchedule(t *testing.T) {
+	s := MultiSchedule(AtHour(3), AtMinute(4), AtSecond(5))
+	if d := s.TickerDuration(); d != time.Minute {
+		t.Fatalf("expected 1m: got %s", d)
 	}
-	if s.IsMatched(now.Add(time.Second)) {
-		t.Error("expected false: got true")
+	if d := s.First(time.Date(2006, 1, 2, 0, 0, 0, 0, time.Local)); d != 5*time.Second {
+		t.Fatalf("expected 5s: got %s", d)
 	}
-	if s.IsMatched(AtHour(hour).Time()) {
-		t.Error("expected false: got true")
+	for _, testcase := range []struct {
+		clock    *Clock
+		expected bool
+	}{
+		{AtClock(3, 0, 0), true},
+		{AtClock(0, 4, 0), true},
+		{AtClock(0, 0, 5), true},
+		{AtClock(4, 5, 3), false},
+	} {
+		if res := s.IsMatched(testcase.clock.Time()); res != testcase.expected {
+			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.expected, res)
+		}
+	}
+}
+
+func TestConditionSchedule(t *testing.T) {
+	s := ConditionSchedule(Weekends, MultiSchedule(AtClock(9, 30, 0), AtHour(15)))
+	if d := s.TickerDuration(); d != time.Second {
+		t.Fatalf("expected 1s: got %s", d)
+	}
+	if d := s.First(time.Date(2006, 1, 2, 3, 4, 5, 0, time.Local)); d != time.Second {
+		t.Fatalf("expected 1s: got %s", d)
+	}
+	for _, testcase := range []struct {
+		clock    *Clock
+		expected bool
+	}{
+		{AtClock(9, 0, 0), false},
+		{AtClock(9, 30, 0), true},
+		{AtClock(15, 0, 0), true},
+		{AtClock(15, 30, 0), false},
+	} {
+		if res := s.IsMatched(testcase.clock.Time()); res != testcase.expected {
+			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.expected, res)
+		}
 	}
 }

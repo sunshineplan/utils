@@ -68,10 +68,11 @@ func (s multiSched) First(t time.Time) time.Duration {
 }
 
 func (s multiSched) TickerDuration() time.Duration {
-	if len(s) == 1 {
-		return s[0].TickerDuration()
+	var res time.Duration
+	for _, i := range s {
+		res = gcd(res, i.TickerDuration())
 	}
-	return time.Second
+	return res
 }
 
 type condSched []Schedule
@@ -104,12 +105,13 @@ func (s condSched) First(t time.Time) time.Duration {
 	if len(s) == 1 {
 		return s[0].First(t)
 	}
-	return 0
+	return first(t, s.TickerDuration())
 }
 
 func (s condSched) TickerDuration() time.Duration {
-	if len(s) == 1 {
-		return s[0].TickerDuration()
+	var res time.Duration
+	for _, i := range s {
+		res = gcd(res, i.TickerDuration())
 	}
-	return time.Second
+	return res
 }
