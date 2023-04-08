@@ -70,7 +70,16 @@ func (s multiSched) First(t time.Time) time.Duration {
 func (s multiSched) TickerDuration() time.Duration {
 	var res time.Duration
 	for _, i := range s {
-		res = gcd(res, i.TickerDuration())
+		d := gcd(res, i.TickerDuration())
+		if res == d {
+			switch d {
+			case time.Hour:
+				d = time.Minute
+			case time.Minute:
+				d = time.Second
+			}
+		}
+		res = d
 	}
 	return res
 }

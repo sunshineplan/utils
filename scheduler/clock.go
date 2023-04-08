@@ -28,7 +28,7 @@ func AtClock(hour, min, sec int) *Clock {
 	return &Clock{hour, min, sec}
 }
 
-var FullClock = AtClock(-1, -1, -1)
+func FullClock() *Clock { return AtClock(-1, -1, -1) }
 
 func AtHour(hour int) *Clock {
 	return AtClock(hour, 0, 0)
@@ -98,19 +98,6 @@ func (c *Clock) Second(sec int) *Clock {
 	return c
 }
 
-func (c Clock) time(year int, month time.Month, day int) time.Time {
-	if c.hour == -1 {
-		c.hour = 0
-	}
-	if c.min == -1 {
-		c.min = 0
-	}
-	if c.sec == -1 {
-		c.sec = 0
-	}
-	return time.Date(year, month, day, c.hour, c.min, c.sec, 0, time.Local)
-}
-
 func (c Clock) IsMatched(t time.Time) bool {
 	hour, min, sec := t.Clock()
 	return (c.hour == -1 || c.hour == hour) &&
@@ -119,7 +106,44 @@ func (c Clock) IsMatched(t time.Time) bool {
 }
 
 func (c Clock) First(t time.Time) time.Duration {
-	return c.time(t.Date()).AddDate(0, 0, 1).Sub(t) % (24 * time.Hour)
+	now, clock := AtClock(t.Clock()), Clock{}
+	if c.sec == -1 {
+		clock.sec = now.sec
+	} else {
+		clock.sec = c.sec
+	}
+	if c.min == -1 {
+		clock.min = now.min
+	} else {
+		clock.min = c.min
+	}
+	if c.hour == -1 {
+		clock.hour = now.hour
+	} else {
+		clock.hour = c.hour
+	}
+
+	if clock.Time().Equal(now.Time()) {
+		return 0
+	}
+	if c.sec == -1 {
+		clock.sec = 0
+	}
+	if clock.Time().Before(now.Time()) {
+		if c.min == -1 {
+			if clock.hour == now.hour {
+				return clock.Time().Add(time.Minute).Sub(now.Time())
+			}
+			clock.min = 0
+		}
+		if c.hour == -1 {
+			return clock.Time().Add(time.Hour).Sub(now.Time())
+		}
+		return clock.Time().Add(24 * time.Hour).Sub(now.Time())
+	} else if c.min == -1 && clock.hour != now.hour {
+		clock.min = 0
+	}
+	return clock.Time().Sub(now.Time())
 }
 
 func (c Clock) TickerDuration() time.Duration {
@@ -180,9 +204,20 @@ func (s clockSched) First(t time.Time) time.Duration {
 	if s.IsMatched(t) {
 		return 0
 	}
+	start, end, t := s.start.Time(), s.end.Time(), AtClock(t.Clock()).Time()
+	for clock := AtClock(t.Clock()).Time(); start.Before(clock) && end.After(clock); clock = clock.Add(time.Second) {
+		if s.IsMatched(clock) {
+			return clock.Sub(t)
+		}
+	}
 	return s.start.First(t)
 }
 
 func (s clockSched) TickerDuration() time.Duration {
-	return time.Second
+	if s.start.sec != 0 {
+		return time.Second
+	} else if s.start.min != 0 && s.d%time.Minute == 0 {
+		return time.Minute
+	}
+	return s.d
 }

@@ -62,7 +62,7 @@ func (sched *Scheduler) Run(fn ...func(time.Time)) *Scheduler {
 	return sched
 }
 
-func (sched *Scheduler) init(t time.Time) error {
+func (sched *Scheduler) init(d time.Duration, t time.Time) error {
 	sched.mu.Lock()
 	defer sched.mu.Unlock()
 	if len(sched.fn) == 0 {
@@ -72,7 +72,6 @@ func (sched *Scheduler) init(t time.Time) error {
 	}
 	if sched.ctx == nil || sched.ctx.Err() != nil {
 		sched.ctx, sched.cancel = context.WithCancel(context.Background())
-		d := sched.sched.TickerDuration()
 		sched.sched.init(t)
 		sched.timer = time.AfterFunc(sched.sched.First(t), func() {
 			var t time.Time
@@ -108,7 +107,7 @@ func (sched *Scheduler) init(t time.Time) error {
 }
 
 func (sched *Scheduler) Start() error {
-	if err := sched.init(time.Now()); err != nil {
+	if err := sched.init(sched.sched.TickerDuration(), time.Now()); err != nil {
 		return err
 	}
 	go func() {
@@ -159,7 +158,7 @@ func (sched *Scheduler) Immediately() <-chan error {
 func (sched *Scheduler) Once() <-chan error {
 	done := make(chan error)
 	go func() {
-		if err := sched.init(time.Now()); err != nil {
+		if err := sched.init(sched.sched.TickerDuration(), time.Now()); err != nil {
 			done <- err
 			return
 		}

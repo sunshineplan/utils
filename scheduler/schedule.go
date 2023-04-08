@@ -141,7 +141,7 @@ func ptrWeekday(weekday time.Weekday) *time.Weekday {
 func Weekday(weekday ...time.Weekday) Schedule {
 	var s multiSched
 	for _, weekday := range weekday {
-		s = append(s, WeekdaySchedule(0, 0, ptrWeekday(weekday), FullClock))
+		s = append(s, WeekdaySchedule(0, 0, ptrWeekday(weekday), FullClock()))
 	}
 	return s
 }
