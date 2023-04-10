@@ -73,6 +73,8 @@ func (s multiSched) TickerDuration() time.Duration {
 		d := gcd(res, i.TickerDuration())
 		if res == d {
 			switch d {
+			case 24 * time.Hour:
+				d = time.Hour
 			case time.Hour:
 				d = time.Minute
 			case time.Minute:

@@ -28,6 +28,21 @@ func TestMultiSchedule(t *testing.T) {
 	}
 }
 
+func TestMultiScheduleTickerDuration(t *testing.T) {
+	for _, testcase := range []struct {
+		schedule Schedule
+		expected time.Duration
+	}{
+		{MultiSchedule(AtHour(3), AtMinute(4), AtSecond(5)), time.Minute},
+		{HourSchedule(9, 17), time.Hour},
+		{MinuteSchedule(0, 59), time.Minute},
+	} {
+		if res := testcase.schedule.TickerDuration(); res != testcase.expected {
+			t.Errorf("expected %v; got %v", testcase.expected, res)
+		}
+	}
+}
+
 func TestConditionSchedule(t *testing.T) {
 	s := ConditionSchedule(Weekends, MultiSchedule(AtClock(9, 30, 0), AtHour(15)))
 	if d := s.TickerDuration(); d != time.Second {
