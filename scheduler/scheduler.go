@@ -97,6 +97,8 @@ func (sched *Scheduler) newTimer(first, duration time.Duration) {
 					}
 					sched.mu.Unlock()
 				case t := <-sched.notify:
+					sched.mu.Lock()
+					defer sched.mu.Unlock()
 					sched.ticker.Stop()
 					sched.newTimer(sched.sched.First(t), duration)
 					return

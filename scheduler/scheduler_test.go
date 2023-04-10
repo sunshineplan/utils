@@ -55,6 +55,8 @@ func TestTickerScheduler2(t *testing.T) {
 	}
 	s.notify <- time.Now().Add(30 * time.Second)
 	time.Sleep(500 * time.Millisecond)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if !s.timer.Stop() {
 		t.Fatal("expected timer running; got stopped")
 	}
