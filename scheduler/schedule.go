@@ -203,7 +203,7 @@ func (s tickerSched) IsMatched(t time.Time) bool {
 }
 
 func (s tickerSched) First(t time.Time) time.Duration {
-	return 0
+	return t.Sub(s.start) % s.d
 }
 
 func (s tickerSched) TickerDuration() time.Duration {

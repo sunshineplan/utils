@@ -50,6 +50,14 @@ func TestTickerScheduler2(t *testing.T) {
 	if n := n.Load(); n != 1 {
 		t.Errorf("expected 1; got %d", n)
 	}
+	if s.timer.Stop() {
+		t.Fatal("expected timer stopped; got running")
+	}
+	s.notify <- time.Now().Add(30 * time.Second)
+	time.Sleep(500 * time.Millisecond)
+	if !s.timer.Stop() {
+		t.Fatal("expected timer running; got stopped")
+	}
 }
 
 func TestOnce(t *testing.T) {
@@ -66,7 +74,7 @@ func TestOnce(t *testing.T) {
 	case <-time.After(2500 * time.Millisecond):
 		t.Fatal("timeout")
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(1500 * time.Millisecond)
 	if n := n.Load(); n != 1 {
 		t.Errorf("expected 1; got %d", n)
 	}
