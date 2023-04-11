@@ -205,7 +205,7 @@ func (s clockSched) First(t time.Time) time.Duration {
 		return 0
 	}
 	start, end, t := s.start.Time(), s.end.Time(), AtClock(t.Clock()).Time()
-	for clock := AtClock(t.Clock()).Time(); start.Before(clock) && end.After(clock); clock = clock.Add(time.Second) {
+	for clock := AtClock(t.Clock()).Time(); clock.Compare(start) != -1 && clock.Compare(end) != 1; clock = clock.Add(time.Second) {
 		if s.IsMatched(clock) {
 			return clock.Sub(t)
 		}

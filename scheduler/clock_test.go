@@ -85,3 +85,10 @@ func TestClockSchedule(t *testing.T) {
 		}
 	}
 }
+
+func TestClockScheduleFirst(t *testing.T) {
+	s := ClockSchedule(ClockFromString("6:00"), ClockFromString("22:00"), time.Hour)
+	if res := s.First(AtClock(21, 59, 0).Time()); res != time.Minute {
+		t.Errorf("expected 1m; got %v", res)
+	}
+}
