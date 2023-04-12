@@ -166,16 +166,23 @@ func (c Clock) TickerDuration() time.Duration {
 }
 
 func (c Clock) String() string {
+	var hour, min, sec string
 	if c.hour == -1 {
-		c.hour = 0
+		hour = "--"
+	} else {
+		hour = fmt.Sprint(c.hour)
 	}
 	if c.min == -1 {
-		c.min = 0
+		min = "--"
+	} else {
+		min = fmt.Sprintf("%02d", c.min)
 	}
 	if c.sec == -1 {
-		c.sec = 0
+		sec = "--"
+	} else {
+		sec = fmt.Sprintf("%02d", c.sec)
 	}
-	return fmt.Sprintf("%d:%02d:%02d", c.hour, c.min, c.sec)
+	return fmt.Sprintf("%s:%s:%s", hour, min, sec)
 }
 
 func (c Clock) Time() time.Time {
@@ -220,4 +227,8 @@ func (s clockSched) TickerDuration() time.Duration {
 		return time.Minute
 	}
 	return s.d
+}
+
+func (s clockSched) String() string {
+	return fmt.Sprintf("%q-%q(every %s)", s.start, s.end, s.d)
 }

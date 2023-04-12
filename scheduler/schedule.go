@@ -1,11 +1,15 @@
 package scheduler
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type Schedule interface {
 	IsMatched(time.Time) bool
 	First(time.Time) time.Duration
 	TickerDuration() time.Duration
+	String() string
 }
 
 var (
@@ -85,6 +89,29 @@ func (s sched) TickerDuration() time.Duration {
 	return s.clock.TickerDuration()
 }
 
+func (s sched) String() string {
+	var year, month, day string
+	if s.year == 0 {
+		year = "----"
+	} else {
+		year = fmt.Sprint(s.year)
+	}
+	if s.month == 0 {
+		month = "--"
+	} else {
+		month = fmt.Sprintf("%02d", s.month)
+	}
+	if s.day == 0 {
+		day = "--"
+	} else {
+		day = fmt.Sprintf("%02d", s.day)
+	}
+	if s.clock == nil {
+		s.clock = &Clock{}
+	}
+	return fmt.Sprintf("%s/%s/%s %s", year, month, day, s.clock)
+}
+
 type weekSched struct {
 	year, week int
 	weekday    *time.Weekday
@@ -121,6 +148,29 @@ func (s weekSched) TickerDuration() time.Duration {
 		return 24 * time.Hour
 	}
 	return s.clock.TickerDuration()
+}
+
+func (s weekSched) String() string {
+	var year, week, weekday string
+	if s.year == 0 {
+		year = "----"
+	} else {
+		year = fmt.Sprint(s.year)
+	}
+	if s.week == 0 {
+		week = "--"
+	} else {
+		week = fmt.Sprintf("%02d", s.week)
+	}
+	if s.weekday == nil {
+		weekday = "----"
+	} else {
+		weekday = fmt.Sprint(s.weekday)
+	}
+	if s.clock == nil {
+		s.clock = &Clock{}
+	}
+	return fmt.Sprintf("%s/ISOWeek:%s/Weekday:%s %s", year, week, weekday, s.clock)
 }
 
 type weekdaySched struct {
@@ -179,6 +229,29 @@ func (s weekdaySched) TickerDuration() time.Duration {
 	return s.clock.TickerDuration()
 }
 
+func (s weekdaySched) String() string {
+	var year, month, weekday string
+	if s.year == 0 {
+		year = "----"
+	} else {
+		year = fmt.Sprint(s.year)
+	}
+	if s.month == 0 {
+		month = "--"
+	} else {
+		month = fmt.Sprintf("%02d", s.month)
+	}
+	if s.weekday == nil {
+		weekday = "----"
+	} else {
+		weekday = fmt.Sprint(s.weekday)
+	}
+	if s.clock == nil {
+		s.clock = &Clock{}
+	}
+	return fmt.Sprintf("%s/%s/Weekday:%s %s", year, month, weekday, s.clock)
+}
+
 type tickerSched struct {
 	d     time.Duration
 	start time.Time
@@ -208,4 +281,8 @@ func (s tickerSched) First(t time.Time) time.Duration {
 
 func (s tickerSched) TickerDuration() time.Duration {
 	return s.d
+}
+
+func (s tickerSched) String() string {
+	return fmt.Sprintln("Every", s.d)
 }

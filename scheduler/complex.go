@@ -1,6 +1,10 @@
 package scheduler
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 var (
 	_ Schedule = complexSched(nil)
@@ -13,6 +17,7 @@ type complexSched interface {
 	IsMatched(time.Time) bool
 	First(time.Time) time.Duration
 	TickerDuration() time.Duration
+	String() string
 
 	init(t time.Time)
 	len() int
@@ -90,6 +95,25 @@ func (s multiSched) TickerDuration() time.Duration {
 	return res
 }
 
+func (s multiSched) String() string {
+	switch len(s) {
+	case 0:
+		return ""
+	case 1:
+		return s[0].String()
+	default:
+		var b strings.Builder
+		b.WriteString("MultiSchedule: ")
+		for i, sched := range s {
+			if i != 0 {
+				fmt.Fprint(&b, "; ")
+			}
+			fmt.Fprint(&b, sched)
+		}
+		return b.String()
+	}
+}
+
 type condSched []Schedule
 
 func ConditionSchedule(schedules ...Schedule) Schedule {
@@ -129,4 +153,23 @@ func (s condSched) TickerDuration() time.Duration {
 		res = gcd(res, i.TickerDuration())
 	}
 	return res
+}
+
+func (s condSched) String() string {
+	switch len(s) {
+	case 0:
+		return ""
+	case 1:
+		return s[0].String()
+	default:
+		var b strings.Builder
+		b.WriteString("ConditionSchedule: ")
+		for i, sched := range s {
+			if i != 0 {
+				fmt.Fprint(&b, "; ")
+			}
+			fmt.Fprint(&b, sched)
+		}
+		return b.String()
+	}
 }
