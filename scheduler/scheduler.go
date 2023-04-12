@@ -115,15 +115,21 @@ func (sched *Scheduler) newTimer(first, duration time.Duration) {
 		}
 	})
 	go func() {
-		select {
-		case t := <-sched.notify:
-			if sched.timer.Stop() {
-				sched.timer.Reset(sched.sched.First(t))
+		for {
+			select {
+			case t := <-sched.notify:
+				sched.mu.Lock()
+				if sched.timer.Stop() {
+					sched.timer.Reset(sched.sched.First(t))
+				}
+				sched.mu.Unlock()
+			case <-sched.ctx.Done():
+				cancel()
+				sched.timer.Stop()
+				return
+			case <-ctx.Done():
+				return
 			}
-		case <-sched.ctx.Done():
-			cancel()
-			sched.timer.Stop()
-		case <-ctx.Done():
 		}
 	}()
 }

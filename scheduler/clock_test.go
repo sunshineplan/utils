@@ -78,7 +78,7 @@ func TestClockSchedule(t *testing.T) {
 		{ClockFromString("16:00:00"), 17*time.Hour + 30*time.Minute, false},
 	} {
 		if res := s.First(testcase.clock.Time()); res != testcase.duration {
-			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.expected, res)
+			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.duration, res)
 		}
 		if res := s.IsMatched(testcase.clock.Time()); res != testcase.expected {
 			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.expected, res)
