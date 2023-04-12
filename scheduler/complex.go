@@ -68,20 +68,24 @@ func (s multiSched) First(t time.Time) time.Duration {
 }
 
 func (s multiSched) TickerDuration() time.Duration {
+	var downgrade bool
 	var res time.Duration
 	for _, i := range s {
 		d := gcd(res, i.TickerDuration())
-		if res == d {
-			switch d {
-			case 24 * time.Hour:
-				d = time.Hour
-			case time.Hour:
-				d = time.Minute
-			case time.Minute:
-				d = time.Second
-			}
+		if !downgrade && res == d {
+			downgrade = true
 		}
 		res = d
+	}
+	if downgrade {
+		switch res {
+		case 24 * time.Hour:
+			return time.Hour
+		case time.Hour:
+			return time.Minute
+		case time.Minute:
+			return time.Second
+		}
 	}
 	return res
 }

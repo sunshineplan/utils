@@ -34,7 +34,7 @@ func TestMultiScheduleTickerDuration(t *testing.T) {
 		expected time.Duration
 	}{
 		{MultiSchedule(AtHour(3), AtMinute(4), AtSecond(5)), time.Minute},
-		{HourSchedule(9, 17), time.Hour},
+		{HourSchedule(9, 17, 23), time.Hour},
 		{MinuteSchedule(0, 59), time.Minute},
 	} {
 		if res := testcase.schedule.TickerDuration(); res != testcase.expected {
