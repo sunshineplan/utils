@@ -32,7 +32,7 @@ func initComplexSched[sche complex](s sche, t time.Time) {
 		if i, ok := s.(complexSched); ok {
 			i.init(t)
 		} else if i, ok := s.(*tickerSched); ok {
-			i.start = t
+			i.init(t)
 		}
 	}
 }

@@ -76,7 +76,7 @@ func SecondSchedule(sec ...int) Schedule {
 
 func (c *Clock) Hour(hour int) *Clock {
 	if hour > 23 || hour < -1 {
-		panic(fmt.Sprintln("invalid hour", hour))
+		panic(fmt.Sprint("invalid hour ", hour))
 	}
 	c.hour = hour
 	return c
@@ -84,7 +84,7 @@ func (c *Clock) Hour(hour int) *Clock {
 
 func (c *Clock) Minute(min int) *Clock {
 	if min > 59 || min < -1 {
-		panic(fmt.Sprintln("invalid minute", min))
+		panic(fmt.Sprint("invalid minute ", min))
 	}
 	c.min = min
 	return c
@@ -92,7 +92,7 @@ func (c *Clock) Minute(min int) *Clock {
 
 func (c *Clock) Second(sec int) *Clock {
 	if sec > 59 || sec < -1 {
-		panic(fmt.Sprintln("invalid second", sec))
+		panic(fmt.Sprint("invalid second ", sec))
 	}
 	c.sec = sec
 	return c

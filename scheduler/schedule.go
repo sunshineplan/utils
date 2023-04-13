@@ -268,11 +268,15 @@ func Every(d ...time.Duration) Schedule {
 	return s
 }
 
+func (s *tickerSched) init(t time.Time) {
+	s.start = t.Truncate(time.Second)
+}
+
 func (s tickerSched) IsMatched(t time.Time) bool {
 	if s.d == 0 {
 		return false
 	}
-	return t.Truncate(time.Second).Sub(s.start.Truncate(time.Second))%s.d == 0
+	return t.Truncate(time.Second).Sub(s.start)%s.d == 0
 }
 
 func (s tickerSched) First(t time.Time) time.Duration {
@@ -284,5 +288,5 @@ func (s tickerSched) TickerDuration() time.Duration {
 }
 
 func (s tickerSched) String() string {
-	return fmt.Sprintln("Every", s.d)
+	return fmt.Sprint("Every ", s.d)
 }

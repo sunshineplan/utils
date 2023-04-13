@@ -7,15 +7,22 @@ import (
 
 func TestClock(t *testing.T) {
 	now := time.Now()
-	s := ScheduleFromString(AtClock(now.Add(time.Second).Clock()).String())
-	if s.IsMatched(now) {
-		t.Error("expected false: got true")
-	}
-	if !s.IsMatched(now.Add(time.Second)) {
+	s := ScheduleFromString(AtClock(now.Clock()).String())
+	if !s.IsMatched(now) {
 		t.Error("expected true: got false")
 	}
 	if s.IsMatched(now.Add(2 * time.Second)) {
 		t.Error("expected false: got true")
+	}
+	if s.IsMatched(now.Add(-2 * time.Second)) {
+		t.Error("expected false: got true")
+	}
+	s = ScheduleFromString("7:00")
+	if res := s.TickerDuration(); res != 24*time.Hour {
+		t.Errorf("expected 24h; got %v", res)
+	}
+	if res := s.First(AtClock(6, 0, 0).Time()); res != time.Hour {
+		t.Errorf("expected 1h; got %v", res)
 	}
 }
 
