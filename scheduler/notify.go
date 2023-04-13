@@ -17,15 +17,14 @@ func init() {
 			if last.IsZero() {
 				last = t
 			} else {
-				sub := t.Sub(last)
-				last = t
-				if sub := int64(sub / time.Millisecond); sub != 1000 && sub != 999 {
+				if sub := t.Sub(last.Add(time.Second)); sub >= 10*time.Millisecond || sub <= -10*time.Millisecond {
 					mu.Lock()
 					for k := range subscriber {
 						k <- t
 					}
 					mu.Unlock()
 				}
+				last = t
 			}
 		}
 	}()
