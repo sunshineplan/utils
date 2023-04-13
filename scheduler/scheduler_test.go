@@ -50,16 +50,21 @@ func TestTickerScheduler2(t *testing.T) {
 	if n := n.Load(); n != 1 {
 		t.Errorf("expected 1; got %d", n)
 	}
+
+	s.mu.Lock()
 	if s.timer.Stop() {
 		t.Fatal("expected timer stopped; got running")
 	}
+	s.mu.Unlock()
+
 	s.notify <- time.Now().Add(30 * time.Second)
 	time.Sleep(500 * time.Millisecond)
+
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if !s.timer.Stop() {
 		t.Fatal("expected timer running; got stopped")
 	}
+	s.mu.Unlock()
 }
 
 func TestOnce(t *testing.T) {
