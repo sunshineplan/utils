@@ -52,14 +52,18 @@ type Message struct {
 }
 
 func (m *Message) RcptList() (rcpts []string) {
+	list := make(map[string]struct{})
 	for _, to := range m.To {
-		rcpts = append(rcpts, to.Address)
+		list[to.Address] = struct{}{}
 	}
 	for _, cc := range m.Cc {
-		rcpts = append(rcpts, cc.Address)
+		list[cc.Address] = struct{}{}
 	}
 	for _, bcc := range m.Bcc {
-		rcpts = append(rcpts, bcc.Address)
+		list[bcc.Address] = struct{}{}
+	}
+	for k := range list {
+		rcpts = append(rcpts, k)
 	}
 	return
 }

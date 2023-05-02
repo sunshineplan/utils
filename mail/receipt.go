@@ -18,6 +18,14 @@ func Receipt(name, address string) *mail.Address {
 
 type Receipts []*mail.Address
 
+func (rcpts Receipts) List() []string {
+	var s []string
+	for _, rcpt := range rcpts {
+		s = append(s, rcpt.Address)
+	}
+	return s
+}
+
 func (rcpts Receipts) String() string {
 	var b strings.Builder
 	for i, rcpt := range rcpts {
