@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/sunshineplan/utils/executor"
 )
@@ -17,7 +19,13 @@ func UserAgentString() (string, error) {
 			"https://fastly.jsdelivr.net/gh/sunshineplan/useragent/README.md",
 		},
 		func(url string) (any, error) {
-			return http.Get(url)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+			if err != nil {
+				return nil, err
+			}
+			return http.DefaultClient.Do(req)
 		},
 	)
 	if err != nil {
