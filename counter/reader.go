@@ -5,22 +5,35 @@ import (
 	"sync/atomic"
 )
 
-var (
-	_ io.Reader     = &Reader{}
-	_ io.ReadCloser = &ReadCloser{}
-)
+type Reader interface {
+	io.ReadCloser
+	Count() int64
+}
 
-type Reader struct {
-	io.Reader
+type reader struct {
+	r io.Reader
+	c io.Closer
 	n atomic.Int64
 }
 
-func NewReader(r io.Reader) *Reader {
-	return &Reader{Reader: r}
+func NewReader(r io.Reader) Reader {
+	var c io.Closer
+	if closer, ok := r.(io.Closer); ok {
+		c = closer
+	}
+	reader := &reader{r: r, c: c}
+	if _, ok := r.(io.WriterTo); ok {
+		return readerWriterTo{reader}
+	}
+	return reader
 }
 
-func (r *Reader) Read(p []byte) (n int, err error) {
-	n, err = r.Reader.Read(p)
+func NewReaderCloser(rc io.ReadCloser) Reader {
+	return NewReader(rc)
+}
+
+func (r *reader) Read(p []byte) (n int, err error) {
+	n, err = r.r.Read(p)
 	if err != nil {
 		return
 	}
@@ -28,15 +41,21 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 	return
 }
 
-func (r *Reader) Count() int64 {
+func (r *reader) Close() error {
+	if r.c != nil {
+		return r.c.Close()
+	}
+	return nil
+}
+
+func (r *reader) Count() int64 {
 	return r.n.Load()
 }
 
-type ReadCloser struct {
-	*Reader
-	io.Closer
+type readerWriterTo struct {
+	*reader
 }
 
-func NewReaderCloser(rc io.ReadCloser) *ReadCloser {
-	return &ReadCloser{Reader: NewReader(rc), Closer: rc}
+func (r *readerWriterTo) WriteTo(w io.Writer) (n int64, err error) {
+	return r.r.(io.WriterTo).WriteTo(w)
 }

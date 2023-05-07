@@ -5,22 +5,35 @@ import (
 	"sync/atomic"
 )
 
-var (
-	_ io.Writer      = &Writer{}
-	_ io.WriteCloser = &WriteCloser{}
-)
+type Writer interface {
+	io.WriteCloser
+	Count() int64
+}
 
-type Writer struct {
-	io.Writer
+type writer struct {
+	w io.Writer
+	c io.Closer
 	n atomic.Int64
 }
 
-func NewWriter(w io.Writer) *Writer {
-	return &Writer{Writer: w}
+func NewWriter(w io.Writer) Writer {
+	var c io.Closer
+	if closer, ok := w.(io.Closer); ok {
+		c = closer
+	}
+	writer := &writer{w: w, c: c}
+	if _, ok := w.(io.ReaderFrom); ok {
+		return writerReaderFrom{writer}
+	}
+	return writer
 }
 
-func (w *Writer) Write(p []byte) (n int, err error) {
-	n, err = w.Writer.Write(p)
+func NewWriterCloser(wc io.WriteCloser) Writer {
+	return NewWriter(wc)
+}
+
+func (w *writer) Write(p []byte) (n int, err error) {
+	n, err = w.w.Write(p)
 	if err != nil {
 		return
 	}
@@ -28,15 +41,21 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	return
 }
 
-func (w *Writer) Count() int64 {
+func (w *writer) Close() error {
+	if w.c != nil {
+		return w.c.Close()
+	}
+	return nil
+}
+
+func (w *writer) Count() int64 {
 	return w.n.Load()
 }
 
-type WriteCloser struct {
-	*Writer
-	io.Closer
+type writerReaderFrom struct {
+	*writer
 }
 
-func NewWriterCloser(wc io.WriteCloser) *WriteCloser {
-	return &WriteCloser{Writer: NewWriter(wc), Closer: wc}
+func (w *writerReaderFrom) ReadFrom(r Reader) (n int64, err error) {
+	return w.w.(io.ReaderFrom).ReadFrom(r)
 }

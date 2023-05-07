@@ -38,7 +38,7 @@ type ProgressBar struct {
 	speed      float64
 	unit       string
 
-	cw *counter.Writer
+	cw counter.Writer
 }
 
 type format struct {

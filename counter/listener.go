@@ -11,21 +11,29 @@ var (
 )
 
 type Listener struct {
-	net.Listener
+	l       net.Listener
 	read    atomic.Int64
 	written atomic.Int64
 }
 
 func NewListener(l net.Listener) *Listener {
-	return &Listener{Listener: l}
+	return &Listener{l: l}
 }
 
 func (l *Listener) Accept() (net.Conn, error) {
-	c, err := l.Listener.Accept()
+	c, err := l.l.Accept()
 	if err != nil {
 		return nil, err
 	}
 	return &conn{Conn: c, l: l}, nil
+}
+
+func (l *Listener) Close() error {
+	return l.l.Close()
+}
+
+func (l *Listener) Addr() net.Addr {
+	return l.l.Addr()
 }
 
 func (l *Listener) ReadCount() int64 {
