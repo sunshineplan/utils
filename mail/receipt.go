@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"encoding"
 	"encoding/json"
 	"fmt"
 	"net/mail"
@@ -9,8 +10,9 @@ import (
 )
 
 var (
-	_ json.Unmarshaler = (*Receipts)(nil)
-	_ json.Marshaler   = Receipts{}
+	_ encoding.TextUnmarshaler = (*Receipts)(nil)
+	_ json.Unmarshaler         = (*Receipts)(nil)
+	_ json.Marshaler           = Receipts{}
 )
 
 func Receipt(name, address string) *mail.Address {
@@ -38,17 +40,21 @@ func (rcpts Receipts) String() string {
 	return b.String()
 }
 
-func (rcpts *Receipts) UnmarshalJSON(text []byte) error {
-	if unquote, err := strconv.Unquote(string(text)); err == nil {
-		addresses, err := mail.ParseAddressList(unquote)
-		if err != nil {
-			return err
-		}
-		*rcpts = addresses
-		return nil
+func (rcpts *Receipts) UnmarshalText(text []byte) error {
+	addresses, err := mail.ParseAddressList(string(text))
+	if err != nil {
+		return err
+	}
+	*rcpts = addresses
+	return nil
+}
+
+func (rcpts *Receipts) UnmarshalJSON(b []byte) error {
+	if unquote, err := strconv.Unquote(string(b)); err == nil {
+		return rcpts.UnmarshalText([]byte(unquote))
 	}
 	var s []string
-	if err := json.Unmarshal(text, &s); err != nil {
+	if err := json.Unmarshal(b, &s); err != nil {
 		return nil
 	}
 	var addresses []*mail.Address
