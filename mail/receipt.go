@@ -11,6 +11,7 @@ import (
 
 var (
 	_ encoding.TextUnmarshaler = (*Receipts)(nil)
+	_ encoding.TextMarshaler   = Receipts{}
 	_ json.Unmarshaler         = (*Receipts)(nil)
 	_ json.Marshaler           = Receipts{}
 )
@@ -67,6 +68,10 @@ func (rcpts *Receipts) UnmarshalJSON(b []byte) error {
 	}
 	*rcpts = addresses
 	return nil
+}
+
+func (rcpts Receipts) MarshalText() ([]byte, error) {
+	return []byte(rcpts.String()), nil
 }
 
 func (rcpts Receipts) MarshalJSON() ([]byte, error) {
