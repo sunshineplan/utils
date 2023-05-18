@@ -201,12 +201,12 @@ func (pb *ProgressBar) startCount() {
 				f = format{
 					Done:    progressed,
 					Undone:  strings.Repeat(" ", pb.blockWidth-done),
-					Speed:   unit.FormatBytes(uint64(pb.speed)) + "/s",
-					Current: unit.FormatBytes(uint64(now)),
+					Speed:   unit.ByteSize(pb.speed).String() + "/s",
+					Current: unit.ByteSize(now).String(),
 					Percent: fmt.Sprintf("%.2f%%", percent),
-					Total:   unit.FormatBytes(uint64(pb.total)),
-					Elapsed: fmt.Sprintf("Elapsed: %s", unit.FormatDuration(time.Since(pb.start))),
-					Left:    fmt.Sprintf("Left: %s", unit.FormatDuration(left)),
+					Total:   unit.ByteSize(pb.total).String(),
+					Elapsed: fmt.Sprintf("Elapsed: %s", time.Since(pb.start).Truncate(time.Second)),
+					Left:    fmt.Sprintf("Left: %s", left.Truncate(time.Second)),
 				}
 			} else {
 				f = format{
@@ -216,8 +216,8 @@ func (pb *ProgressBar) startCount() {
 					Current: strconv.FormatInt(now, 10),
 					Percent: fmt.Sprintf("%.2f%%", percent),
 					Total:   strconv.FormatInt(pb.total, 10),
-					Elapsed: fmt.Sprintf("Elapsed: %s", unit.FormatDuration(time.Since(pb.start))),
-					Left:    fmt.Sprintf("Left: %s", unit.FormatDuration(left)),
+					Elapsed: fmt.Sprintf("Elapsed: %s", time.Since(pb.start).Truncate(time.Second)),
+					Left:    fmt.Sprintf("Left: %s", left.Truncate(time.Second)),
 				}
 			}
 
@@ -235,7 +235,7 @@ func (pb *ProgressBar) startCount() {
 			if now == pb.total {
 				totalSpeed := float64(pb.total) / (float64(time.Since(pb.start)) / float64(time.Second))
 				if pb.unit == "bytes" {
-					f.Speed = unit.FormatBytes(uint64(totalSpeed)) + "/s"
+					f.Speed = unit.ByteSize(totalSpeed).String() + "/s"
 				} else {
 					f.Speed = fmt.Sprintf("%.2f/s", totalSpeed)
 				}
