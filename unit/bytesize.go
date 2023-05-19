@@ -3,7 +3,6 @@ package unit
 import (
 	"encoding"
 	"errors"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -70,7 +69,13 @@ func NewByteSize(n float64, unit ByteSize) ByteSize {
 	return ByteSize(n * float64(unit))
 }
 
-var BytesFormat = "%.2g"
+func DefaultByteSizeFormatFloat(f float64) string {
+	s := strconv.FormatFloat(f, 'f', 2, 64)
+	s = strings.TrimRight(s, "0")
+	return strings.TrimSuffix(s, ".")
+}
+
+var ByteSizeFormatFloat = DefaultByteSizeFormatFloat
 
 func (n ByteSize) String() string {
 	unit := B
@@ -88,7 +93,7 @@ func (n ByteSize) String() string {
 	case n >= KB:
 		unit = KB
 	}
-	return fmt.Sprintf(BytesFormat+byteSizeStr[unit], float64(n)/float64(unit))
+	return ByteSizeFormatFloat(float64(n)/float64(unit)) + byteSizeStr[unit]
 }
 
 func (b ByteSize) MarshalText() ([]byte, error) {
