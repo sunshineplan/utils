@@ -14,7 +14,7 @@ var (
 	_ encoding.TextUnmarshaler = new(ByteSize)
 )
 
-var byteSizeRegexp = regexp.MustCompile(`^(\d+(?:\.\d+)?)[\t ]?((?i:[KMGTPE]?B)?)$`)
+var byteSizeRegexp = regexp.MustCompile(`^(\d+(?:\.\d+)?) ?((?i)[KMGTPE]?B?)$`)
 
 var (
 	byteSizeStr = map[ByteSize]string{
@@ -27,13 +27,13 @@ var (
 		EB: "EB",
 	}
 	strByteSize = map[string]ByteSize{
-		"B":  B,
-		"KB": KB,
-		"MB": MB,
-		"GB": GB,
-		"TB": TB,
-		"PB": PB,
-		"EB": EB,
+		"B": B,
+		"K": KB,
+		"M": MB,
+		"G": GB,
+		"T": TB,
+		"P": PB,
+		"E": EB,
 	}
 )
 
@@ -56,7 +56,7 @@ func ParseByteSize(s string) (ByteSize, error) {
 		return 0, errors.New("invalid byte size syntax")
 	}
 	unit := strings.ToUpper(res[2])
-	if unit == "" {
+	if unit = strings.TrimSuffix(unit, "B"); unit == "" {
 		unit = "B"
 	}
 	v, err := strconv.ParseFloat(res[1], 64)
@@ -64,6 +64,10 @@ func ParseByteSize(s string) (ByteSize, error) {
 		return 0, err
 	}
 	return ByteSize(v * float64(strByteSize[unit])), nil
+}
+
+func NewByteSize(n float64, unit ByteSize) ByteSize {
+	return ByteSize(n * float64(unit))
 }
 
 var BytesFormat = "%.2g"
