@@ -104,7 +104,7 @@ func (sched *Scheduler) checkMatched(t time.Time) {
 
 func (sched *Scheduler) newTimer(first, duration time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
-	sched.timer = time.AfterFunc(first+20*time.Millisecond, func() {
+	sched.timer = time.AfterFunc(first, func() {
 		cancel()
 		var now time.Time
 		sched.ticker, now = time.NewTicker(duration), time.Now()
