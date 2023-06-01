@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -32,13 +31,11 @@ type ProgressBar struct {
 	blockWidth int
 	refresh    time.Duration
 	template   *template.Template
-	current    atomic.Int64
+	current    counter.Counter
 	total      int64
 	lastWidth  int
 	speed      float64
 	unit       string
-
-	cw counter.Writer
 }
 
 type format struct {
@@ -115,10 +112,7 @@ func (pb *ProgressBar) Add(n int64) {
 }
 
 func (pb *ProgressBar) now() int64 {
-	if pb.cw == nil {
-		return pb.current.Load()
-	}
-	return pb.cw.Count()
+	return pb.current.Load()
 }
 
 func (pb *ProgressBar) print(f format) {
@@ -281,8 +275,6 @@ func (pb *ProgressBar) Cancel() {
 
 // FromReader starts the progress bar from a reader.
 func (pb *ProgressBar) FromReader(r io.Reader, w io.Writer) (int64, error) {
-	pb.cw = counter.NewWriter(w)
 	pb.Start()
-
-	return io.Copy(pb.cw, r)
+	return io.Copy(pb.current.AddWriter(w), r)
 }
