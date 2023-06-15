@@ -23,6 +23,7 @@ func ReadFile(file string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	return ReadAll(f)
 }

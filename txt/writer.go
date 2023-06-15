@@ -38,8 +38,15 @@ func (w *Writer) WriteLine(s string) (int, error) {
 // WriteAll writes contents to w using WriteLine and then calls Flush,
 // returning any error from the Flush.
 func (w *Writer) WriteAll(contents []string) error {
-	for _, i := range contents {
-		if _, err := w.WriteLine(i); err != nil {
+	l := len(contents)
+	for i, s := range contents {
+		var err error
+		if i != l-1 {
+			_, err = w.WriteLine(s)
+		} else {
+			_, err = w.WriteString(s)
+		}
+		if err != nil {
 			return err
 		}
 	}

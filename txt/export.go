@@ -16,6 +16,7 @@ func ExportFile(contents []string, file string) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
 	return Export(contents, f)
 }

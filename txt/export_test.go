@@ -7,10 +7,7 @@ import (
 
 func TestExport(t *testing.T) {
 	testcase := []string{"A", "B", "C"}
-	result := `A
-B
-C
-`
+	result := "A\nB\nC"
 
 	var b bytes.Buffer
 	if err := Export(testcase, &b); err != nil {
