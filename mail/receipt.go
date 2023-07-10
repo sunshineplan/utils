@@ -22,6 +22,14 @@ func Receipt(name, address string) *mail.Address {
 
 type Receipts []*mail.Address
 
+func ParseReceipts(rcpts string) (Receipts, error) {
+	addresses, err := mail.ParseAddressList(rcpts)
+	if err != nil {
+		return nil, err
+	}
+	return Receipts(addresses), nil
+}
+
 func (rcpts Receipts) List() []string {
 	var s []string
 	for _, rcpt := range rcpts {
@@ -42,7 +50,7 @@ func (rcpts Receipts) String() string {
 }
 
 func (rcpts *Receipts) UnmarshalText(text []byte) error {
-	addresses, err := mail.ParseAddressList(string(text))
+	addresses, err := ParseReceipts(string(text))
 	if err != nil {
 		return err
 	}
