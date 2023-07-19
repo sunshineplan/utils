@@ -110,16 +110,15 @@ func (m *Message) Bytes(id string) []byte {
 	if l := len(m.Attachments); l > 0 {
 		for i, attachment := range m.Attachments {
 			w.PrintfLine("--" + boundary)
+			if mimetype := mime.TypeByExtension(filepath.Ext(attachment.Filename)); mimetype != "" {
+				w.PrintfLine("Content-Type: " + mimetype)
+			} else {
+				w.PrintfLine("Content-Type: application/octet-stream")
+			}
 			if attachment.ContentID != "" {
-				w.PrintfLine("Content-Type: message/rfc822")
 				w.PrintfLine(`Content-Disposition: inline; filename="=?UTF-8?B?%s?="`, toBase64(attachment.Filename))
 				w.PrintfLine("Content-ID: <%s>", attachment.ContentID)
 			} else {
-				if mimetype := mime.TypeByExtension(filepath.Ext(attachment.Filename)); mimetype != "" {
-					w.PrintfLine("Content-Type: " + mimetype)
-				} else {
-					w.PrintfLine("Content-Type: application/octet-stream")
-				}
 				w.PrintfLine(`Content-Disposition: attachment; filename="=?UTF-8?B?%s?="`, toBase64(attachment.Filename))
 			}
 			w.PrintfLine("Content-Transfer-Encoding: base64")
