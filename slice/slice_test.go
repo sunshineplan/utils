@@ -5,25 +5,6 @@ import (
 	"testing"
 )
 
-func testReverse[E any](t *testing.T, s1, s2 []E) {
-	Reverse(s1)
-	if !reflect.DeepEqual(s1, s2) {
-		t.Errorf("expected %#v; got %#v", s2, s1)
-	}
-}
-
-func TestReverse(t *testing.T) {
-	type test struct {
-		a, b string
-	}
-
-	testReverse(t, []test{{"a", "b"}, {"a", "b"}, {"b", "c"}}, []test{{"b", "c"}, {"a", "b"}, {"a", "b"}})
-	testReverse(t, []int{1, 2, 2, 3}, []int{3, 2, 2, 1})
-	testReverse(t, []string{"a", "b", "b", "c"}, []string{"c", "b", "b", "a"})
-	testReverse(t, []test{}, []test{})
-	testReverse(t, []test(nil), []test(nil))
-}
-
 func testDeduplicate[E comparable](t *testing.T, s1, s2 []E) {
 	res := Deduplicate(s1)
 	if !reflect.DeepEqual(res, s2) {
