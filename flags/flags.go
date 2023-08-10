@@ -12,17 +12,21 @@ import (
 	"github.com/sunshineplan/utils/txt"
 )
 
-var Strict bool
+var (
+	Strict bool
 
-var config string
+	config string
+)
 
 func SetConfigFile(path string) { config = path }
 
-func getArgs(strict bool) (args []string) {
+func getArgs(strict, hint bool) (args []string) {
 	lines, err := txt.ReadFile(config)
 	if err != nil {
-		if !strict && errors.Is(err, fs.ErrNotExist) {
+		if errors.Is(err, fs.ErrNotExist) && (strict || hint) {
 			fmt.Println("config file is missing")
+		}
+		if !strict {
 			return
 		}
 		panic(err)
@@ -57,9 +61,9 @@ func unquote(s string) string {
 	return s
 }
 
-func parse(strict bool) {
+func ParseFlags(strict, hint bool) {
 	if config != "" {
-		flag.CommandLine.Parse(append(getArgs(strict), os.Args[1:]...))
+		flag.CommandLine.Parse(append(getArgs(strict, hint), os.Args[1:]...))
 		return
 	}
 	flag.Parse()
@@ -70,9 +74,9 @@ func UseStrict(strict bool) {
 }
 
 func Parse() {
-	parse(Strict)
+	ParseFlags(Strict, true)
 }
 
 func ParseStrict() {
-	parse(true)
+	ParseFlags(true, true)
 }
