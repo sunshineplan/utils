@@ -53,13 +53,10 @@ func (w *Writer) WriteFields(fields any) error {
 		}
 
 		for i := 0; i < v.NumField(); i++ {
-			var f field
-			if tag, ok := v.Type().Field(i).Tag.Lookup("csv"); ok {
-				f = field{v.Type().Field(i).Name, tag}
-			} else {
-				f = field{v.Type().Field(i).Name, ""}
+			if f := v.Type().Field(i); f.IsExported() {
+				tag, _ := v.Type().Field(i).Tag.Lookup("csv")
+				w.fields = append(w.fields, field{v.Type().Field(i).Name, tag})
 			}
-			w.fields = append(w.fields, f)
 		}
 	case reflect.Slice:
 		if v.Len() == 0 {
