@@ -6,68 +6,113 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strconv"
 )
 
-var errNilPtr = errors.New("destination pointer is nil") // embedded in descriptive error
+var (
+	errNilPtr = errors.New("destination pointer is nil") // embedded in descriptive error
+	errNotSet = errors.New("not set")
+)
 
 func marshalText(i any) (text string, err error) {
-	var b []byte
 	switch v := i.(type) {
 	case nil:
 	case string:
 		text = v
-	case encoding.TextMarshaler:
-		b, err = v.MarshalText()
-		text = string(b)
 	default:
-		b, err = json.Marshal(v)
-		text = string(b)
+		var b []byte
+		if b, err = json.Marshal(v); err == nil {
+			text = string(b)
+		}
 	}
 	return
 }
 
-func convert(src string) any {
-	if i64, err := strconv.ParseInt(src, 10, 64); err == nil {
-		return i64
+func strconvErr(err error) error {
+	if numError, ok := err.(*strconv.NumError); ok {
+		return numError.Err
 	}
-	if f64, err := strconv.ParseFloat(src, 64); err == nil {
-		return f64
-	}
-	if bv, err := strconv.ParseBool(src); err == nil {
-		return bv
-	}
-	if regexp.MustCompile(`^\s*\[.*\]\s*$`).MatchString(src) {
-		return json.RawMessage(src)
-	}
-	return src
+	return err
 }
 
-// convertAssign copies to dest the value in src, converting it if possible.
+func convert(t reflect.Type, s string) (reflect.Value, error) {
+	if t.Kind() == reflect.Ptr {
+		return convert(t.Elem(), s)
+	}
+	v := reflect.Indirect(reflect.New(t))
+	if v.CanInt() {
+		n, err := strconv.ParseInt(s, 10, t.Bits())
+		if err != nil {
+			return v, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
+		}
+		v.SetInt(n)
+		return v, nil
+	} else if v.CanUint() {
+		u, err := strconv.ParseUint(s, 10, t.Bits())
+		if err != nil {
+			return v, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
+		}
+		v.SetUint(u)
+		return v, nil
+	} else if v.CanFloat() {
+		f, err := strconv.ParseFloat(s, t.Bits())
+		if err != nil {
+			return v, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
+		}
+		v.SetFloat(f)
+		return v, nil
+	} else if v.CanComplex() {
+		c, err := strconv.ParseComplex(s, t.Bits())
+		if err != nil {
+			return v, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
+		}
+		v.SetComplex(c)
+		return v, nil
+	}
+	switch t.Kind() {
+	case reflect.String, reflect.Interface:
+		v.SetString(s)
+		return v, nil
+	case reflect.Bool:
+		b, err := strconv.ParseBool(s)
+		if err == nil {
+			return v, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), err)
+		}
+		v.SetBool(b)
+		return v, nil
+	case reflect.Slice:
+		if t.Elem().Kind() == reflect.Uint8 {
+			v.SetBytes([]byte(s))
+			return v, nil
+		}
+	}
+	return v, errNotSet
+}
+
+// setCell copies to dest the value in src, converting it if possible.
 // An error is returned if the copy would result in loss of information.
 // dest should be a pointer type.
 // https://golang.org/src/database/sql/convert.go?h=convertAssignRows#L219
-func convertAssign(dest any, src string) error {
+func setCell(dest any, s string) error {
 	// Common cases, without reflect.
 	switch d := dest.(type) {
 	case *string:
 		if d == nil {
 			return errNilPtr
 		}
-		*d = src
+		*d = s
 		return nil
 	case *[]byte:
 		if d == nil {
 			return errNilPtr
 		}
-		*d = []byte(src)
+		*d = []byte(s)
 		return nil
 	case *bool:
 		if d == nil {
 			return errNilPtr
 		}
-		bv, err := strconv.ParseBool(src)
+		bv, err := strconv.ParseBool(s)
 		if err == nil {
 			*d = bv
 		}
@@ -76,18 +121,69 @@ func convertAssign(dest any, src string) error {
 		if d == nil {
 			return errNilPtr
 		}
-		*d = src
+		*d = s
 		return nil
 	case json.Unmarshaler:
 		if d == nil {
 			return errNilPtr
 		}
-		return d.UnmarshalJSON([]byte(src))
+		return d.UnmarshalJSON([]byte(s))
 	case encoding.TextUnmarshaler:
 		if d == nil {
 			return errNilPtr
 		}
-		return d.UnmarshalText([]byte(src))
+		return d.UnmarshalText([]byte(s))
+	}
+
+	dpv := reflect.ValueOf(dest)
+	if dpv.Kind() != reflect.Ptr {
+		return errors.New("destination not a pointer")
+	}
+	if dpv.IsNil() {
+		return errNilPtr
+	}
+	dv := reflect.Indirect(dpv)
+	if v := reflect.ValueOf(s); v.Type().AssignableTo(dv.Type()) {
+		dv.Set(v)
+		return nil
+	}
+	if dv.Kind() == reflect.Pointer {
+		dv.Set(reflect.New(dv.Type().Elem()))
+		return setCell(dv.Interface(), s)
+	}
+
+	if v, err := convert(dv.Type(), s); err != nil {
+		if err == errNotSet {
+			return json.Unmarshal([]byte(s), dest)
+		}
+		return err
+	} else {
+		dv.Set(v)
+		return nil
+	}
+}
+
+func setRow(dest any, m map[string]string) error {
+	// Common cases, without reflect.
+	switch d := dest.(type) {
+	case *map[string]string:
+		if d == nil {
+			return errNilPtr
+		}
+		*d = m
+		return nil
+	case json.Unmarshaler:
+		if d == nil {
+			return errNilPtr
+		}
+		b, _ := json.Marshal(m)
+		return d.UnmarshalJSON(b)
+	case encoding.TextUnmarshaler:
+		if d == nil {
+			return errNilPtr
+		}
+		b, _ := json.Marshal(m)
+		return d.UnmarshalText(b)
 	}
 
 	dpv := reflect.ValueOf(dest)
@@ -98,57 +194,55 @@ func convertAssign(dest any, src string) error {
 		return errNilPtr
 	}
 
-	sv := reflect.ValueOf(src)
 	dv := reflect.Indirect(dpv)
-	if sv.Type().AssignableTo(dv.Type()) {
-		dv.Set(sv)
+	if v := reflect.ValueOf(m); v.Type().AssignableTo(dv.Type()) {
+		dv.Set(v)
 		return nil
 	}
 
-	// The following conversions use a string value as an intermediate representation
-	// to convert between various numeric types.
-	//
-	// This also allows scanning into user defined types such as "type Int int64".
-	// For symmetry, also check for string destination types.
-	if src == "" {
-		return fmt.Errorf("converting Empty String to %s is unsupported", dv.Kind())
+	if len(m) == 0 {
+		return nil
 	}
 	switch dv.Kind() {
 	case reflect.Ptr:
 		dv.Set(reflect.New(dv.Type().Elem()))
-		return convertAssign(dv.Interface(), src)
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		i64, err := strconv.ParseInt(src, 10, dv.Type().Bits())
-		if err != nil {
-			err = strconvErr(err)
-			return fmt.Errorf("converting type String (%q) to a %s: %v", src, dv.Kind(), err)
+		return setRow(dv.Interface(), m)
+	case reflect.Map:
+		if dv.Type().Key().Kind() != reflect.String {
+			return errors.New("map key is not string kind")
 		}
-		dv.SetInt(i64)
+		for k, v := range m {
+			i := reflect.New(dv.Type().Elem())
+			if err := setCell(i.Interface(), v); err != nil {
+				return err
+			}
+			dv.SetMapIndex(reflect.ValueOf(k), reflect.Indirect(i))
+		}
 		return nil
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		u64, err := strconv.ParseUint(src, 10, dv.Type().Bits())
-		if err != nil {
-			err = strconvErr(err)
-			return fmt.Errorf("converting type String (%q) to a %s: %v", src, dv.Kind(), err)
+	case reflect.Struct:
+		csvTags := make(map[string]string)
+		for _, field := range reflect.VisibleFields(dv.Type()) {
+			if tag, ok := field.Tag.Lookup("csv"); ok {
+				csvTags[tag] = field.Name
+			}
 		}
-		dv.SetUint(u64)
-		return nil
-	case reflect.Float32, reflect.Float64:
-		f64, err := strconv.ParseFloat(src, dv.Type().Bits())
-		if err != nil {
-			err = strconvErr(err)
-			return fmt.Errorf("converting type String (%q) to a %s: %v", src, dv.Kind(), err)
+		for k, v := range m {
+			var val reflect.Value
+			if field, ok := csvTags[k]; ok {
+				val = dv.FieldByName(field)
+			} else {
+				val = dv.FieldByName(k)
+			}
+			if val.IsValid() {
+				i := reflect.New(val.Type())
+				if err := setCell(i.Interface(), v); err != nil {
+					return err
+				}
+				val.Set(reflect.Indirect(i))
+			}
 		}
-		dv.SetFloat(f64)
 		return nil
 	}
-
-	return json.Unmarshal([]byte(src), dest)
-}
-
-func strconvErr(err error) error {
-	if numError, ok := err.(*strconv.NumError); ok {
-		return numError.Err
-	}
-	return err
+	b, _ := json.Marshal(m)
+	return json.Unmarshal(b, dest)
 }

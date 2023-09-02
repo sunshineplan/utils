@@ -22,7 +22,7 @@ func (v *test) UnmarshalText(b []byte) (err error) {
 
 func TestConvert(t *testing.T) {
 	var s string
-	if err := convertAssign(&s, "string"); err != nil {
+	if err := setCell(&s, "string"); err != nil {
 		t.Fatal(err)
 	}
 	if expect := "string"; s != expect {
@@ -30,7 +30,7 @@ func TestConvert(t *testing.T) {
 	}
 
 	var n int
-	if err := convertAssign(&n, "123"); err != nil {
+	if err := setCell(&n, "123"); err != nil {
 		t.Fatal(err)
 	}
 	if expect := 123; n != expect {
@@ -38,7 +38,7 @@ func TestConvert(t *testing.T) {
 	}
 
 	var a []int
-	if err := convertAssign(&a, "[1,2]"); err != nil {
+	if err := setCell(&a, "[1,2]"); err != nil {
 		t.Fatal(err)
 	}
 	if expect := []int{1, 2}; !reflect.DeepEqual(expect, a) {
@@ -46,13 +46,13 @@ func TestConvert(t *testing.T) {
 	}
 
 	var ts test
-	if err := convertAssign(&ts, ""); err != nil {
+	if err := setCell(&ts, ""); err != nil {
 		t.Fatal(err)
 	}
 	if expect := test(""); expect != ts {
 		t.Errorf("expected %v; got %v", expect, ts)
 	}
-	if err := convertAssign(&ts, `["1","2"]`); err != nil {
+	if err := setCell(&ts, `["1","2"]`); err != nil {
 		t.Fatal(err)
 	}
 	if expect := test("1,2"); expect != ts {

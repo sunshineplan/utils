@@ -2,7 +2,6 @@ package csv
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -89,7 +88,7 @@ func (r *Reader) Scan(dest ...any) error {
 	}
 
 	for i, v := range r.next {
-		if err := convertAssign(dest[i], v); err != nil {
+		if err := setCell(dest[i], v); err != nil {
 			return fmt.Errorf("Scan error on field index %d: %v", i, err)
 		}
 	}
@@ -109,18 +108,13 @@ func (r *Reader) Decode(dest any) error {
 		return r.nextErr
 	}
 
-	m := make(map[string]any)
+	m := make(map[string]string)
 	for i, field := range r.fields {
 		if len(r.next) > i {
-			m[field] = convert(r.next[i])
+			m[field] = r.next[i]
 		}
 	}
-
-	b, err := json.Marshal(m)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(b, dest)
+	return setRow(dest, m)
 }
 
 func (r *Reader) Close() error {
