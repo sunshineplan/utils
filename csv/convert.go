@@ -19,6 +19,11 @@ func marshalText(i any) (text string, err error) {
 	case nil:
 	case string:
 		text = v
+	case encoding.TextMarshaler:
+		var b []byte
+		if b, err = v.MarshalText(); err == nil {
+			text = string(b)
+		}
 	default:
 		var b []byte
 		if b, err = json.Marshal(v); err == nil {
@@ -178,12 +183,6 @@ func setRow(dest any, m map[string]string) error {
 		}
 		b, _ := json.Marshal(m)
 		return d.UnmarshalJSON(b)
-	case encoding.TextUnmarshaler:
-		if d == nil {
-			return errNilPtr
-		}
-		b, _ := json.Marshal(m)
-		return d.UnmarshalText(b)
 	}
 
 	dpv := reflect.ValueOf(dest)
