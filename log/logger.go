@@ -1,15 +1,17 @@
 package log
 
 import (
+	"context"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"sync"
 )
 
 var (
-	_ io.Writer = (*Logger)(nil)
-	_ Rotatable = (*Logger)(nil)
+	_ io.Writer = new(Logger)
+	_ Rotatable = new(Logger)
 )
 
 const (
@@ -25,17 +27,27 @@ const (
 
 type Logger struct {
 	*log.Logger
-	m     sync.Mutex
 	file  *os.File
 	extra io.Writer
+
+	slog *slog.Logger
+
+	mu    *sync.Mutex
+	level *slog.LevelVar
+}
+
+func newLogger(l *log.Logger, file *os.File) *Logger {
+	logger := &Logger{Logger: l, file: file, mu: new(sync.Mutex), level: new(slog.LevelVar)}
+	logger.slog = slog.New(newDefaultHandler(logger.mu, l, &slog.HandlerOptions{Level: logger.level}))
+	return logger
 }
 
 func New(file, prefix string, flag int) *Logger {
 	if file == "" {
-		return &Logger{Logger: log.New(io.Discard, prefix, flag)}
+		return newLogger(log.New(io.Discard, prefix, flag), nil)
 	}
 	f := openFile(file)
-	return &Logger{Logger: log.New(f, prefix, flag), file: f}
+	return newLogger(log.New(f, prefix, flag), f)
 }
 
 func (l *Logger) setOutput(file *os.File, extra io.Writer) {
@@ -58,8 +70,8 @@ func (l *Logger) setOutput(file *os.File, extra io.Writer) {
 }
 
 func (l *Logger) SetOutput(file string, extra io.Writer) {
-	l.m.Lock()
-	defer l.m.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.setOutput(openFile(file), extra)
 }
 
@@ -68,9 +80,65 @@ func (l *Logger) SetFile(file string) {
 }
 
 func (l *Logger) SetExtra(extra io.Writer) {
-	l.m.Lock()
-	defer l.m.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.setOutput(l.file, extra)
+}
+
+func (l *Logger) SetHandler(h slog.Handler) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.slog = slog.New(h)
+}
+func (l *Logger) Level() *slog.LevelVar {
+	return l.level
+}
+func (l *Logger) SetLevel(level slog.Level) {
+	l.level.Set(level)
+}
+func (l *Logger) Debug(msg string, args ...any) {
+	l.slog.Debug(msg, args...)
+}
+func (l *Logger) DebugContext(ctx context.Context, msg string, args ...any) {
+	l.slog.DebugContext(ctx, msg, args...)
+}
+func (l *Logger) Enabled(ctx context.Context, level slog.Level) bool {
+	return l.slog.Enabled(ctx, level)
+}
+func (l *Logger) Error(msg string, args ...any) {
+	l.slog.Error(msg, args...)
+}
+func (l *Logger) ErrorContext(ctx context.Context, msg string, args ...any) {
+	l.slog.ErrorContext(ctx, msg, args...)
+}
+func (l *Logger) Handler() slog.Handler {
+	return l.slog.Handler()
+}
+func (l *Logger) Info(msg string, args ...any) {
+	l.slog.Info(msg, args...)
+}
+func (l *Logger) InfoContext(ctx context.Context, msg string, args ...any) {
+	l.slog.InfoContext(ctx, msg, args...)
+}
+func (l *Logger) Log(ctx context.Context, level slog.Level, msg string, args ...any) {
+	l.slog.Log(ctx, level, msg, args...)
+}
+func (l *Logger) LogAttrs(ctx context.Context, level slog.Level, msg string, attrs ...slog.Attr) {
+	l.slog.LogAttrs(ctx, level, msg, attrs...)
+}
+func (l *Logger) Warn(msg string, args ...any) {
+	l.slog.Warn(msg, args...)
+}
+func (l *Logger) WarnContext(ctx context.Context, msg string, args ...any) {
+	l.slog.WarnContext(ctx, msg, args...)
+}
+func (l *Logger) With(args ...any) *Logger {
+	l.slog = l.slog.With(args...)
+	return l
+}
+func (l *Logger) WithGroup(name string) *Logger {
+	l.slog = l.slog.WithGroup(name)
+	return l
 }
 
 func (l *Logger) Rotate() {
