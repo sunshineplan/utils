@@ -111,7 +111,7 @@ func (l *Logger) Error(msg string, args ...any) {
 func (l *Logger) ErrorContext(ctx context.Context, msg string, args ...any) {
 	l.slog.ErrorContext(ctx, msg, args...)
 }
-func (l *Logger) Handler() slog.Handler {
+func (l *Logger) LoggerHandler() slog.Handler {
 	return l.slog.Handler()
 }
 func (l *Logger) Info(msg string, args ...any) {

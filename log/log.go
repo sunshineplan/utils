@@ -99,8 +99,8 @@ func Error(msg string, args ...any) {
 func ErrorContext(ctx context.Context, msg string, args ...any) {
 	std.ErrorContext(ctx, msg, args...)
 }
-func Handler() slog.Handler {
-	return std.Handler()
+func LoggerHandler() slog.Handler {
+	return std.LoggerHandler()
 }
 func Info(msg string, args ...any) {
 	std.Info(msg, args...)
