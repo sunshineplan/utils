@@ -10,10 +10,6 @@ import (
 	"github.com/sunshineplan/utils/smtp"
 )
 
-func SetDebug(b bool) {
-	smtp.SetDebug(b)
-}
-
 // Dialer is a dialer to an SMTP server.
 type Dialer struct {
 	Server   string

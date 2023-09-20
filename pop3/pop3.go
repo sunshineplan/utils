@@ -5,18 +5,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/textproto"
 	"strconv"
 	"strings"
 )
-
-var debug bool
-
-func SetDebug(b bool) {
-	debug = b
-}
 
 type Client struct {
 	*textproto.Conn
@@ -61,10 +55,7 @@ func NewClient(conn net.Conn) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if debug {
-		log.Println("<", s)
-	}
+	slog.Debug("<<< " + s)
 
 	if _, err = parseResp(s); err != nil {
 		c.Close()
@@ -246,9 +237,7 @@ func (c *Client) Quit() error {
 }
 
 func (c *Client) Cmd(s string, isMulti bool, args ...any) (string, error) {
-	if debug {
-		log.Println(">", fmt.Sprintf(s, args...))
-	}
+	slog.Debug(">>> " + fmt.Sprintf(s, args...))
 	if _, err := c.Conn.Cmd(s, args...); err != nil {
 		return "", err
 	}
@@ -257,9 +246,7 @@ func (c *Client) Cmd(s string, isMulti bool, args ...any) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if debug {
-		log.Println("<", s)
-	}
+	slog.Debug("<<< " + s)
 
 	s, err = parseResp(s)
 	if err != nil {
@@ -275,9 +262,7 @@ func (c *Client) Cmd(s string, isMulti bool, args ...any) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if debug {
-			log.Println("<", s)
-		}
+		slog.Debug("<<< " + s)
 		if s == "." {
 			break
 		}

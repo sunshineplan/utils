@@ -7,18 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/smtp"
 	"net/textproto"
 	"strings"
 )
-
-var debug bool
-
-func SetDebug(b bool) {
-	debug = b
-}
 
 // A Client represents a client connection to an SMTP server.
 type Client struct {
@@ -60,10 +54,7 @@ func NewClient(conn net.Conn, host string) (*Client, error) {
 		text.Close()
 		return nil, err
 	}
-
-	if debug {
-		log.Println("<", code, msg)
-	}
+	slog.Debug("<<<", "code", code, "msg", msg)
 
 	c := &Client{Conn: text, conn: conn, serverName: host, localName: "localhost"}
 	_, c.tls = conn.(*tls.Conn)
@@ -73,9 +64,7 @@ func NewClient(conn net.Conn, host string) (*Client, error) {
 
 // Cmd is a convenience function that sends a command and returns the response.
 func (c *Client) Cmd(expectCode int, format string, args ...any) (int, string, error) {
-	if debug {
-		log.Println(">", fmt.Sprintf(format, args...))
-	}
+	slog.Debug(">>> " + fmt.Sprintf(format, args...))
 	id, err := c.Conn.Cmd(format, args...)
 	if err != nil {
 		return 0, "", err
@@ -83,9 +72,7 @@ func (c *Client) Cmd(expectCode int, format string, args ...any) (int, string, e
 	c.StartResponse(id)
 	defer c.EndResponse(id)
 	code, msg, err := c.ReadResponse(expectCode)
-	if debug {
-		log.Println("<", code, msg)
-	}
+	slog.Debug("<<<", "code", code, "msg", msg)
 	return code, msg, err
 }
 
@@ -284,9 +271,7 @@ type dataCloser struct {
 func (d *dataCloser) Close() error {
 	d.WriteCloser.Close()
 	code, msg, err := d.c.ReadResponse(250)
-	if debug {
-		log.Println("<", code, msg)
-	}
+	slog.Debug("<<<", "code", code, "msg", msg)
 	return err
 }
 
