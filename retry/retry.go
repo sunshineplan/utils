@@ -1,37 +1,52 @@
 package retry
 
 import (
+	"errors"
 	"time"
 )
 
-var _ error = errNoMoreRetry("")
+var errNoMoreRetry error = errorNoMoreRetry("no more retry")
 
-type errNoMoreRetry string
+type errorNoMoreRetry string
 
-func (err errNoMoreRetry) Error() string {
+func (err errorNoMoreRetry) Error() string {
 	return string(err)
+}
+
+func (errorNoMoreRetry) Unwrap() error {
+	return errNoMoreRetry
 }
 
 // IsNoMoreRetry reports whether error is NoMoreRetry error.
 func IsNoMoreRetry(err error) bool {
-	_, ok := err.(errNoMoreRetry)
-	return ok
+	if e, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, err := range e.Unwrap() {
+			if IsNoMoreRetry(err) {
+				return true
+			}
+		}
+		return false
+	}
+	return errors.Is(err, errNoMoreRetry)
 }
 
 // ErrNoMoreRetry tells function does no more retry.
-func ErrNoMoreRetry(err string) error { return errNoMoreRetry(err) }
+func ErrNoMoreRetry(err string) error { return errorNoMoreRetry(err) }
 
 // Do keeps retrying the function until no error is returned.
-func Do(fn func() error, attempts, delay int) (err error) {
+func Do(fn func() error, attempts, delay int) error {
+	var errs []error
 	for i := 0; i < attempts; i++ {
-		if err = fn(); err == nil || IsNoMoreRetry(err) {
-			return
+		err := fn()
+		if err == nil {
+			return nil
 		}
-
-		if i < attempts-1 {
+		errs = append(errs, err)
+		if IsNoMoreRetry(err) {
+			break
+		} else if i < attempts-1 {
 			time.Sleep(time.Second * time.Duration(delay))
 		}
 	}
-
-	return
+	return errors.Join(errs...)
 }

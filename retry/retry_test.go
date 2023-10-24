@@ -7,6 +7,9 @@ import (
 )
 
 func TestRetry(t *testing.T) {
+	if err := ErrNoMoreRetry("error"); !errors.Is(err, errNoMoreRetry) {
+		t.Error("expected err is errNoMoreRetry; got not")
+	}
 	var i int
 	if err := Do(func() error {
 		defer func() { i++ }()
@@ -23,8 +26,8 @@ func TestRetry(t *testing.T) {
 		return errors.New("error" + strconv.Itoa(i))
 	}, 3, 1); err == nil {
 		t.Error("expected non-nil error; got nil error")
-	} else if err.Error() != "error2" {
-		t.Errorf("expected error2; got %s", err)
+	} else if expect := "error0\nerror1\nerror2"; err.Error() != expect {
+		t.Errorf("expected %s; got %s", expect, err)
 	}
 
 	i = 0
