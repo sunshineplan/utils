@@ -2,21 +2,13 @@ package choice
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 )
 
-var (
-	_ Choice      = a("")
-	_ Description = a("")
-)
+var _ Description = a("")
 
 type a string
-
-func (s a) Run() (any, error) {
-	return s, nil
-}
 
 func (s a) Description() string {
 	return strings.Repeat(string(s), 2)
@@ -27,10 +19,18 @@ func (s a) String() string {
 }
 
 func TestMenu(t *testing.T) {
-	choices := []a{"a", "b", "c"}
-	expect := `1. aa
-2. bb
-3. cc
+	choices := []a{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
+	expect := ` 1. aa
+ 2. bb
+ 3. cc
+ 4. dd
+ 5. ee
+ 6. ff
+ 7. gg
+ 8. hh
+ 9. ii
+10. jj
+ q. Quit
 `
 	if s := Menu(choices); s != expect {
 		t.Errorf("expected %q; got %q", expect, s)
@@ -44,7 +44,13 @@ func TestChoose(t *testing.T) {
 	}
 	if s, err := choose("2", choices); err != nil {
 		t.Fatal(err)
-	} else if expect := "b"; fmt.Sprint(s) != expect {
+	} else if expect := "b"; s.String() != expect {
 		t.Errorf("expected %q; got %q", expect, s)
+	}
+}
+
+func TestError(t *testing.T) {
+	if !errors.Is(choiceError(""), ErrBadChoice) {
+		t.Error("expected err is ErrBadChoice; got not")
 	}
 }
