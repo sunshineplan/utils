@@ -25,7 +25,7 @@ func choiceStr(choice any) string {
 }
 
 // Menu function is used to generate a string representation of the menu, associating choices with numbers.
-func Menu[E any](choices []E) string {
+func Menu[E any](choices []E, showQuit bool) string {
 	if len(choices) == 0 {
 		return ""
 	}
@@ -38,7 +38,9 @@ func Menu[E any](choices []E) string {
 	for i, choice := range choices {
 		fmt.Fprintf(&b, "%s. %s\n", fmt.Sprintf(option, i+1), choiceStr(choice))
 	}
-	fmt.Fprintf(&b, "%s. Quit\n", fmt.Sprintf(fmt.Sprintf("%%%ds", digit), "q"))
+	if showQuit {
+		fmt.Fprintf(&b, "%s. Quit\n", fmt.Sprintf(fmt.Sprintf("%%%ds", digit), "q"))
+	}
 	return b.String()
 }
 
