@@ -32,7 +32,7 @@ func TestMenu(t *testing.T) {
 10. jj
  q. Quit
 `
-	if s := Menu(choices); s != expect {
+	if s := Menu(choices, true); s != expect {
 		t.Errorf("expected %q; got %q", expect, s)
 	}
 }
