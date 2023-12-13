@@ -1,53 +1,36 @@
 package html
 
-import (
-	"fmt"
-	"html"
-	"strings"
-)
+import "html"
 
 var (
 	EscapeString   = html.EscapeString
 	UnescapeString = html.UnescapeString
 )
 
-type Attribute struct {
-	Name  string
-	Value string
-}
-
-func Attributes(pairs ...string) (attributes []Attribute) {
-	if len(pairs)%2 != 0 {
-		panic("pairs must have even number of elements")
-	}
-	for i := 0; i < len(pairs); i = i + 2 {
-		attributes = append(attributes, Attribute{pairs[i], pairs[i+1]})
-	}
-	return
-}
-
-func (attr Attribute) String() string {
-	if attr.Value == "" || attr.Value == "true" {
-		return attr.Name
-	}
-	return fmt.Sprintf("%s=%q", attr.Name, attr.Value)
-}
-
 type HTML string
 
-func Element[T HTML | string](tag string, attributes []Attribute, content T) HTML {
-	var b strings.Builder
-	fmt.Fprint(&b, "<", tag)
-	for _, i := range attributes {
-		fmt.Fprint(&b, " ", i)
-	}
-	fmt.Fprint(&b, ">")
-	switch any(content).(type) {
-	case HTML:
-		fmt.Fprint(&b, content)
-	default:
-		fmt.Fprint(&b, EscapeString(string(content)))
-	}
-	fmt.Fprintf(&b, "</%s>", tag)
-	return HTML(b.String())
+type HTMLer interface {
+	HTML() HTML
 }
+
+func A() *Element     { return NewElement("a") }
+func B() *Element     { return NewElement("b") }
+func Br() *Element    { return NewElement("br") }
+func Div() *Element   { return NewElement("div") }
+func Em() *Element    { return NewElement("em") }
+func Form() *Element  { return NewElement("form") }
+func H1() *Element    { return NewElement("h1") }
+func H2() *Element    { return NewElement("h2") }
+func I() *Element     { return NewElement("i") }
+func Img() *Element   { return NewElement("img") }
+func Input() *Element { return NewElement("input") }
+func Label() *Element { return NewElement("label") }
+func Li() *Element    { return NewElement("li") }
+func P() *Element     { return NewElement("p") }
+func Span() *Element  { return NewElement("span") }
+func Svg() *Element   { return NewElement("svg") }
+func Table() *Element { return NewElement("table") }
+func Tbody() *Element { return NewElement("tbody") }
+func Title() *Element { return NewElement("title") }
+func Thead() *Element { return NewElement("thead") }
+func Ul() *Element    { return NewElement("ul") }
