@@ -54,9 +54,9 @@ func content(v any) HTML {
 	}
 }
 
-func (e *Element) Content(v any) *Element {
-	e.content = content(v)
-	return e
+func (e *Element) Content(v ...any) *Element {
+	e.content = ""
+	return e.AppendContent(v...)
 }
 
 func (e *Element) Contentf(format string, a ...any) *Element {
@@ -67,17 +67,25 @@ func (e *Element) HTMLContent(html string) *Element {
 	return e.Content(HTML(html))
 }
 
-func (e *Element) AppendContent(v any) *Element {
-	e.content += content(v)
+func (e *Element) AppendContent(v ...any) *Element {
+	for _, v := range v {
+		e.content += content(v)
+	}
 	return e
 }
 
-func (e *Element) AppendChild(child *Element) *Element {
-	return e.AppendContent(child)
+func (e *Element) AppendChild(child ...*Element) *Element {
+	for _, i := range child {
+		e.AppendContent(i)
+	}
+	return e
 }
 
-func (e *Element) AppendHTML(html string) *Element {
-	return e.AppendContent(HTML(html))
+func (e *Element) AppendHTML(html ...string) *Element {
+	for _, i := range html {
+		e.AppendContent(HTML(i))
+	}
+	return e
 }
 
 // https://developer.mozilla.org/en-US/docs/Glossary/Void_element
