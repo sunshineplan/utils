@@ -13,6 +13,8 @@ type HTMLer interface {
 	HTML() HTML
 }
 
+func Background() *Element { return NewElement("") }
+
 func A() *Element     { return NewElement("a") }
 func B() *Element     { return NewElement("b") }
 func Br() *Element    { return NewElement("br") }

@@ -23,22 +23,37 @@ func TestElement(t *testing.T) {
 			t.Errorf("expected %q; got %q", tc.html, res)
 		}
 	}
-	if div, expect := Div().Content(Br()).HTML(), "<div><br></div>"; expect != string(div) {
+	if div, expect := Div().Content(Br()).String(), "<div><br></div>"; expect != div {
 		t.Errorf("expected %q; got %q", expect, div)
 	}
 }
 
 func TestAppend(t *testing.T) {
 	e := Div()
-	if expect := "<div></div>"; expect != string(e.HTML()) {
-		t.Errorf("expected %q; got %q", expect, e.HTML())
+	if expect := "<div></div>"; expect != e.String() {
+		t.Errorf("expected %q; got %q", expect, e.String())
 	}
 	e.AppendContent("test")
-	if expect := "<div>test</div>"; expect != string(e.HTML()) {
-		t.Errorf("expected %q; got %q", expect, e.HTML())
+	if expect := "<div>test</div>"; expect != e.String() {
+		t.Errorf("expected %q; got %q", expect, e.String())
 	}
 	e.AppendChild(Img().Src("test"))
-	if expect := `<div>test<img src="test"></div>`; expect != string(e.HTML()) {
-		t.Errorf("expected %q; got %q", expect, e.HTML())
+	if expect := `<div>test<img src="test"></div>`; expect != e.String() {
+		t.Errorf("expected %q; got %q", expect, e.String())
+	}
+}
+
+func TestBackground(t *testing.T) {
+	e := Background()
+	if expect := ""; expect != e.String() {
+		t.Errorf("expected %q; got %q", expect, e.String())
+	}
+	e.AppendContent("test")
+	if expect := "test"; expect != e.String() {
+		t.Errorf("expected %q; got %q", expect, e.String())
+	}
+	e.AppendChild(Img().Src("test"))
+	if expect := `test<img src="test">`; expect != e.String() {
+		t.Errorf("expected %q; got %q", expect, e.String())
 	}
 }

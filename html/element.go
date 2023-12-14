@@ -35,6 +35,10 @@ func (e *Element) Style(style string) *Element {
 	return e.Attribute("style", style)
 }
 
+func (e *Element) Title(title string) *Element {
+	return e.Attribute("title", title)
+}
+
 func content(v any) HTML {
 	switch v := v.(type) {
 	case nil:
@@ -55,6 +59,14 @@ func (e *Element) Content(v any) *Element {
 	return e
 }
 
+func (e *Element) Contentf(format string, a ...any) *Element {
+	return e.Content(fmt.Sprintf(format, a...))
+}
+
+func (e *Element) HTMLContent(html string) *Element {
+	return e.Content(HTML(html))
+}
+
 func (e *Element) AppendContent(v any) *Element {
 	e.content += content(v)
 	return e
@@ -62,6 +74,10 @@ func (e *Element) AppendContent(v any) *Element {
 
 func (e *Element) AppendChild(child *Element) *Element {
 	return e.AppendContent(child)
+}
+
+func (e *Element) AppendHTML(html string) *Element {
+	return e.AppendContent(HTML(html))
 }
 
 // https://developer.mozilla.org/en-US/docs/Glossary/Void_element
@@ -100,19 +116,27 @@ func (e Element) printAttrs() string {
 	return strings.Join(s, " ")
 }
 
-func (e *Element) HTML() HTML {
+func (e *Element) String() string {
 	var b strings.Builder
-	fmt.Fprint(&b, "<", e.tag)
-	if attrs := e.printAttrs(); attrs != "" {
-		fmt.Fprint(&b, " ", attrs)
+	if e.tag != "" {
+		fmt.Fprint(&b, "<", e.tag)
+		if attrs := e.printAttrs(); attrs != "" {
+			fmt.Fprint(&b, " ", attrs)
+		}
 	}
-	if e.isVoidElement() {
+	if e.tag == "" {
+		fmt.Fprint(&b, e.content)
+	} else if e.isVoidElement() {
 		fmt.Fprint(&b, ">")
 	} else {
 		fmt.Fprint(&b, ">", e.content)
 		fmt.Fprintf(&b, "</%s>", e.tag)
 	}
-	return HTML(b.String())
+	return b.String()
+}
+
+func (e *Element) HTML() HTML {
+	return HTML(e.String())
 }
 
 func NewElement(tag string) *Element {
