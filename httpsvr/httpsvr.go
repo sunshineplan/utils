@@ -41,6 +41,11 @@ func New() *Server {
 	return &Server{Server: &http.Server{}, Logger: log.Default()}
 }
 
+func (s *Server) SetLogger(logger *log.Logger) {
+	s.Logger = logger
+	s.Server.ErrorLog = logger.Logger
+}
+
 func (s *Server) SetReload(d time.Duration) {
 	s.reload = d
 }
