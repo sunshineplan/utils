@@ -2,7 +2,11 @@ package html
 
 import "strconv"
 
-func Tr[T *TableHeader | *TableData](element ...T) *Element {
+var _ HTMLer = new(TableCell)
+
+type TableCell struct{ *Element }
+
+func Tr(element ...*TableCell) *Element {
 	tr := NewElement("tr")
 	for _, i := range element {
 		tr.AppendContent(i)
@@ -10,60 +14,45 @@ func Tr[T *TableHeader | *TableData](element ...T) *Element {
 	return tr
 }
 
-var (
-	_ HTMLer = new(TableHeader)
-	_ HTMLer = new(TableData)
-)
-
-type (
-	TableHeader struct{ *Element }
-	TableData   struct{ *Element }
-)
-
-func Th(content any) *TableHeader {
-	return &TableHeader{NewElement("th").Content(content)}
+func Th(content any) *TableCell {
+	return &TableCell{NewElement("th").Content(content)}
 }
 
-func (th *TableHeader) Abbr(abbr string) *TableHeader {
-	th.Element.Attribute("abbr", abbr)
-	return th
+func Td(content any) *TableCell {
+	return &TableCell{NewElement("td").Content(content)}
 }
 
-func (th *TableHeader) Colspan(n uint) *TableHeader {
-	th.Element.Attribute("colspan", strconv.FormatUint(uint64(n), 10))
-	return th
+func (cell *TableCell) Abbr(abbr string) *TableCell {
+	cell.Element.Attribute("abbr", abbr)
+	return cell
 }
 
-func (th *TableHeader) Headers(headers string) *TableHeader {
-	th.Element.Attribute("headers", headers)
-	return th
+func (cell *TableCell) Colspan(n uint) *TableCell {
+	cell.Element.Attribute("colspan", strconv.FormatUint(uint64(n), 10))
+	return cell
 }
 
-func (th *TableHeader) Rowspan(n uint) *TableHeader {
-	th.Element.Attribute("rowspan", strconv.FormatUint(uint64(n), 10))
-	return th
+func (cell *TableCell) Headers(headers string) *TableCell {
+	cell.Element.Attribute("headers", headers)
+	return cell
 }
 
-func (th *TableHeader) Scope(scope string) *TableHeader {
-	th.Element.Attribute("scope", scope)
-	return th
+func (cell *TableCell) Rowspan(n uint) *TableCell {
+	cell.Element.Attribute("rowspan", strconv.FormatUint(uint64(n), 10))
+	return cell
 }
 
-func Td(content any) *TableData {
-	return &TableData{NewElement("td").Content(content)}
+func (cell *TableCell) Scope(scope string) *TableCell {
+	cell.Element.Attribute("scope", scope)
+	return cell
 }
 
-func (td *TableData) Colspan(n uint) *TableData {
-	td.Element.Attribute("colspan", strconv.FormatUint(uint64(n), 10))
-	return td
+func (cell *TableCell) Class(class ...string) *TableCell {
+	cell.Element.Class(class...)
+	return cell
 }
 
-func (td *TableData) Headers(headers string) *TableData {
-	td.Element.Attribute("headers", headers)
-	return td
-}
-
-func (td *TableData) Rowspan(n uint) *TableData {
-	td.Element.Attribute("rowspan", strconv.FormatUint(uint64(n), 10))
-	return td
+func (cell *TableCell) Style(style string) *TableCell {
+	cell.Element.Style(style)
+	return cell
 }

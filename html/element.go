@@ -27,6 +27,10 @@ func (e *Element) Href(href string) *Element {
 	return e.Attribute("href", href)
 }
 
+func (e *Element) Name(name string) *Element {
+	return e.Attribute("name", name)
+}
+
 func (e *Element) Src(src string) *Element {
 	return e.Attribute("src", src)
 }
