@@ -14,12 +14,13 @@ import (
 type Dialer struct {
 	Server   string
 	Port     int
+	TLS      bool
 	Account  string
 	Password string
 	Timeout  time.Duration
 }
 
-func (d *Dialer) Dial() (*smtp.Client, error) {
+func (d *Dialer) Dial() (client *smtp.Client, err error) {
 	if d.Timeout == 0 {
 		d.Timeout = 3 * time.Minute
 	}
@@ -27,16 +28,23 @@ func (d *Dialer) Dial() (*smtp.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
-	client, err := smtp.Dial(ctx, fmt.Sprintf("%s:%d", d.Server, d.Port))
-	if err != nil {
-		return nil, err
+	if d.TLS {
+		client, err = smtp.DialTLS(ctx, fmt.Sprintf("%s:%d", d.Server, d.Port))
+	} else {
+		client, err = smtp.Dial(ctx, fmt.Sprintf("%s:%d", d.Server, d.Port))
 	}
-	if ok, _ := client.Extension("STARTTLS"); ok {
-		if err := client.StartTLS(nil); err != nil {
-			client.Quit()
-			return nil, err
+	if err != nil {
+		return
+	}
+
+	if !d.TLS {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err = client.StartTLS(nil); err != nil {
+				return
+			}
 		}
 	}
+
 	if ok, _ := client.Extension("AUTH"); ok && d.Account != "" && d.Password != "" {
 		if err = client.Auth2(&smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}); err != nil {
 			client.Quit()
@@ -110,5 +118,5 @@ func (d *Dialer) Send(msg ...*Message) error {
 func (d *Dialer) SendMail(ctx context.Context, from string, to []string, msg []byte) error {
 	addr := fmt.Sprintf("%s:%d", d.Server, d.Port)
 	auth := &smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}
-	return smtp.SendMail(ctx, addr, auth, from, to, msg)
+	return smtp.SendMail(ctx, addr, d.TLS, auth, from, to, msg)
 }

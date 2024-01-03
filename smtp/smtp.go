@@ -45,6 +45,22 @@ func Dial(ctx context.Context, addr string) (*Client, error) {
 	return NewClient(conn, host)
 }
 
+// DialTLS returns a new Client connected to an SMTP server with TLS connection at addr.
+// The addr must include a port, as in "mail.example.com:smtp".
+func DialTLS(ctx context.Context, addr string) (*Client, error) {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	d := &tls.Dialer{Config: &tls.Config{ServerName: host}}
+	conn, err := d.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(conn, host)
+}
+
 // NewClient returns a new Client using an existing connection and host as a
 // server name to be used when authenticating.
 func NewClient(conn net.Conn, host string) (*Client, error) {
@@ -163,7 +179,8 @@ func (c *Client) TLSConnectionState() (state tls.ConnectionState, ok bool) {
 	if !ok {
 		return
 	}
-	return tc.ConnectionState(), true
+	state = tc.ConnectionState()
+	return
 }
 
 // Verify checks the validity of an email address on the server.
@@ -371,33 +388,41 @@ func (c *Client) SendMail(from string, to []string, msg []byte) error {
 // fields such as "From", "To", "Subject", and "Cc".  Sending "Bcc"
 // messages is accomplished by including an email address in the to
 // parameter but not including it in the msg headers.
-func SendMail(ctx context.Context, addr string, auth *Auth, from string, to []string, msg []byte) error {
-	if err := validateLine(from); err != nil {
-		return err
+func SendMail(ctx context.Context, addr string, tls bool, auth *Auth, from string, to []string, msg []byte) (err error) {
+	if err = validateLine(from); err != nil {
+		return
 	}
 	for _, recp := range to {
-		if err := validateLine(recp); err != nil {
-			return err
+		if err = validateLine(recp); err != nil {
+			return
 		}
 	}
 
-	c, err := Dial(ctx, addr)
+	var c *Client
+	if tls {
+		c, err = DialTLS(ctx, addr)
+	} else {
+		c, err = Dial(ctx, addr)
+	}
 	if err != nil {
-		return err
+		return
 	}
 	defer c.Quit()
 
-	if ok, _ := c.Extension("STARTTLS"); ok {
-		if err := c.StartTLS(nil); err != nil {
-			return err
+	if !tls {
+		if ok, _ := c.Extension("STARTTLS"); ok {
+			if err = c.StartTLS(nil); err != nil {
+				return
+			}
 		}
 	}
+
 	if auth != nil && c.ext != nil {
 		if _, ok := c.ext["AUTH"]; !ok {
 			return errors.New("smtp: server doesn't support AUTH")
 		}
 		if err = c.Auth2(auth); err != nil {
-			return err
+			return
 		}
 	}
 
