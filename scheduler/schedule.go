@@ -3,6 +3,8 @@ package scheduler
 import (
 	"fmt"
 	"time"
+
+	"github.com/sunshineplan/utils/clock"
 )
 
 type Schedule interface {
@@ -28,7 +30,7 @@ var datetimeLayout = []string{
 func ScheduleFromString(str ...string) Schedule {
 	var s multiSched
 	for _, str := range str {
-		if _, err := parseTime(str, clockLayout); err == nil {
+		if _, err := clock.Parse(str); err == nil {
 			s = append(s, ClockFromString(str))
 			continue
 		}
