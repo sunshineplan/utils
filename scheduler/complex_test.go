@@ -44,7 +44,7 @@ func TestMultiScheduleTickerDuration(t *testing.T) {
 }
 
 func TestConditionSchedule(t *testing.T) {
-	s := ConditionSchedule(Weekends, MultiSchedule(AtClock(9, 30, 0), AtHour(15)))
+	s := ConditionSchedule(Weekdays, MultiSchedule(AtClock(9, 30, 0), AtHour(15)))
 	if d := s.TickerDuration(); d != time.Second {
 		t.Fatalf("expected 1s: got %s", d)
 	}
