@@ -50,6 +50,14 @@ func Parse(v string) (Clock, error) {
 	return Clock{}, fmt.Errorf("cannot parse %q as clock", v)
 }
 
+func MustParse(v string) Clock {
+	if c, err := Parse(v); err != nil {
+		panic("clock: " + err.Error())
+	} else {
+		return c
+	}
+}
+
 func ParseTime(t time.Time) Clock {
 	return New(t.Clock())
 }
