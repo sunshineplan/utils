@@ -83,6 +83,10 @@ func (c Clock) Second() int {
 	return int(c.wall % secondsPerMinute)
 }
 
+func (c Clock) Seconds() int {
+	return int(c.wall)
+}
+
 func (c Clock) String() string {
 	return fmt.Sprintf("%d:%02d:%02d", c.Hour(), c.Minute(), c.Second())
 }
@@ -99,6 +103,10 @@ func (c *Clock) UnmarshalText(text []byte) error {
 	}
 	*c = clock
 	return nil
+}
+
+func (c Clock) IsZero() bool {
+	return c.wall == 0
 }
 
 func (c Clock) After(u Clock) bool {
