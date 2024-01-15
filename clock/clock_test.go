@@ -58,6 +58,22 @@ func TestParse(t *testing.T) {
 	}
 }
 
+func TestSeconds(t *testing.T) {
+	for i, testcase := range []struct {
+		c        Clock
+		expected int
+	}{
+		{New(0, 0, 0), 0},
+		{New(7, 1, 2), 7*secondsPerHour + 1*secondsPerMinute + 2},
+		{New(19, 4, 30), 19*secondsPerHour + 4*secondsPerMinute + 30},
+		{New(25, 4, 30), secondsPerHour + 4*secondsPerMinute + 30},
+	} {
+		if res := testcase.c.Seconds(); res != testcase.expected {
+			t.Errorf("#%d: expected %d; got %d", i, testcase.expected, res)
+		}
+	}
+}
+
 func TestSub(t *testing.T) {
 	for i, tc := range []struct {
 		c Clock
