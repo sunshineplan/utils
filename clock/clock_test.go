@@ -74,6 +74,22 @@ func TestSeconds(t *testing.T) {
 	}
 }
 
+func TestAdd(t *testing.T) {
+	for i, tc := range []struct {
+		c Clock
+		d time.Duration
+		u Clock
+	}{
+		{Clock{}, 0, Clock{}},
+		{Clock{}, time.Second, New(0, 0, 1)},
+		{New(0, 0, 1), -time.Second, Clock{}},
+	} {
+		if got := tc.c.Add(tc.d); got != tc.u {
+			t.Errorf("#%d: got %s; want %s", i, got, tc.u)
+		}
+	}
+}
+
 func TestSub(t *testing.T) {
 	for i, tc := range []struct {
 		c Clock
@@ -88,7 +104,7 @@ func TestSub(t *testing.T) {
 		{New(12, 0, 0), New(12, 30, 0), -30 * time.Minute},
 	} {
 		if got := tc.c.Sub(tc.u); got != tc.d {
-			t.Errorf("#%d: Sub(%v, %v): got %v; want %v", i, tc.c, tc.u, got, tc.d)
+			t.Errorf("#%d: got %v; want %v", i, got, tc.d)
 		}
 	}
 }
