@@ -22,11 +22,11 @@ type Clock struct {
 	wall uint64
 }
 
-func abs[Int int | uint64](wall Int) uint64 {
+func abs[Int int | float64 | uint64](wall Int) uint64 {
 	for wall < 0 {
 		wall += secondsPerDay
 	}
-	return uint64(wall % secondsPerDay)
+	return uint64(int64(wall) % secondsPerDay)
 }
 
 func New(hour, min, sec int) Clock {
@@ -134,7 +134,7 @@ func (c Clock) Compare(u Clock) int {
 }
 
 func (c Clock) Add(d time.Duration) Clock {
-	return Clock{abs(c.wall + uint64(d.Seconds()))}
+	return Clock{abs(float64(c.wall) + d.Seconds())}
 }
 
 func (c Clock) Sub(u Clock) time.Duration {
