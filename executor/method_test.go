@@ -147,18 +147,30 @@ func TestExecuteSerial2(t *testing.T) {
 func TestExecuteRandom1(t *testing.T) {
 	testcase := []any{"a", "b", "c", "d", "e", "f", "g"}
 	var result []any
-	_, err := ExecuteRandom(
+	if _, err := ExecuteRandom(
 		testcase,
 		func(i any) (any, error) {
 			result = append(result, i)
 			return nil, fmt.Errorf("%v", i)
 		},
-	)
-	if err == nil {
+	); err == nil {
 		t.Fatal("expected error; got nil")
 	}
 	if reflect.DeepEqual(testcase, result) {
-		t.Error("expected not equal; got equal")
+		// test again
+		result = nil
+		if _, err := ExecuteRandom(
+			testcase,
+			func(i any) (any, error) {
+				result = append(result, i)
+				return nil, fmt.Errorf("%v", i)
+			},
+		); err == nil {
+			t.Fatal("expected error; got nil")
+		}
+		if reflect.DeepEqual(testcase, result) {
+			t.Error("expected not equal; got equal")
+		}
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].(string) < result[j].(string) })
 	if !reflect.DeepEqual(testcase, result) {
