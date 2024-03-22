@@ -10,10 +10,10 @@ import (
 func TestWriteFields(t *testing.T) {
 	w := NewWriter(io.Discard, false)
 	if err := w.Write(map[string]string{"test": "test"}); err == nil {
-		t.Error("gave nil error; want error")
+		t.Fatal("gave nil error; want error")
 	}
 	if err := w.WriteFields(map[string]string{"test": "test"}); err == nil {
-		t.Error("gave nil error; want error")
+		t.Fatal("gave nil error; want error")
 	}
 	if err := w.WriteFields(struct {
 		A string
@@ -24,6 +24,30 @@ func TestWriteFields(t *testing.T) {
 		if expect := []field{{"A", ""}, {"B", "b"}}; !reflect.DeepEqual(expect, w.fields) {
 			t.Errorf("expected %v; got %v", expect, w.fields)
 		}
+	}
+}
+
+func TestSkipWriteFields(t *testing.T) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf, false)
+	if err := w.WriteFields([]string{"A", "B"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Write([]string{"a", "b"}); err != nil {
+		t.Fatal(err)
+	}
+	w.Flush()
+	w = NewWriter(&buf, false)
+	if err := w.Write([]string{"c", "d"}); err == nil {
+		t.Fatal("gave nil error; want error")
+	}
+	w.SkipWriteFields()
+	if err := w.Write([]string{"c", "d"}); err != nil {
+		t.Fatal(err)
+	}
+	w.Flush()
+	if result, r := "A,B\na,b\nc,d\n", buf.String(); r != result {
+		t.Errorf("expected %q; got %q", result, r)
 	}
 }
 
