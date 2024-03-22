@@ -31,6 +31,10 @@ func NewWriter(w io.Writer, utf8bom bool) *Writer {
 	}
 }
 
+func (w *Writer) SkipWriteFields() {
+	w.fieldsWritten = true
+}
+
 // WriteFields writes fieldnames to w along with necessary utf8bom bytes. The fields must be a
 // non-zero field struct or a non-zero length string slice, otherwise an error will be return.
 // It can be run only once.
@@ -164,7 +168,7 @@ func (w *Writer) Write(record any) error {
 			if len(rec) == 0 {
 				return nil
 			}
-			return w.Writer.Write(r)
+			return w.Writer.Write(rec)
 		} else if d, ok := record.(D); ok {
 			for i, field := range w.fields {
 				for _, e := range d {
