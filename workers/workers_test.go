@@ -2,7 +2,7 @@ package workers
 
 import (
 	"context"
-	"math/rand"
+	"math/rand/v2"
 	"reflect"
 	"sort"
 	"strings"
@@ -73,8 +73,8 @@ func TestRange(t *testing.T) {
 }
 
 func TestLimit(t *testing.T) {
-	limit := rand.Intn(1000) + 51
-	workers := rand.Intn(50) + 1
+	limit := rand.N(1000) + 51
+	workers := rand.N(50) + 1
 
 	var mu1, mu2, mu3, mu4 sync.Mutex
 	var count1, count2, count3, count4 int

@@ -2,7 +2,7 @@ package executor
 
 import (
 	"errors"
-	"math/rand"
+	"math/rand/v2"
 
 	"github.com/sunshineplan/utils/workers"
 )
