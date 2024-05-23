@@ -10,8 +10,8 @@ func TestMultiSchedule(t *testing.T) {
 	if d := s.TickerDuration(); d != time.Minute {
 		t.Fatalf("expected 1m: got %s", d)
 	}
-	if d := s.First(time.Date(2006, 1, 2, 0, 0, 0, 0, time.Local)); d != 5*time.Second {
-		t.Fatalf("expected 5s: got %s", d)
+	if res := s.Next(time.Time{}).Format("15:04:05"); res != "00:00:05" {
+		t.Fatalf("expected 00:00:05: got %q", res)
 	}
 	for _, testcase := range []struct {
 		clock    *Clock
@@ -48,8 +48,8 @@ func TestConditionSchedule(t *testing.T) {
 	if d := s.TickerDuration(); d != time.Second {
 		t.Fatalf("expected 1s: got %s", d)
 	}
-	if d := s.First(time.Date(2006, 1, 2, 3, 4, 5, 0, time.Local)); d != time.Second {
-		t.Fatalf("expected 1s: got %s", d)
+	if res := s.Next(time.Time{}).Format("15:04:05"); res != "00:00:01" {
+		t.Fatalf("expected 00:00:01: got %q", res)
 	}
 	for _, testcase := range []struct {
 		clock    *Clock

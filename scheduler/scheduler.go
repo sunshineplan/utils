@@ -79,7 +79,7 @@ func (sched *Scheduler) init(d time.Duration) error {
 		t := <-timer.C
 		sched.sched.init(t)
 		subscribeNotify(sched.notify)
-		sched.newTimer(sched.sched.First(t), d)
+		sched.newTimer(sched.sched.Next(t).Sub(t), d)
 		return nil
 	}
 	return ErrAlreadyRunning
@@ -119,7 +119,8 @@ func (sched *Scheduler) newTimer(first, duration time.Duration) {
 					sched.ticker.Stop()
 					sched.mu.Lock()
 					defer sched.mu.Unlock()
-					sched.newTimer(sched.sched.First(time.Now()), duration)
+					t := time.Now()
+					sched.newTimer(sched.sched.Next(t).Sub(t), duration)
 					return
 				case <-sched.ctx.Done():
 					sched.ticker.Stop()
@@ -137,7 +138,8 @@ func (sched *Scheduler) newTimer(first, duration time.Duration) {
 			case <-sched.notify:
 				sched.mu.Lock()
 				if sched.timer.Stop() {
-					sched.timer.Reset(sched.sched.First(time.Now()))
+					t := time.Now()
+					sched.timer.Reset(sched.sched.Next(t).Sub(t))
 				}
 				sched.mu.Unlock()
 			case <-sched.ctx.Done():

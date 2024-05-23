@@ -21,32 +21,38 @@ func TestClock(t *testing.T) {
 	if res := s.TickerDuration(); res != 24*time.Hour {
 		t.Errorf("expected 24h; got %v", res)
 	}
-	if res := s.First(AtClock(6, 0, 0).Time()); res != time.Hour {
-		t.Errorf("expected 1h; got %v", res)
+	if res := s.Next(AtClock(6, 0, 0).Time()).Format("15:04:05"); res != "07:00:00" {
+		t.Errorf("expected 07:00:00; got %q", res)
 	}
 }
 
-func TestClockFirst(t *testing.T) {
+func TestClockNext(t *testing.T) {
+	ct := AtClock(12, 30, 30).Time()
 	for _, testcase := range []struct {
 		clock    *Clock
+		time     string
 		expected time.Duration
 	}{
-		{AtClock(0, 0, 0), 11*time.Hour + 29*time.Minute + 30*time.Second}, // 00:00:00
-		{AtClock(-1, -1, -1), 0},                                             // 12:30:30
-		{AtClock(-1, -1, 30), 0},                                             // 12:30:30
-		{AtClock(-1, 30, -1), 0},                                             // 12:30:30
-		{AtClock(12, -1, -1), 0},                                             // 12:30:30
-		{AtClock(12, -1, 30), 0},                                             // 12:30:30
-		{AtClock(-1, -1, 15), 45 * time.Second},                              // 12:31:15
-		{AtClock(-1, -1, 45), 15 * time.Second},                              // 12:30:45
-		{AtClock(-1, 15, -1), 44*time.Minute + 30*time.Second},               // 13:15:00
-		{AtClock(-1, 45, -1), 14*time.Minute + 30*time.Second},               // 12:45:00
-		{AtClock(6, -1, -1), 17*time.Hour + 29*time.Minute + 30*time.Second}, // 06:00:00+1
-		{AtClock(18, -1, -1), 5*time.Hour + 29*time.Minute + 30*time.Second}, // 18:00:00
-		{AtClock(6, -1, 15), 17*time.Hour + 29*time.Minute + 45*time.Second}, // 06:00:15+1
-		{AtClock(18, -1, 45), 5*time.Hour + 30*time.Minute + 15*time.Second}, // 18:00:45
+		{AtClock(0, 0, 0), "00:00:00", 11*time.Hour + 29*time.Minute + 30*time.Second},
+		{AtClock(-1, -1, -1), "12:30:30", 0},
+		{AtClock(-1, -1, 30), "12:30:30", 0},
+		{AtClock(-1, 30, -1), "12:30:30", 0},
+		{AtClock(12, -1, -1), "12:30:30", 0},
+		{AtClock(12, -1, 30), "12:30:30", 0},
+		{AtClock(-1, -1, 15), "12:31:15", 45 * time.Second},
+		{AtClock(-1, -1, 45), "12:30:45", 15 * time.Second},
+		{AtClock(-1, 15, -1), "13:15:00", 44*time.Minute + 30*time.Second},
+		{AtClock(-1, 45, -1), "12:45:00", 14*time.Minute + 30*time.Second},
+		{AtClock(6, -1, -1), "06:00:00", 17*time.Hour + 29*time.Minute + 30*time.Second}, // +1
+		{AtClock(18, -1, -1), "18:00:00", 5*time.Hour + 29*time.Minute + 30*time.Second},
+		{AtClock(6, -1, 15), "06:00:15", 17*time.Hour + 29*time.Minute + 45*time.Second}, // +1
+		{AtClock(18, -1, 45), "18:00:45", 5*time.Hour + 30*time.Minute + 15*time.Second},
 	} {
-		if res := testcase.clock.First(AtClock(12, 30, 30).Time()); res != testcase.expected {
+		next := testcase.clock.Next(ct)
+		if res := next.Format("15:04:05"); res != testcase.time {
+			t.Errorf("%s expected %q; got %q", testcase.clock, testcase.time, res)
+		}
+		if res := next.Sub(ct); res != testcase.expected {
 			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.expected, res)
 		}
 	}
@@ -74,18 +80,18 @@ func TestClockSchedule(t *testing.T) {
 	s := ClockSchedule(AtHour(9).Minute(30), AtHour(15), 2*time.Minute)
 	for _, testcase := range []struct {
 		clock    *Clock
-		duration time.Duration
+		time     string
 		expected bool
 	}{
-		{AtClock(9, 30, 0), 0, true},
-		{AtClock(15, 0, 0), 0, true},
-		{AtClock(13, 0, 0), 0, true},
-		{ClockFromString("9:29"), time.Minute, false},
-		{ClockFromString("9:31"), time.Minute, false},
-		{ClockFromString("16:00:00"), 17*time.Hour + 30*time.Minute, false},
+		{AtClock(9, 30, 0), "09:30:00", true},
+		{AtClock(15, 0, 0), "15:00:00", true},
+		{AtClock(13, 0, 0), "13:00:00", true},
+		{ClockFromString("9:29"), "09:30:00", false},
+		{ClockFromString("9:31"), "09:32:00", false},
+		{ClockFromString("16:00:00"), "09:30:00", false},
 	} {
-		if res := s.First(testcase.clock.Time()); res != testcase.duration {
-			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.duration, res)
+		if res := s.Next(testcase.clock.Time()).Format("15:04:05"); res != testcase.time {
+			t.Errorf("%s expected %q; got %q", testcase.clock, testcase.time, res)
 		}
 		if res := s.IsMatched(testcase.clock.Time()); res != testcase.expected {
 			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.expected, res)
@@ -93,9 +99,9 @@ func TestClockSchedule(t *testing.T) {
 	}
 }
 
-func TestClockScheduleFirst(t *testing.T) {
+func TestClockScheduleNext(t *testing.T) {
 	s := ClockSchedule(ClockFromString("6:00"), ClockFromString("22:00"), time.Hour)
-	if res := s.First(AtClock(21, 59, 0).Time()); res != time.Minute {
-		t.Errorf("expected 1m; got %v", res)
+	if res := s.Next(AtClock(21, 59, 0).Time()).Format("15:04:05"); res != "22:00:00" {
+		t.Errorf("expected 22:00:00; got %q", res)
 	}
 }

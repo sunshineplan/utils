@@ -142,45 +142,52 @@ func (c Clock) IsMatched(t time.Time) bool {
 		(!c.sec || c.Clock.Second() == sec)
 }
 
-func (c Clock) First(t time.Time) time.Duration {
-	u, nc := AtClock(t.Clock()), new(Clock)
+func (c Clock) Next(t time.Time) (next time.Time) {
+	year, month, day := t.Date()
+	var hour, min, sec int
 	if c.sec {
-		nc.Second(c.Clock.Second())
+		sec = c.Clock.Second()
 	} else {
-		nc.Second(u.Clock.Second())
+		sec = t.Second()
 	}
 	if c.min {
-		nc.Minute(c.Clock.Minute())
+		min = c.Clock.Minute()
 	} else {
-		nc.Minute(u.Clock.Minute())
+		min = t.Minute()
 	}
 	if c.hour {
-		nc.Hour(c.Clock.Hour())
+		hour = c.Clock.Hour()
 	} else {
-		nc.Hour(u.Clock.Hour())
+		hour = t.Hour()
 	}
-
-	if nc.Equal(u.Clock) {
-		return 0
-	}
-	if !c.sec {
-		nc.Second(0)
-	}
-	if nc.Before(u.Clock) {
+	switch next = time.Date(year, month, day, hour, min, sec, 0, t.Location()); t.Truncate(time.Second).Compare(next) {
+	case 1:
+		if !c.sec {
+			next = next.Add(-time.Duration(sec) * time.Second)
+		}
 		if !c.min {
-			if nc.Clock.Hour() == u.Clock.Hour() {
-				return nc.Add(time.Minute).Since(u.Clock)
+			if t.Hour() == hour {
+				if t := next.Add(time.Minute); t.Hour() == hour {
+					return t
+				}
 			}
-			nc.Minute(0)
+			next = next.Add(-time.Duration(min) * time.Minute)
 		}
 		if !c.hour {
-			return nc.Add(time.Hour).Since(u.Clock)
+			return next.Add(time.Hour)
 		}
-		return nc.Add(24 * time.Hour).Since(u.Clock)
-	} else if !c.min && nc.Clock.Hour() != u.Clock.Hour() {
-		nc.Minute(0)
+		return next.AddDate(0, 0, 1)
+	case -1:
+		if !c.sec {
+			next = next.Add(-time.Duration(sec) * time.Second)
+		}
+		if !c.min && t.Hour() != hour {
+			next = next.Add(-time.Duration(min) * time.Minute)
+		}
+		return
+	default:
+		return t
 	}
-	return nc.Since(u.Clock)
 }
 
 func (c Clock) TickerDuration() time.Duration {
@@ -232,17 +239,17 @@ func (s clockSched) IsMatched(t time.Time) bool {
 	return (start.Equal(tc) || start.Before(tc) && end.After(tc) || end.Equal(tc)) && tc.Since(start.Clock)%s.d == 0
 }
 
-func (s clockSched) First(t time.Time) time.Duration {
+func (s clockSched) Next(t time.Time) time.Time {
 	if s.IsMatched(t) {
-		return 0
+		return t
 	}
-	start, end, tc := s.start.Clock, s.end.Clock, AtClock(t.Clock()).Clock
+	start, end := s.start.Clock, s.end.Clock
 	for c := AtClock(t.Clock()); c.Compare(start) != -1 && c.Compare(end) != 1; c.Clock = c.Add(time.Second) {
 		if s.IsMatched(c.Time()) {
-			return c.Since(tc)
+			return time.Date(t.Year(), t.Month(), t.Day(), c.Clock.Hour(), c.Clock.Minute(), c.Clock.Second(), 0, t.Location())
 		}
 	}
-	return s.start.First(t)
+	return s.start.Next(t)
 }
 
 func (s clockSched) TickerDuration() time.Duration {

@@ -18,7 +18,3 @@ func gcd(a, b time.Duration) time.Duration {
 	}
 	return a
 }
-
-func first(t time.Time, d time.Duration) time.Duration {
-	return t.Add(d).Truncate(d).Sub(t)
-}
