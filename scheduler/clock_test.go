@@ -26,7 +26,7 @@ func TestClock(t *testing.T) {
 	}
 }
 
-func TestClockNext(t *testing.T) {
+func TestClockNext1(t *testing.T) {
 	ct := AtClock(12, 30, 30).Time()
 	for _, testcase := range []struct {
 		clock    *Clock
@@ -54,6 +54,29 @@ func TestClockNext(t *testing.T) {
 		}
 		if res := next.Sub(ct); res != testcase.expected {
 			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.expected, res)
+		}
+	}
+}
+
+func TestClockNext2(t *testing.T) {
+	for _, testcase := range []struct {
+		clock *Clock
+		t     time.Time
+		s     string
+		d     time.Duration
+	}{
+		{AtClock(0, 0, -1), AtClock(0, 0, 59).Time(), "00:00:59", 0},
+		{AtClock(0, -1, 0), AtClock(0, 59, 59).Time(), "00:00:00", 23*time.Hour + time.Second},
+		{AtClock(-1, 0, 0), AtClock(23, 59, 0).Time(), "00:00:00", time.Minute},
+		{AtClock(0, -1, 0), AtClock(0, 0, 59).Time(), "00:01:00", time.Second},
+		{AtClock(0, 0, -1), AtClock(23, 59, 59).Time(), "00:00:00", time.Second},
+	} {
+		next := testcase.clock.Next(testcase.t)
+		if res := next.Format("15:04:05"); res != testcase.s {
+			t.Errorf("%s expected %q; got %q", testcase.clock, testcase.s, res)
+		}
+		if res := next.Sub(testcase.t); res != testcase.d {
+			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.d, res)
 		}
 	}
 }

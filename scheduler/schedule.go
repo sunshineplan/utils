@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sunshineplan/utils"
 	"github.com/sunshineplan/utils/clock"
 )
 
@@ -52,6 +53,9 @@ type sched struct {
 }
 
 func NewSchedule(year int, month time.Month, day int, clock *Clock) Schedule {
+	if clock == nil {
+		clock = new(Clock)
+	}
 	return sched{year, month, day, clock}
 }
 
@@ -69,25 +73,16 @@ func (s sched) IsMatched(t time.Time) bool {
 	if (s.year == 0 || s.year == year) &&
 		(s.month == 0 || s.month == month) &&
 		(s.day == 0 || s.day == day) {
-		if s.clock == nil {
-			s.clock = &Clock{}
-		}
 		return s.clock.IsMatched(t)
 	}
 	return false
 }
 
 func (s sched) Next(t time.Time) time.Time {
-	if s.clock == nil {
-		s.clock = &Clock{}
-	}
 	return s.clock.Next(t)
 }
 
 func (s sched) TickerDuration() time.Duration {
-	if s.clock == nil {
-		return 24 * time.Hour
-	}
 	return s.clock.TickerDuration()
 }
 
@@ -108,9 +103,6 @@ func (s sched) String() string {
 	} else {
 		day = fmt.Sprintf("%02d", s.day)
 	}
-	if s.clock == nil {
-		s.clock = &Clock{}
-	}
 	return fmt.Sprintf("%s/%s/%s %s", year, month, day, s.clock)
 }
 
@@ -121,6 +113,9 @@ type weekSched struct {
 }
 
 func ISOWeekSchedule(year int, week int, weekday *time.Weekday, clock *Clock) Schedule {
+	if clock == nil {
+		clock = new(Clock)
+	}
 	return weekSched{year, week, weekday, clock}
 }
 
@@ -130,25 +125,16 @@ func (s weekSched) IsMatched(t time.Time) bool {
 	if (s.year == 0 || s.year == year) &&
 		(s.week == 0 || s.week == week) &&
 		(s.weekday == nil || *s.weekday == weekday) {
-		if s.clock == nil {
-			s.clock = &Clock{}
-		}
 		return s.clock.IsMatched(t)
 	}
 	return false
 }
 
 func (s weekSched) Next(t time.Time) time.Time {
-	if s.clock == nil {
-		s.clock = &Clock{}
-	}
 	return s.clock.Next(t)
 }
 
 func (s weekSched) TickerDuration() time.Duration {
-	if s.clock == nil {
-		return 24 * time.Hour
-	}
 	return s.clock.TickerDuration()
 }
 
@@ -169,9 +155,6 @@ func (s weekSched) String() string {
 	} else {
 		weekday = fmt.Sprint(s.weekday)
 	}
-	if s.clock == nil {
-		s.clock = &Clock{}
-	}
 	return fmt.Sprintf("%s/ISOWeek:%s/Weekday:%s %s", year, week, weekday, s.clock)
 }
 
@@ -183,17 +166,16 @@ type weekdaySched struct {
 }
 
 func WeekdaySchedule(year int, month time.Month, weekday *time.Weekday, clock *Clock) Schedule {
+	if clock == nil {
+		clock = new(Clock)
+	}
 	return weekdaySched{year, month, weekday, clock}
-}
-
-func ptrWeekday(weekday time.Weekday) *time.Weekday {
-	return &weekday
 }
 
 func Weekday(weekday ...time.Weekday) Schedule {
 	var s multiSched
 	for _, weekday := range weekday {
-		s = append(s, WeekdaySchedule(0, 0, ptrWeekday(weekday), FullClock()))
+		s = append(s, WeekdaySchedule(0, 0, utils.Ptr(weekday), FullClock()))
 	}
 	return s
 }
@@ -209,25 +191,16 @@ func (s weekdaySched) IsMatched(t time.Time) bool {
 	if (s.year == 0 || s.year == year) &&
 		(s.month == 0 || s.month == month) &&
 		(s.weekday == nil || *s.weekday == weekday) {
-		if s.clock == nil {
-			s.clock = &Clock{}
-		}
 		return s.clock.IsMatched(t)
 	}
 	return false
 }
 
 func (s weekdaySched) Next(t time.Time) time.Time {
-	if s.clock == nil {
-		s.clock = &Clock{}
-	}
 	return s.clock.Next(t)
 }
 
 func (s weekdaySched) TickerDuration() time.Duration {
-	if s.clock == nil {
-		return 24 * time.Hour
-	}
 	return s.clock.TickerDuration()
 }
 
@@ -247,9 +220,6 @@ func (s weekdaySched) String() string {
 		weekday = "----"
 	} else {
 		weekday = fmt.Sprint(s.weekday)
-	}
-	if s.clock == nil {
-		s.clock = &Clock{}
 	}
 	return fmt.Sprintf("%s/%s/Weekday:%s %s", year, month, weekday, s.clock)
 }

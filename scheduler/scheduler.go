@@ -15,7 +15,7 @@ var (
 
 type Scheduler struct {
 	mu     sync.Mutex
-	notify chan struct{}
+	notify chan time.Time
 
 	timer  *time.Timer
 	ticker *time.Ticker
@@ -29,7 +29,7 @@ type Scheduler struct {
 }
 
 func NewScheduler() *Scheduler {
-	return &Scheduler{notify: make(chan struct{}, 1), tc: make(chan time.Time, 1)}
+	return &Scheduler{notify: make(chan time.Time, 1), tc: make(chan time.Time, 1)}
 }
 
 func (sched *Scheduler) At(schedules ...Schedule) *Scheduler {
@@ -86,18 +86,18 @@ func (sched *Scheduler) init(d time.Duration) error {
 }
 
 func (sched *Scheduler) checkMatched(t time.Time) {
+	sched.mu.Lock()
+	defer sched.mu.Unlock()
 	if sched.sched.IsMatched(t) {
 		sched.tc <- t
 	} else if sched.sched.TickerDuration() >= time.Minute {
 		if minus1s := t.Add(-time.Second); sched.sched.IsMatched(minus1s) {
 			sched.tc <- minus1s
-			sched.notify <- struct{}{}
+			sched.notify <- t
 		} else if plus1s := t.Add(time.Second); sched.sched.IsMatched(plus1s) {
 			sched.tc <- plus1s
-			go func() {
-				time.Sleep(2 * time.Second)
-				sched.notify <- struct{}{}
-			}()
+			time.Sleep(2 * time.Second)
+			sched.notify <- time.Now()
 		}
 	}
 }
@@ -112,14 +112,11 @@ func (sched *Scheduler) newTimer(first, duration time.Duration) {
 			for {
 				select {
 				case t := <-sched.ticker.C:
-					sched.mu.Lock()
 					sched.checkMatched(t)
-					sched.mu.Unlock()
-				case <-sched.notify:
+				case t := <-sched.notify:
 					sched.ticker.Stop()
 					sched.mu.Lock()
 					defer sched.mu.Unlock()
-					t := time.Now()
 					sched.newTimer(sched.sched.Next(t).Sub(t), duration)
 					return
 				case <-sched.ctx.Done():
@@ -128,17 +125,14 @@ func (sched *Scheduler) newTimer(first, duration time.Duration) {
 				}
 			}
 		}()
-		sched.mu.Lock()
-		defer sched.mu.Unlock()
 		sched.checkMatched(now)
 	})
 	go func() {
 		for {
 			select {
-			case <-sched.notify:
+			case t := <-sched.notify:
 				sched.mu.Lock()
 				if sched.timer.Stop() {
-					t := time.Now()
 					sched.timer.Reset(sched.sched.Next(t).Sub(t))
 				}
 				sched.mu.Unlock()

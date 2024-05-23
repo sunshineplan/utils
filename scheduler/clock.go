@@ -50,7 +50,7 @@ func AtClock(hour, min, sec int) *Clock {
 	return &c
 }
 
-func FullClock() *Clock { return AtClock(-1, -1, -1) }
+func FullClock() *Clock { return new(Clock) }
 
 func AtHour(hour int) *Clock {
 	return AtClock(hour, 0, 0)
