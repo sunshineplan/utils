@@ -78,8 +78,76 @@ func (s sched) IsMatched(t time.Time) bool {
 	return false
 }
 
-func (s sched) Next(t time.Time) time.Time {
-	return s.clock.Next(t)
+func (s sched) Next(t time.Time) (next time.Time) {
+	year, month, day := t.Date()
+	if s.year != 0 {
+		year = s.year
+	}
+	if s.month != 0 {
+		month = s.month
+	}
+	if s.day != 0 {
+		day = s.day
+	}
+	hour, min, sec := s.clock.Next(t).Clock()
+	switch next = time.Date(year, month, day, hour, min, sec, 0, t.Location()); t.Truncate(time.Second).Compare(next) {
+	case 1:
+		if !s.clock.sec {
+			sec = 0
+		}
+		if !s.clock.min {
+			min = 0
+		}
+		if !s.clock.hour {
+			hour = 0
+		}
+		next = time.Date(year, month, day, hour, min, sec, 0, t.Location())
+		if s.day == 0 {
+			if next = next.AddDate(0, 0, 1); (next.Month() != month && s.month != 0) ||
+				(next.Year() != year && s.year != 0) ||
+				t.After(next) {
+				next = time.Date(year, month, 1, hour, min, sec, 0, t.Location())
+			} else {
+				break
+			}
+		}
+		if s.month == 0 {
+			if next = next.AddDate(0, 1, 0); next.Year() != year && s.year != 0 || t.After(next) {
+				next = time.Date(year, 1, day, hour, min, sec, 0, t.Location())
+			} else {
+				break
+			}
+		}
+		if s.year == 0 {
+			next = next.AddDate(1, 0, 0)
+		}
+	case -1:
+		if !s.clock.sec {
+			sec = 0
+		}
+		if !s.clock.min {
+			min = 0
+		}
+		if !s.clock.hour {
+			hour = 0
+		}
+		if s.day == 0 {
+			day = 1
+		}
+		if s.month == 0 {
+			month = 1
+		}
+		if s.year == 0 {
+			year += 1
+		}
+		next = time.Date(year, month, day, hour, min, sec, 0, t.Location())
+	default:
+		return t
+	}
+	if t.After(next) {
+		return time.Time{}
+	}
+	return
 }
 
 func (s sched) TickerDuration() time.Duration {
