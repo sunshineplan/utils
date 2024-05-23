@@ -23,6 +23,8 @@ type Scheduler struct {
 	fn     []func(time.Time)
 
 	sched complexSched
+	d     time.Duration
+	next  time.Time
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -33,16 +35,24 @@ func NewScheduler() *Scheduler {
 }
 
 func (sched *Scheduler) At(schedules ...Schedule) *Scheduler {
+	if len(schedules) == 0 {
+		panic("no schedules")
+	}
 	sched.mu.Lock()
 	defer sched.mu.Unlock()
 	sched.sched = multiSched(schedules)
+	sched.d = sched.sched.TickerDuration()
 	return sched
 }
 
 func (sched *Scheduler) AtCondition(schedules ...Schedule) *Scheduler {
+	if len(schedules) == 0 {
+		panic("no schedules")
+	}
 	sched.mu.Lock()
 	defer sched.mu.Unlock()
 	sched.sched = condSched(schedules)
+	sched.d = sched.sched.TickerDuration()
 	return sched
 }
 
@@ -50,6 +60,10 @@ func (sched *Scheduler) Clear() {
 	sched.mu.Lock()
 	defer sched.mu.Unlock()
 	sched.sched = nil
+	sched.d = 0
+	if sched.ctx != nil && sched.ctx.Err() == nil {
+		sched.Stop()
+	}
 }
 
 func (sched *Scheduler) Run(fn ...func(time.Time)) *Scheduler {
@@ -63,7 +77,7 @@ func (sched *Scheduler) Run(fn ...func(time.Time)) *Scheduler {
 	return sched
 }
 
-func (sched *Scheduler) init(d time.Duration) error {
+func (sched *Scheduler) init() error {
 	sched.mu.Lock()
 	defer sched.mu.Unlock()
 	if len(sched.fn) == 0 {
@@ -78,8 +92,9 @@ func (sched *Scheduler) init(d time.Duration) error {
 		defer timer.Stop()
 		t := <-timer.C
 		sched.sched.init(t)
+		sched.next = sched.sched.Next(t)
 		subscribeNotify(sched.notify)
-		sched.newTimer(sched.sched.Next(t).Sub(t), d)
+		sched.newTimer(time.Now())
 		return nil
 	}
 	return ErrAlreadyRunning
@@ -88,26 +103,45 @@ func (sched *Scheduler) init(d time.Duration) error {
 func (sched *Scheduler) checkMatched(t time.Time) {
 	sched.mu.Lock()
 	defer sched.mu.Unlock()
+	var matched time.Time
+	var notify bool
 	if sched.sched.IsMatched(t) {
 		sched.tc <- t
+		matched = t
 	} else if sched.sched.TickerDuration() >= time.Minute {
 		if minus1s := t.Add(-time.Second); sched.sched.IsMatched(minus1s) {
 			sched.tc <- minus1s
-			sched.notify <- t
+			matched = minus1s
+			notify = true
 		} else if plus1s := t.Add(time.Second); sched.sched.IsMatched(plus1s) {
 			sched.tc <- plus1s
+			matched = plus1s
 			time.Sleep(2 * time.Second)
-			sched.notify <- time.Now()
+			notify = true
 		}
+	}
+	if !matched.IsZero() && !notify {
+		if sched.next = sched.sched.Next(matched.Truncate(time.Second).Add(time.Second)); sched.next.IsZero() {
+			sched.Stop()
+			return
+		}
+	} else if t.After(sched.next) {
+		notify = true
+	}
+	if notify {
+		sched.notify <- time.Now()
 	}
 }
 
-func (sched *Scheduler) newTimer(first, duration time.Duration) {
+func (sched *Scheduler) newTimer(t time.Time) {
+	if sched.next.IsZero() {
+		sched.Stop()
+		return
+	}
 	ctx, cancel := context.WithCancel(context.Background())
-	sched.timer = time.AfterFunc(first, func() {
+	sched.timer = time.AfterFunc(sched.next.Sub(t), func() {
 		cancel()
-		var now time.Time
-		sched.ticker, now = time.NewTicker(duration), time.Now()
+		sched.ticker = time.NewTicker(sched.d)
 		go func() {
 			for {
 				select {
@@ -117,7 +151,8 @@ func (sched *Scheduler) newTimer(first, duration time.Duration) {
 					sched.ticker.Stop()
 					sched.mu.Lock()
 					defer sched.mu.Unlock()
-					sched.newTimer(sched.sched.Next(t).Sub(t), duration)
+					sched.next = sched.sched.Next(t)
+					sched.newTimer(t)
 					return
 				case <-sched.ctx.Done():
 					sched.ticker.Stop()
@@ -125,7 +160,7 @@ func (sched *Scheduler) newTimer(first, duration time.Duration) {
 				}
 			}
 		}()
-		sched.checkMatched(now)
+		sched.checkMatched(time.Now())
 	})
 	go func() {
 		for {
@@ -133,7 +168,13 @@ func (sched *Scheduler) newTimer(first, duration time.Duration) {
 			case t := <-sched.notify:
 				sched.mu.Lock()
 				if sched.timer.Stop() {
-					sched.timer.Reset(sched.sched.Next(t).Sub(t))
+					sched.next = sched.sched.Next(t)
+					if sched.next.IsZero() {
+						cancel()
+						sched.Stop()
+						return
+					}
+					sched.timer.Reset(sched.next.Sub(t))
 				}
 				sched.mu.Unlock()
 			case <-sched.ctx.Done():
@@ -148,7 +189,7 @@ func (sched *Scheduler) newTimer(first, duration time.Duration) {
 }
 
 func (sched *Scheduler) Start() error {
-	if err := sched.init(sched.sched.TickerDuration()); err != nil {
+	if err := sched.init(); err != nil {
 		return err
 	}
 	go func() {
@@ -200,7 +241,7 @@ func (sched *Scheduler) Immediately() <-chan error {
 func (sched *Scheduler) Once() <-chan error {
 	done := make(chan error)
 	go func() {
-		if err := sched.init(sched.sched.TickerDuration()); err != nil {
+		if err := sched.init(); err != nil {
 			done <- err
 			return
 		}
