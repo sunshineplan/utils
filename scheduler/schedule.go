@@ -9,7 +9,7 @@ import (
 
 type Schedule interface {
 	IsMatched(time.Time) bool
-	First(time.Time) time.Duration
+	Next(time.Time) time.Time
 	TickerDuration() time.Duration
 	String() string
 }
@@ -77,11 +77,11 @@ func (s sched) IsMatched(t time.Time) bool {
 	return false
 }
 
-func (s sched) First(t time.Time) time.Duration {
+func (s sched) Next(t time.Time) time.Time {
 	if s.clock == nil {
 		s.clock = &Clock{}
 	}
-	return s.clock.First(t)
+	return s.clock.Next(t)
 }
 
 func (s sched) TickerDuration() time.Duration {
@@ -138,11 +138,11 @@ func (s weekSched) IsMatched(t time.Time) bool {
 	return false
 }
 
-func (s weekSched) First(t time.Time) time.Duration {
+func (s weekSched) Next(t time.Time) time.Time {
 	if s.clock == nil {
 		s.clock = &Clock{}
 	}
-	return s.clock.First(t)
+	return s.clock.Next(t)
 }
 
 func (s weekSched) TickerDuration() time.Duration {
@@ -217,11 +217,11 @@ func (s weekdaySched) IsMatched(t time.Time) bool {
 	return false
 }
 
-func (s weekdaySched) First(t time.Time) time.Duration {
+func (s weekdaySched) Next(t time.Time) time.Time {
 	if s.clock == nil {
 		s.clock = &Clock{}
 	}
-	return s.clock.First(t)
+	return s.clock.Next(t)
 }
 
 func (s weekdaySched) TickerDuration() time.Duration {
@@ -281,11 +281,11 @@ func (s tickerSched) IsMatched(t time.Time) bool {
 	return t.Truncate(time.Second).Sub(s.start)%s.d == 0
 }
 
-func (s tickerSched) First(t time.Time) time.Duration {
+func (s tickerSched) Next(t time.Time) time.Time {
 	if d := t.Sub(s.start); d > 0 {
-		return d % s.d
+		return t.Add(d % s.d)
 	}
-	return s.start.Sub(t)
+	return s.start
 }
 
 func (s tickerSched) TickerDuration() time.Duration {
