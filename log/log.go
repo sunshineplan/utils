@@ -5,11 +5,16 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"os"
 )
 
-var std = newLogger(log.Default(), nil)
+var std = newLogger(log.Default(), os.Stderr)
 
 func Default() *Logger { return std }
+
+func File() string {
+	return std.File()
+}
 
 func SetOutput(file string, extra io.Writer) {
 	std.SetOutput(file, extra)
