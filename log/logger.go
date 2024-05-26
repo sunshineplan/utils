@@ -50,6 +50,13 @@ func New(file, prefix string, flag int) *Logger {
 	return newLogger(log.New(f, prefix, flag), f)
 }
 
+func (l *Logger) File() string {
+	if l.file != nil {
+		return l.file.Name()
+	}
+	return ""
+}
+
 func (l *Logger) setOutput(file *os.File, extra io.Writer) {
 	var writers []io.Writer
 	if file != nil {
