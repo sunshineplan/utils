@@ -18,7 +18,6 @@ type Schedule interface {
 var (
 	_ Schedule = sched{}
 	_ Schedule = weekSched{}
-	_ Schedule = weekdaySched{}
 	_ Schedule = tickerSched{}
 )
 
@@ -187,6 +186,19 @@ func ISOWeekSchedule(year int, week int, weekday *time.Weekday, clock *Clock) Sc
 	return weekSched{year, week, weekday, clock}
 }
 
+func Weekday(weekday ...time.Weekday) Schedule {
+	var s multiSched
+	for _, weekday := range weekday {
+		s = append(s, ISOWeekSchedule(0, 0, utils.Ptr(weekday), FullClock()))
+	}
+	return s
+}
+
+var (
+	Weekdays = Weekday(time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday)
+	Weekends = Weekday(time.Saturday, time.Sunday)
+)
+
 func (s weekSched) IsMatched(t time.Time) bool {
 	year, week := t.ISOWeek()
 	weekday := t.Weekday()
@@ -332,72 +344,6 @@ func (s weekSched) String() string {
 		weekday = fmt.Sprint(s.weekday)
 	}
 	return fmt.Sprintf("%s/ISOWeek:%s/Weekday:%s %s", year, week, weekday, s.clock)
-}
-
-type weekdaySched struct {
-	year    int
-	month   time.Month
-	weekday *time.Weekday
-	clock   *Clock
-}
-
-func WeekdaySchedule(year int, month time.Month, weekday *time.Weekday, clock *Clock) Schedule {
-	if clock == nil {
-		clock = new(Clock)
-	}
-	return weekdaySched{year, month, weekday, clock}
-}
-
-func Weekday(weekday ...time.Weekday) Schedule {
-	var s multiSched
-	for _, weekday := range weekday {
-		s = append(s, WeekdaySchedule(0, 0, utils.Ptr(weekday), FullClock()))
-	}
-	return s
-}
-
-var (
-	Weekdays = Weekday(time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday)
-	Weekends = Weekday(time.Saturday, time.Sunday)
-)
-
-func (s weekdaySched) IsMatched(t time.Time) bool {
-	year, month, _ := t.Date()
-	weekday := t.Weekday()
-	if (s.year == 0 || s.year == year) &&
-		(s.month == 0 || s.month == month) &&
-		(s.weekday == nil || *s.weekday == weekday) {
-		return s.clock.IsMatched(t)
-	}
-	return false
-}
-
-func (s weekdaySched) Next(t time.Time) time.Time {
-	return s.clock.Next(t)
-}
-
-func (s weekdaySched) TickerDuration() time.Duration {
-	return s.clock.TickerDuration()
-}
-
-func (s weekdaySched) String() string {
-	var year, month, weekday string
-	if s.year == 0 {
-		year = "----"
-	} else {
-		year = fmt.Sprint(s.year)
-	}
-	if s.month == 0 {
-		month = "--"
-	} else {
-		month = fmt.Sprintf("%02d", s.month)
-	}
-	if s.weekday == nil {
-		weekday = "----"
-	} else {
-		weekday = fmt.Sprint(s.weekday)
-	}
-	return fmt.Sprintf("%s/%s/Weekday:%s %s", year, month, weekday, s.clock)
 }
 
 type tickerSched struct {
