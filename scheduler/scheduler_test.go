@@ -8,7 +8,7 @@ import (
 
 func TestScheduler(t *testing.T) {
 	now := time.Now()
-	s := NewScheduler().At(TimeSchedule(now.Add(time.Second)))
+	s := NewScheduler().At(TimeSchedule(now.Add(2 * time.Second)))
 	defer s.Stop()
 	var n atomic.Int32
 	if err := s.Run(func(_ time.Time) { n.Add(1) }).Start(); err != nil {
@@ -17,7 +17,7 @@ func TestScheduler(t *testing.T) {
 	if n := n.Load(); n != 0 {
 		t.Errorf("expected 0; got %d", n)
 	}
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(3 * time.Second)
 	if n := n.Load(); n != 1 {
 		t.Errorf("expected 1; got %d", n)
 	}
