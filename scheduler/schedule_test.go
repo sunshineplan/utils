@@ -60,7 +60,7 @@ func TestScheduleNext(t *testing.T) {
 		if res := testcase.s.Next(parse(testcase.t)).Format(format); res != testcase.next {
 			t.Errorf("#%d expected %v; got %v", i, testcase.next, res)
 		} else if next := parse(testcase.next); !next.IsZero() && !testcase.s.IsMatched(next) {
-			t.Errorf("#%d expected matched; got not", i)
+			t.Errorf("#%d expected matched; got not %v", i, res)
 		}
 	}
 }

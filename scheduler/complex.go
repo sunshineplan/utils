@@ -61,10 +61,8 @@ func (s multiSched) IsMatched(t time.Time) bool {
 }
 
 func (s multiSched) Next(t time.Time) (next time.Time) {
-	for i, sched := range s {
-		if i == 0 {
-			next = sched.Next(t)
-		} else if t := sched.Next(t); t.Before(next) {
+	for _, i := range s {
+		if t := i.Next(t); next.IsZero() || !t.IsZero() && t.Before(next) {
 			next = t
 		}
 	}
