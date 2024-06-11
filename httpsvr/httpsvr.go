@@ -16,7 +16,7 @@ import (
 	"github.com/sunshineplan/utils/log"
 )
 
-var certCache = cache.New(false)
+var certCache = cache.New[string, *tls.Certificate](false)
 
 var defaultReload = 24 * time.Hour
 
@@ -124,7 +124,7 @@ func (s *Server) run() error {
 	return nil
 }
 
-func (s *Server) loadCertificate() (any, error) {
+func (s *Server) loadCertificate() (*tls.Certificate, error) {
 	cert, err := tls.LoadX509KeyPair(s.certFile, s.keyFile)
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func (s *Server) loadCertificate() (any, error) {
 func (s *Server) getCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	v, ok := certCache.Get("cert")
 	if ok {
-		return v.(*tls.Certificate), nil
+		return v, nil
 	}
 
 	cert, err := s.loadCertificate()
@@ -148,7 +148,7 @@ func (s *Server) getCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error
 	}
 	certCache.Set("cert", cert, s.reload, s.loadCertificate)
 
-	return cert.(*tls.Certificate), nil
+	return cert, nil
 }
 
 // Run runs an HTTP server which can be gracefully shut down.

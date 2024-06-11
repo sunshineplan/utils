@@ -1,8 +1,6 @@
 package counter
 
-import (
-	"net"
-)
+import "net"
 
 var (
 	_ net.Listener = &Listener{}
