@@ -1,137 +1,119 @@
 package cache
 
 import (
+	"context"
 	"log"
 	"sync"
 	"time"
 )
 
-type item struct {
-	sync.Mutex
-	Value      any
-	Duration   time.Duration
-	Expiration int64
-	Regenerate func() (any, error)
+var valueKey int
+
+func newContext(value any, lifecycle time.Duration) (ctx context.Context, cancel context.CancelFunc) {
+	ctx = context.WithValue(context.Background(), &valueKey, value)
+	if lifecycle > 0 {
+		ctx, cancel = context.WithTimeout(ctx, lifecycle)
+	}
+	return
 }
 
-func (i *item) Expired() bool {
-	if i.Duration == 0 {
-		return false
-	}
+type item[T any] struct {
+	sync.Mutex
+	context.Context
+	cancel    context.CancelFunc
+	lifecycle time.Duration
+	fn        func() (T, error)
+}
 
-	return time.Now().UnixNano() > i.Expiration
+func (i *item[T]) value() T {
+	i.Lock()
+	defer i.Unlock()
+	return i.Value(&valueKey).(T)
+}
+
+func (i *item[T]) renew() T {
+	v, err := i.fn()
+	if err != nil {
+		log.Print(err)
+		v = i.value()
+	}
+	i.Lock()
+	defer i.Unlock()
+	i.Context, i.cancel = newContext(v, i.lifecycle)
+	return v
 }
 
 // Cache is cache struct.
-type Cache struct {
+type Cache[Key, Value any] struct {
 	cache     sync.Map
-	autoClean bool
+	autoRenew bool
 }
 
 // New creates a new cache with auto clean or not.
-func New(autoClean bool) *Cache {
-	c := &Cache{autoClean: autoClean}
+func New[Key, Value any](autoRenew bool) *Cache[Key, Value] {
+	return &Cache[Key, Value]{autoRenew: autoRenew}
+}
 
-	if autoClean {
-		go c.check()
+// Set sets cache value for a key, if fn is presented, this value will regenerate when expired.
+func (c *Cache[Key, Value]) Set(key Key, value Value, lifecycle time.Duration, fn func() (Value, error)) {
+	i := &item[Value]{lifecycle: lifecycle, fn: fn}
+	i.Context, i.cancel = newContext(value, lifecycle)
+	if c.autoRenew && lifecycle > 0 {
+		go func() {
+			for {
+				<-i.Done()
+				if err := i.Err(); err == context.DeadlineExceeded {
+					if i.fn != nil {
+						i.renew()
+					} else {
+						c.Delete(key)
+					}
+				} else {
+					return
+				}
+			}
+		}()
 	}
-
-	return c
-}
-
-// Set sets cache value for a key, if f is presented, this value will regenerate when expired.
-func (c *Cache) Set(key, value any, d time.Duration, f func() (any, error)) {
-	c.cache.Store(key, &item{
-		Value:      value,
-		Duration:   d,
-		Expiration: time.Now().Add(d).UnixNano(),
-		Regenerate: f,
-	})
-}
-
-func (c *Cache) regenerate(i *item) {
-	i.Expiration = 0
-	i.Unlock()
-
-	go func() {
-		value, err := i.Regenerate()
-
-		i.Lock()
-		defer i.Unlock()
-
-		if err != nil {
-			log.Print(err)
-		} else {
-			i.Value = value
-		}
-		i.Expiration = time.Now().Add(i.Duration).UnixNano()
-	}()
+	c.cache.Store(key, i)
 }
 
 // Get gets cache value by key and whether value was found.
-func (c *Cache) Get(key any) (any, bool) {
-	value, ok := c.cache.Load(key)
+func (c *Cache[Key, Value]) Get(key Key) (Value, bool) {
+	v, ok := c.cache.Load(key)
 	if !ok {
-		return nil, false
+		return *new(Value), false
 	}
-
-	i := value.(*item)
-	i.Lock()
-
-	if i.Expired() && !c.autoClean {
-		if i.Regenerate == nil {
-			c.cache.Delete(key)
-			i.Unlock()
-
-			return nil, false
+	if i := v.(*item[Value]); !c.autoRenew && i.Err() == context.DeadlineExceeded {
+		if i.fn == nil {
+			c.Delete(key)
+			return *new(Value), false
 		}
-
-		defer c.regenerate(i)
-
-		return i.Value, true
+		return i.renew(), true
+	} else {
+		return i.value(), true
 	}
-
-	i.Unlock()
-
-	return i.Value, true
 }
 
 // Delete deletes the value for a key.
-func (c *Cache) Delete(key any) {
-	c.cache.Delete(key)
+func (c *Cache[Key, Value]) Delete(key Key) {
+	if v, ok := c.cache.LoadAndDelete(key); ok {
+		if v, ok := v.(*item[Value]); ok {
+			if v.cancel != nil {
+				v.cancel()
+			}
+		}
+	}
 }
 
 // Empty deletes all values in cache.
-func (c *Cache) Empty() {
-	c.cache.Range(func(key, _ any) bool {
-		c.cache.Delete(key)
+func (c *Cache[Key, Value]) Empty() {
+	c.cache.Range(func(k, v any) bool {
+		c.cache.Delete(k)
+		if v, ok := v.(*item[Value]); ok {
+			if v.cancel != nil {
+				v.cancel()
+			}
+		}
 		return true
 	})
-}
-
-func (c *Cache) check() {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		c.cache.Range(func(key, value any) bool {
-			i := value.(*item)
-			i.Lock()
-
-			if i.Expired() {
-				if i.Regenerate == nil {
-					c.cache.Delete(key)
-					i.Unlock()
-				} else {
-					defer c.regenerate(i)
-				}
-
-				return true
-			}
-
-			i.Unlock()
-
-			return true
-		})
-	}
 }
