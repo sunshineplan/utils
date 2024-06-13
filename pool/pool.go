@@ -7,7 +7,11 @@ type Pool[T any] struct {
 }
 
 func New[T any]() *Pool[T] {
-	return &Pool[T]{&sync.Pool{New: func() any { return new(T) }}}
+	return NewFunc(func() *T { return new(T) })
+}
+
+func NewFunc[T any](fn func() *T) *Pool[T] {
+	return &Pool[T]{&sync.Pool{New: func() any { return fn() }}}
 }
 
 func (p *Pool[T]) Get() *T {
