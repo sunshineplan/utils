@@ -49,6 +49,7 @@ func TestEmpty(t *testing.T) {
 
 func TestRenew(t *testing.T) {
 	cache := New[string, string](true)
+	defer cache.Empty()
 	expire := make(chan struct{})
 	cache.Set("renew", "old", 2*time.Second, func() (string, error) {
 		defer func() { close(expire) }()
