@@ -5,13 +5,23 @@ import (
 	"time"
 )
 
-func TestSetGetDelete(t *testing.T) {
+func TestCache(t *testing.T) {
 	cache := New[string, string](false)
 	cache.Set("key", "value", 0, nil)
 	if value, ok := cache.Get("key"); !ok {
 		t.Fatal("expected ok; got not")
 	} else if value != "value" {
 		t.Errorf("expected value; got %q", value)
+	}
+	if value, ok := cache.Swap("key", "swap"); !ok {
+		t.Fatal("expected ok; got not")
+	} else if value != "value" {
+		t.Errorf("expected value; got %q", value)
+	}
+	if value, ok := cache.Get("key"); !ok {
+		t.Fatal("expected ok; got not")
+	} else if value != "swap" {
+		t.Errorf("expected swap; got %q", value)
 	}
 	cache.Delete("key")
 	if _, ok := cache.Get("key"); ok {
