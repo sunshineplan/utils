@@ -56,7 +56,7 @@ func (w *Writer) WriteFields(fields any) error {
 			return fmt.Errorf("can not get fieldnames from zero field struct")
 		}
 
-		for i := 0; i < v.NumField(); i++ {
+		for i := range v.NumField() {
 			if f := v.Type().Field(i); f.IsExported() {
 				tag, _ := v.Type().Field(i).Tag.Lookup("csv")
 				w.fields = append(w.fields, field{v.Type().Field(i).Name, tag})
@@ -147,7 +147,7 @@ func (w *Writer) Write(record any) error {
 		for i, field := range w.fields {
 			var val reflect.Value
 			var found bool
-			for i := 0; i < v.NumField(); i++ {
+			for i := range v.NumField() {
 				if tag, ok := v.Type().Field(i).Tag.Lookup("csv"); ok && tag == field.tag {
 					val = v.FieldByName(field.name)
 					found = true
@@ -199,7 +199,7 @@ func (w *Writer) WriteAll(records any) error {
 	}
 
 	v := reflect.ValueOf(records)
-	for i := 0; i < v.Len(); i++ {
+	for i := range v.Len() {
 		if err := w.Write(v.Index(i).Interface()); err != nil {
 			return err
 		}
