@@ -17,7 +17,7 @@ func TestRoundRobin(t *testing.T) {
 		t.Error(err)
 	} else {
 		var res []string
-		for i := 0; i < 6; i++ {
+		for range 6 {
 			res = append(res, loadbalancer.Next())
 		}
 		if expect := []string{a, b, c, a, b, c}; !reflect.DeepEqual(res, expect) {
@@ -30,7 +30,7 @@ func TestRoundRobin(t *testing.T) {
 		t.Error(err)
 	} else {
 		var res []string
-		for i := 0; i < 8; i++ {
+		for range 8 {
 			res = append(res, loadbalancer.Next())
 		}
 		if expect := []string{a, a, b, c, a, a, b, c}; !reflect.DeepEqual(res, expect) {

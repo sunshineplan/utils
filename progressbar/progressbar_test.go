@@ -17,8 +17,7 @@ func TestProgessBar(t *testing.T) {
 
 	pb := New(15).SetRefresh(4 * time.Second)
 	pb.Start()
-	for i := int64(0); i < pb.total; i++ {
-		//log.Print(i)
+	for range pb.total {
 		pb.Add(1)
 		time.Sleep(time.Second)
 	}
@@ -26,8 +25,7 @@ func TestProgessBar(t *testing.T) {
 
 	pb = New(10).SetRefresh(500 * time.Millisecond)
 	pb.Start()
-	for i := int64(0); i < pb.total; i++ {
-		//log.Print(i)
+	for range pb.total {
 		pb.Add(1)
 		time.Sleep(time.Second)
 	}
@@ -45,7 +43,7 @@ func TestCancel(t *testing.T) {
 		pb.Cancel()
 	}()
 	go func() {
-		for i := int64(0); i < pb.total; i++ {
+		for range pb.total {
 			pb.Add(1)
 			time.Sleep(time.Second)
 		}

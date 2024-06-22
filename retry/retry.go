@@ -36,7 +36,7 @@ func ErrNoMoreRetry(err string) error { return errorNoMoreRetry(err) }
 // Do keeps retrying the function until no error is returned.
 func Do(fn func() error, attempts, delay int) error {
 	var errs []error
-	for i := 0; i < attempts; i++ {
+	for i := range attempts {
 		err := fn()
 		if err == nil {
 			return nil

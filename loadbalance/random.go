@@ -36,7 +36,7 @@ func WeightedRandom[E any](items ...Weighted[E]) (LoadBalancer[E], error) {
 func (r *random[E]) load() {
 	length := len(r.items)
 	var s []int
-	for i := 0; i < length; i++ {
+	for i := range length {
 		s = append(s, i)
 	}
 	rand.Shuffle(length, func(i, j int) { s[i], s[j] = s[j], s[i] })

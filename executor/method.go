@@ -71,7 +71,7 @@ func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(
 			rand.Shuffle(count, func(i, j int) { clone[i], clone[j] = clone[j], clone[i] })
 		}
 
-		for i := 0; i < count; i++ {
+		for i := range count {
 			ctx := argContext(len(fn), clone[i])
 			workers.RunSlice(limit, fn, func(_ int, fn func(T) (any, error)) {
 				ctx.runFn(fn, result, lasterr)

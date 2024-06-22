@@ -71,7 +71,7 @@ func RunSlice[E any](limit int, s []E, f func(int, E)) {
 	}
 
 	c := make(chan struct{}, limit)
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c <- struct{}{}
 		go func(index int, value E) {
 			defer func() { <-c }()
@@ -79,7 +79,7 @@ func RunSlice[E any](limit int, s []E, f func(int, E)) {
 		}(i, s[i])
 	}
 
-	for i := 0; i < limit; i++ {
+	for range limit {
 		c <- struct{}{}
 	}
 	close(c)
@@ -102,7 +102,7 @@ func RunMap[K comparable, V any](limit int, m map[K]V, f func(K, V)) {
 		}(k, v)
 	}
 
-	for i := 0; i < limit; i++ {
+	for range limit {
 		c <- struct{}{}
 	}
 	close(c)
@@ -129,7 +129,7 @@ func RunRange[Int Integer](limit int, start, end Int, f func(Int)) {
 		}(i)
 	}
 
-	for i := 0; i < limit; i++ {
+	for range limit {
 		c <- struct{}{}
 	}
 	close(c)
