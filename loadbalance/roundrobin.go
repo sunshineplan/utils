@@ -1,35 +1,68 @@
 package loadbalance
 
-import "sync/atomic"
+import (
+	"sync/atomic"
 
-var _ LoadBalancer[struct{}] = &roundrobin[struct{}]{}
+	"github.com/sunshineplan/utils/cache"
+)
+
+var _ LoadBalancer[any] = &roundrobin[any]{}
 
 type roundrobin[E any] struct {
-	items []E
-	next  atomic.Int64
+	m    *cache.Map[[2]int64, *Weighted[E]]
+	n    int64
+	next atomic.Int64
 }
 
-func RoundRobin[E any](items ...E) (LoadBalancer[E], error) {
+func newRoundRobin[E any, Items []E | []*Weighted[E]](items Items) (*roundrobin[E], error) {
 	if len(items) == 0 {
 		return nil, ErrEmptyLoadBalancer
 	}
-	return &roundrobin[E]{items: items}, nil
-}
-
-func WeightedRoundRobin[E any](items ...Weighted[E]) (LoadBalancer[E], error) {
-	var pool []E
-	for _, i := range items {
-		for n := i.Weight; n > 0; n-- {
-			pool = append(pool, i.Item)
+	var s []*Weighted[E]
+	switch items := any(items).(type) {
+	case []E:
+		for _, i := range items {
+			s = append(s, &Weighted[E]{i, 1})
 		}
+	case []*Weighted[E]:
+		s = items
 	}
-	if len(pool) == 0 {
-		return nil, ErrEmptyLoadBalancer
+	r := new(roundrobin[E])
+	r.m = new(cache.Map[[2]int64, *Weighted[E]])
+	for _, i := range s {
+		r.m.Store([2]int64{r.n, r.n + i.Weight}, i)
+		r.n += i.Weight
 	}
-	return &roundrobin[E]{items: pool}, nil
+	return r, nil
 }
 
-func (r *roundrobin[E]) Next() E {
-	n := r.next.Add(1)
-	return r.items[(int(n)-1)%len(r.items)]
+func RoundRobin[E any](items ...E) (LoadBalancer[E], error) {
+	return newRoundRobin[E](items)
+}
+
+func WeightedRoundRobin[E any](items ...*Weighted[E]) (LoadBalancer[E], error) {
+	return newRoundRobin[E](items)
+}
+
+func (r *roundrobin[E]) get(n int64) (e E) {
+	if r.m == nil {
+		panic("load balancer is closed")
+	}
+	r.m.Range(func(i [2]int64, w *Weighted[E]) bool {
+		if n >= i[0] && n < i[1] {
+			e = w.Item
+			return false
+		}
+		return true
+	})
+	return
+}
+
+func (r *roundrobin[E]) Next() (next E) {
+	return r.get(r.next.Swap((r.next.Load() + 1) % r.n))
+
+}
+
+func (r *roundrobin[E]) Close() {
+	r.m = nil
 }

@@ -25,15 +25,15 @@ func TestRoundRobin(t *testing.T) {
 		}
 	}
 
-	loadbalancer, err = WeightedRoundRobin([]Weighted[string]{{a, 2}, {b, 1}, {c, 1}}...)
+	loadbalancer, err = WeightedRoundRobin([]*Weighted[string]{{a, 2}, {b, 1}, {c, 1}}...)
 	if err != nil {
 		t.Error(err)
 	} else {
 		var res []string
-		for range 8 {
+		for range 12 {
 			res = append(res, loadbalancer.Next())
 		}
-		if expect := []string{a, a, b, c, a, a, b, c}; !reflect.DeepEqual(res, expect) {
+		if expect := []string{a, a, b, c, a, a, b, c, a, a, b, c}; !reflect.DeepEqual(res, expect) {
 			t.Errorf("want %v, got %v", expect, res)
 		}
 	}

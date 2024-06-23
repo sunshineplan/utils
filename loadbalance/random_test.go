@@ -27,7 +27,7 @@ func TestRandom(t *testing.T) {
 		}
 	}
 
-	loadbalancer, err = WeightedRandom([]Weighted[string]{{a, 2}, {b, 1}, {c, 1}}...)
+	loadbalancer, err = WeightedRandom([]*Weighted[string]{{a, 2}, {b, 1}, {c, 1}}...)
 	if err != nil {
 		t.Error(err)
 	} else {
