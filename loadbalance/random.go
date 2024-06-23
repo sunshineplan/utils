@@ -1,56 +1,67 @@
 package loadbalance
 
-import (
-	"math/rand/v2"
-	"sync"
-)
+import "math/rand/v2"
 
-var _ LoadBalancer[struct{}] = &random[struct{}]{}
+var _ LoadBalancer[any] = &random[any]{}
 
 type random[E any] struct {
-	sync.Mutex
-	items []E
-	c     chan E
+	rr   *roundrobin[E]
+	next chan int64
+	c    chan struct{}
 }
 
 func Random[E any](items ...E) (LoadBalancer[E], error) {
-	if len(items) == 0 {
-		return nil, ErrEmptyLoadBalancer
+	rr, err := newRoundRobin[E](items)
+	if err != nil {
+		return nil, err
 	}
-	return &random[E]{items: items, c: make(chan E, len(items))}, nil
+	return &random[E]{rr: rr, c: make(chan struct{})}, nil
 }
 
-func WeightedRandom[E any](items ...Weighted[E]) (LoadBalancer[E], error) {
-	var pool []E
-	for _, i := range items {
-		for n := i.Weight; n > 0; n-- {
-			pool = append(pool, i.Item)
+func WeightedRandom[E any](items ...*Weighted[E]) (LoadBalancer[E], error) {
+	rr, err := newRoundRobin[E](items)
+	if err != nil {
+		return nil, err
+	}
+	return &random[E]{rr: rr, c: make(chan struct{})}, nil
+}
+
+func (r *random[E]) init() {
+	r.next = make(chan int64, r.rr.n)
+	go func() {
+		for {
+			if _, ok := <-r.c; !ok {
+				return
+			}
+			var s []int64
+			for i := range r.rr.n {
+				s = append(s, i)
+			}
+			rand.Shuffle(len(s), func(i, j int) { s[i], s[j] = s[j], s[i] })
+			for _, i := range s {
+				r.next <- i
+			}
 		}
-	}
-	if len(pool) == 0 {
-		return nil, ErrEmptyLoadBalancer
-	}
-	return Random(pool...)
-}
-
-func (r *random[E]) load() {
-	length := len(r.items)
-	var s []int
-	for i := range length {
-		s = append(s, i)
-	}
-	rand.Shuffle(length, func(i, j int) { s[i], s[j] = s[j], s[i] })
-	for _, i := range s {
-		r.c <- r.items[i]
-	}
+	}()
 }
 
 func (r *random[E]) Next() E {
-	r.Lock()
-	defer r.Unlock()
-
-	if len(r.c) == 0 {
-		r.load()
+	if r.rr == nil {
+		panic("load balancer is closed")
 	}
-	return <-r.c
+	if r.next == nil {
+		r.init()
+	}
+	if len(r.next) <= int(r.rr.n/4) {
+		r.c <- struct{}{}
+	}
+	return r.rr.get(<-r.next)
+}
+
+func (r *random[E]) Close() {
+	if r.next != nil {
+		close(r.next)
+	}
+	close(r.c)
+	r.rr = nil
 }
