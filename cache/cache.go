@@ -11,20 +11,20 @@ var valueKey int
 
 type item[T any] struct {
 	sync.Mutex
-	context.Context
+	ctx       context.Context
 	cancel    context.CancelFunc
 	lifecycle time.Duration
 	fn        func() (T, error)
 }
 
-func (i *item[T]) set(value T) {
-	if i.Context = context.WithValue(context.Background(), &valueKey, value); i.lifecycle > 0 {
-		i.Context, i.cancel = context.WithTimeout(i.Context, i.lifecycle)
+func (i *item[T]) set(value *T) {
+	if i.ctx = context.WithValue(context.Background(), &valueKey, value); i.lifecycle > 0 {
+		i.ctx, i.cancel = context.WithTimeout(i.ctx, i.lifecycle)
 	}
 }
 
 func (i *item[T]) value() T {
-	return i.Value(&valueKey).(T)
+	return *i.ctx.Value(&valueKey).(*T)
 }
 
 func (i *item[T]) renew() T {
@@ -35,7 +35,7 @@ func (i *item[T]) renew() T {
 		log.Print(err)
 		v = i.value()
 	}
-	i.set(v)
+	i.set(&v)
 	return v
 }
 
@@ -55,20 +55,20 @@ func (c *Cache[Key, Value]) Set(key Key, value Value, lifecycle time.Duration, f
 	i := &item[Value]{lifecycle: lifecycle, fn: fn}
 	i.Lock()
 	defer i.Unlock()
-	i.set(value)
+	i.set(&value)
 	if c.autoRenew && lifecycle > 0 {
 		go func() {
 			for {
-				<-i.Done()
-				if err := i.Err(); err == context.DeadlineExceeded {
+				<-i.ctx.Done()
+				if i.ctx.Err() == context.DeadlineExceeded {
 					if i.fn != nil {
 						i.renew()
+						continue
 					} else {
 						c.Delete(key)
 					}
-				} else {
-					return
 				}
+				return
 			}
 		}()
 	}
@@ -79,7 +79,7 @@ func (c *Cache[Key, Value]) get(key Key) (i *item[Value], ok bool) {
 	if i, ok = c.m.Load(key); !ok {
 		return
 	}
-	if !c.autoRenew && i.Err() == context.DeadlineExceeded {
+	if !c.autoRenew && i.ctx.Err() == context.DeadlineExceeded {
 		if i.fn == nil {
 			c.Delete(key)
 			return nil, false
@@ -119,7 +119,7 @@ func (c *Cache[Key, Value]) Swap(key Key, value Value) (previous Value, loaded b
 		i.Lock()
 		defer i.Unlock()
 		previous = i.value()
-		i.set(value)
+		i.set(&value)
 	}
 	return
 }
