@@ -18,11 +18,11 @@ const (
 	argKey
 )
 
-type fn[T any] interface {
-	func(T) (any, error)
+type fn[Arg, Res any] interface {
+	func(Arg) (Res, error)
 }
 
-type Context[T any] struct {
+type Context[Arg, Res any] struct {
 	context.Context
 	cancel context.CancelFunc
 
@@ -32,25 +32,25 @@ type Context[T any] struct {
 	count int
 }
 
-func newContext[T any](ctx context.Context, count int) *Context[T] {
+func newContext[Arg, Res any](ctx context.Context, count int) *Context[Arg, Res] {
 	ctx, cancel := context.WithCancel(ctx)
-	return &Context[T]{ctx, cancel, sync.Mutex{}, nil, count}
+	return &Context[Arg, Res]{ctx, cancel, sync.Mutex{}, nil, count}
 }
 
-func fnContext[T any, Fn fn[T]](count int, fn Fn) *Context[T] {
-	return newContext[T](context.WithValue(context.Background(), fnKey, fn), count)
+func fnContext[Arg, Res any, Fn fn[Arg, Res]](count int, fn Fn) *Context[Arg, Res] {
+	return newContext[Arg, Res](context.WithValue(context.Background(), fnKey, fn), count)
 }
 
-func argContext[T any](count int, arg T) *Context[T] {
-	return newContext[T](context.WithValue(context.Background(), argKey, arg), count)
+func argContext[Arg, Res any](count int, arg Arg) *Context[Arg, Res] {
+	return newContext[Arg, Res](context.WithValue(context.Background(), argKey, arg), count)
 }
 
-func (ctx *Context[T]) run(executor func(chan<- any, chan<- error), rc chan<- any, ec chan<- error) {
+func (ctx *Context[Arg, Res]) run(executor func(chan<- Res, chan<- error), rc chan<- Res, ec chan<- error) {
 	if ctx.Err() != nil {
 		return
 	}
 
-	r := make(chan any, 1)
+	r := make(chan Res, 1)
 	c := make(chan error, 1)
 	go executor(r, c)
 
@@ -67,7 +67,7 @@ func (ctx *Context[T]) run(executor func(chan<- any, chan<- error), rc chan<- an
 			}
 
 			if ctx.count <= 1 {
-				rc <- nil
+				rc <- *new(Res)
 				if l := len(ctx.res); l > 0 {
 					ec <- ctx.res[l-1]
 				} else {
@@ -84,17 +84,17 @@ func (ctx *Context[T]) run(executor func(chan<- any, chan<- error), rc chan<- an
 	}
 }
 
-func (ctx *Context[T]) runArg(arg T, rc chan<- any, ec chan<- error) {
-	ctx.run(func(c1 chan<- any, c2 chan<- error) {
-		r, err := (ctx.Value(fnKey).(func(T) (any, error)))(arg)
+func (ctx *Context[Arg, Res]) runArg(arg Arg, rc chan<- Res, ec chan<- error) {
+	ctx.run(func(c1 chan<- Res, c2 chan<- error) {
+		r, err := (ctx.Value(fnKey).(func(Arg) (Res, error)))(arg)
 		c1 <- r
 		c2 <- err
 	}, rc, ec)
 }
 
-func (ctx *Context[T]) runFn(fn func(T) (any, error), rc chan<- any, ec chan<- error) {
-	ctx.run(func(c1 chan<- any, c2 chan<- error) {
-		r, err := fn(ctx.Value(argKey).(T))
+func (ctx *Context[Arg, Res]) runFn(fn func(Arg) (Res, error), rc chan<- Res, ec chan<- error) {
+	ctx.run(func(c1 chan<- Res, c2 chan<- error) {
+		r, err := fn(ctx.Value(argKey).(Arg))
 		c1 <- r
 		c2 <- err
 	}, rc, ec)
