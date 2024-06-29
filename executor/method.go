@@ -30,12 +30,13 @@ func SetLimit(n int) {
 
 // Execute gets the result from the functions with several args by specified method.
 // If both argMethod and fnMethod is Concurrent, fnMethod will be first.
-func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(T) (any, error)) (any, error) {
+func Execute[Arg, Res any](argMethod, fnMethod Method, limit int, args []Arg, fn ...func(Arg) (Res, error)) (res Res, err error) {
 	if len(fn) == 0 {
-		return nil, errors.New("no function provided")
+		err = errors.New("no function provided")
+		return
 	}
 
-	var clone []T
+	var clone []Arg
 	var count int
 	var nilArg bool
 	switch len(args) {
@@ -43,25 +44,25 @@ func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(
 		nilArg = true
 	default:
 		count = len(args)
-		clone = make([]T, count)
+		clone = make([]Arg, count)
 		copy(clone, args)
 	}
 
 	switch fnMethod {
 	case Concurrent:
-		result := make(chan any, 1)
+		result := make(chan Res, 1)
 		lasterr := make(chan error, 1)
 
 		if nilArg {
-			ctx := argContext(len(fn), *new(T))
+			ctx := argContext[Arg, Res](len(fn), *new(Arg))
 			defer ctx.cancel()
 
-			workers.RunSlice(limit, fn, func(_ int, fn func(T) (any, error)) {
+			workers.RunSlice(limit, fn, func(_ int, fn func(Arg) (Res, error)) {
 				ctx.runFn(fn, result, lasterr)
 			})
 
-			if err := <-lasterr; err != nil {
-				return nil, err
+			if err = <-lasterr; err != nil {
+				return
 			}
 
 			return <-result, nil
@@ -72,15 +73,16 @@ func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(
 		}
 
 		for i := range count {
-			ctx := argContext(len(fn), clone[i])
-			workers.RunSlice(limit, fn, func(_ int, fn func(T) (any, error)) {
+			ctx := argContext[Arg, Res](len(fn), clone[i])
+			workers.RunSlice(limit, fn, func(_ int, fn func(Arg) (Res, error)) {
 				ctx.runFn(fn, result, lasterr)
 			})
 
-			if err := <-lasterr; err == nil {
-				return <-result, nil
+			if err = <-lasterr; err == nil {
+				res = <-result
+				return
 			} else if i == count-1 {
-				return nil, err
+				return
 			}
 			ctx.cancel()
 		}
@@ -90,12 +92,12 @@ func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(
 		}
 
 		for i, f := range fn {
-			result := make(chan any, 1)
+			result := make(chan Res, 1)
 			lasterr := make(chan error, 1)
 
 			ctx := fnContext(count, f)
 			if nilArg {
-				ctx.runArg(*new(T), result, lasterr)
+				ctx.runArg(*new(Arg), result, lasterr)
 			} else {
 				var worker int
 				switch argMethod {
@@ -104,48 +106,51 @@ func Execute[T any](argMethod, fnMethod Method, limit int, args []T, fn ...func(
 				case Serial, Random:
 					worker = 1
 				default:
-					return nil, errors.New("unknown arg method")
+					err = errors.New("unknown arg method")
+					return
 				}
 
 				if argMethod == Random {
 					rand.Shuffle(count, func(i, j int) { clone[i], clone[j] = clone[j], clone[i] })
 				}
 
-				workers.RunSlice(worker, clone, func(_ int, arg T) {
+				workers.RunSlice(worker, clone, func(_ int, arg Arg) {
 					ctx.runArg(arg, result, lasterr)
 				})
 			}
 
-			if err := <-lasterr; err == nil {
-				return <-result, nil
+			if err = <-lasterr; err == nil {
+				res = <-result
+				return
 			} else if i == len(fn)-1 {
-				return nil, err
+				return
 			}
 			ctx.cancel()
 		}
 	default:
-		return nil, errors.New("unknown function method")
+		err = errors.New("unknown function method")
+		return
 	}
-
-	return nil, errors.New("unknown error")
+	err = errors.New("unknown error")
+	return
 }
 
 // ExecuteConcurrentArg gets the fastest result from the functions with args, args will be run concurrently.
-func ExecuteConcurrentArg[T any](arg []T, fn ...func(T) (any, error)) (any, error) {
+func ExecuteConcurrentArg[Arg, Res any](arg []Arg, fn ...func(Arg) (Res, error)) (Res, error) {
 	return Execute(Concurrent, Serial, defaultLimit, arg, fn...)
 }
 
 // ExecuteConcurrentFn gets the fastest result from the functions with args, functions will be run concurrently.
-func ExecuteConcurrentFn[T any](arg []T, fn ...func(T) (any, error)) (any, error) {
+func ExecuteConcurrentFn[Arg, Res any](arg []Arg, fn ...func(Arg) (Res, error)) (Res, error) {
 	return Execute(Serial, Concurrent, defaultLimit, arg, fn...)
 }
 
 // ExecuteSerial gets the result until success from the functions with args in order.
-func ExecuteSerial[T any](arg []T, fn ...func(T) (any, error)) (any, error) {
+func ExecuteSerial[Arg, Res any](arg []Arg, fn ...func(Arg) (Res, error)) (Res, error) {
 	return Execute(Serial, Serial, defaultLimit, arg, fn...)
 }
 
 // ExecuteRandom gets the result until success from the functions with args randomly.
-func ExecuteRandom[T any](arg []T, fn ...func(T) (any, error)) (any, error) {
+func ExecuteRandom[Arg, Res any](arg []Arg, fn ...func(Arg) (Res, error)) (Res, error) {
 	return Execute(Random, Random, defaultLimit, arg, fn...)
 }

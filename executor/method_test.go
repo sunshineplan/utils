@@ -3,7 +3,7 @@ package executor
 import (
 	"fmt"
 	"reflect"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 )
@@ -11,7 +11,7 @@ import (
 func TestExecuteConcurrent1(t *testing.T) {
 	result, err := ExecuteConcurrentArg(
 		[]int{0, 1, 2},
-		func(n int) (any, error) {
+		func(n int) (int, error) {
 			time.Sleep(time.Second * time.Duration(n))
 			return n * 2, nil
 		},
@@ -38,14 +38,14 @@ func TestExecuteConcurrent1(t *testing.T) {
 func TestExecuteConcurrent2(t *testing.T) {
 	result, err := ExecuteConcurrentFn(
 		[]int{1},
-		func(n int) (any, error) {
+		func(n int) (int, error) {
 			return n * 0 * 2, nil
 		},
-		func(n int) (any, error) {
+		func(n int) (int, error) {
 			time.Sleep(time.Second * 1 * time.Duration(n))
 			return n * 1 * 2, nil
 		},
-		func(n int) (any, error) {
+		func(n int) (int, error) {
 			time.Sleep(time.Second * 2 * time.Duration(n))
 			return n * 2 * 2, nil
 		},
@@ -79,7 +79,7 @@ func TestExecuteConcurrent2(t *testing.T) {
 func TestExecuteSerial1(t *testing.T) {
 	result, err := ExecuteSerial(
 		[]int{0, 1, 2},
-		func(n int) (any, error) {
+		func(n int) (int, error) {
 			time.Sleep(time.Second * time.Duration(n))
 			return n * 2, nil
 		},
@@ -106,14 +106,14 @@ func TestExecuteSerial1(t *testing.T) {
 func TestExecuteSerial2(t *testing.T) {
 	result, err := ExecuteSerial(
 		[]int{1},
-		func(n int) (any, error) {
+		func(n int) (int, error) {
 			return n * 0 * 2, nil
 		},
-		func(n int) (any, error) {
+		func(n int) (int, error) {
 			time.Sleep(time.Second * 1 * time.Duration(n))
 			return n * 1 * 2, nil
 		},
-		func(n int) (any, error) {
+		func(n int) (int, error) {
 			time.Sleep(time.Second * 2 * time.Duration(n))
 			return n * 2 * 2, nil
 		},
@@ -145,11 +145,11 @@ func TestExecuteSerial2(t *testing.T) {
 }
 
 func TestExecuteRandom1(t *testing.T) {
-	testcase := []any{"a", "b", "c", "d", "e", "f", "g"}
-	var result []any
+	testcase := []string{"a", "b", "c", "d", "e", "f", "g"}
+	var result []string
 	if _, err := ExecuteRandom(
 		testcase,
-		func(i any) (any, error) {
+		func(i string) (any, error) {
 			result = append(result, i)
 			return nil, fmt.Errorf("%v", i)
 		},
@@ -161,7 +161,7 @@ func TestExecuteRandom1(t *testing.T) {
 		result = nil
 		if _, err := ExecuteRandom(
 			testcase,
-			func(i any) (any, error) {
+			func(i string) (any, error) {
 				result = append(result, i)
 				return nil, fmt.Errorf("%v", i)
 			},
@@ -172,7 +172,7 @@ func TestExecuteRandom1(t *testing.T) {
 			t.Error("expected not equal; got equal")
 		}
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].(string) < result[j].(string) })
+	slices.Sort(result)
 	if !reflect.DeepEqual(testcase, result) {
 		t.Errorf("expected %v; got %v", testcase, result)
 	}
@@ -219,7 +219,7 @@ func TestExecuteRandom2(t *testing.T) {
 	if reflect.DeepEqual(expect, result) {
 		t.Errorf("expected not equal; got equal: %v", result)
 	}
-	sort.Strings(result)
+	slices.Sort(result)
 	if !reflect.DeepEqual(expect, result) {
 		t.Errorf("expected equal; got not equal: %v", result)
 	}
