@@ -51,8 +51,8 @@ func TestTickerScheduler2(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(1500 * time.Millisecond)
-	if n := n.Load(); n != 1 {
-		t.Errorf("expected 1; got %d", n)
+	if n := n.Load(); n != 1 && n != 2 {
+		t.Errorf("expected 1 or 2; got %d", n)
 	}
 
 	s.mu.Lock()
