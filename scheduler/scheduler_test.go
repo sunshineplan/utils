@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"log"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -11,9 +12,13 @@ func TestScheduler(t *testing.T) {
 	s := NewScheduler().At(TimeSchedule(now.Add(2 * time.Second)))
 	defer s.Stop()
 	var n atomic.Int32
-	if err := s.Run(func(_ time.Time) { n.Add(1) }).Start(); err != nil {
+	if err := s.Run(func(_ time.Time) {
+		log.Println("Scheduler", 1)
+		n.Add(1)
+	}).Start(); err != nil {
 		t.Fatal(err)
 	}
+	log.Println("Start", "Scheduler")
 	if n := n.Load(); n != 0 {
 		t.Errorf("expected 0; got %d", n)
 	}
@@ -27,12 +32,20 @@ func TestTickerScheduler1(t *testing.T) {
 	s := NewScheduler().At(Every(time.Second))
 	defer s.Stop()
 	var a, b atomic.Int32
-	if err := s.Do(func(_ time.Time) { a.Add(1) }); err != nil {
+	if err := s.Do(func(_ time.Time) {
+		log.Println("TickerScheduler1", "a", 1)
+		a.Add(1)
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Do(func(_ time.Time) { b.Add(1) }); err != nil {
+	log.Println("Start", "TickerScheduler1", "a")
+	if err := s.Do(func(_ time.Time) {
+		log.Println("TickerScheduler1", "b", 1)
+		b.Add(1)
+	}); err != nil {
 		t.Fatal(err)
 	}
+	log.Println("Start", "TickerScheduler1", "b")
 	time.Sleep(1500 * time.Millisecond)
 	if a, b := a.Load(), b.Load(); a != 1 || b != 1 {
 		t.Errorf("expected 1 1; got %d %d", a, b)
@@ -45,14 +58,18 @@ func TestTickerScheduler1(t *testing.T) {
 
 func TestTickerScheduler2(t *testing.T) {
 	var n atomic.Int32
-	s := NewScheduler().At(Every(time.Minute)).Run(func(_ time.Time) { n.Add(1) })
+	s := NewScheduler().At(Every(time.Minute)).Run(func(_ time.Time) {
+		log.Println("TickerScheduler2", 1)
+		n.Add(1)
+	})
 	defer s.Stop()
 	if err := s.Start(); err != nil {
 		t.Fatal(err)
 	}
+	log.Println("Start", "TickerScheduler2")
 	time.Sleep(1500 * time.Millisecond)
-	if n := n.Load(); n != 1 && n != 2 {
-		t.Errorf("expected 1 or 2; got %d", n)
+	if n := n.Load(); n != 1 {
+		t.Errorf("expected 1; got %d", n)
 	}
 
 	s.mu.Lock()
@@ -76,7 +93,11 @@ func TestOnce(t *testing.T) {
 	s := NewScheduler().At(TimeSchedule(now.Add(time.Second), now.Add(2*time.Second)))
 	defer s.Stop()
 	var n atomic.Int32
-	done := s.Run(func(_ time.Time) { n.Add(1) }).Once()
+	done := s.Run(func(_ time.Time) {
+		log.Println("Once", 1)
+		n.Add(1)
+	}).Once()
+	log.Println("Start", "Once")
 	select {
 	case err := <-done:
 		if err != nil {
