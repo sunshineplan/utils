@@ -140,7 +140,7 @@ func TestInsertBeforeUnknownMark(t *testing.T) {
 	l.PushBack(1)
 	l.PushBack(2)
 	l.PushBack(3)
-	l.InsertBefore(1, &Element[int]{new(list.Element)})
+	l.InsertBefore(1, &Element[int]{new(list.Element), nil})
 	checkList(t, &l, []int{1, 2, 3})
 }
 
@@ -150,7 +150,7 @@ func TestInsertAfterUnknownMark(t *testing.T) {
 	l.PushBack(1)
 	l.PushBack(2)
 	l.PushBack(3)
-	l.InsertAfter(1, &Element[int]{new(list.Element)})
+	l.InsertAfter(1, &Element[int]{new(list.Element), nil})
 	checkList(t, &l, []int{1, 2, 3})
 }
 
