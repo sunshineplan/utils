@@ -124,8 +124,8 @@ func (c *Cache[Key, Value]) Swap(key Key, value Value) (previous Value, loaded b
 	return
 }
 
-// Empty deletes all values in cache.
-func (c *Cache[Key, Value]) Empty() {
+// Clear deletes all values in cache.
+func (c *Cache[Key, Value]) Clear() {
 	c.m.Range(func(k Key, i *item[Value]) bool {
 		c.m.Delete(k)
 		i.Lock()

@@ -3,7 +3,7 @@ package csv
 import (
 	"bytes"
 	"io"
-	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -21,7 +21,7 @@ func TestWriteFields(t *testing.T) {
 	}{}); err != nil {
 		t.Error(err)
 	} else {
-		if expect := []field{{"A", ""}, {"B", "b"}}; !reflect.DeepEqual(expect, w.fields) {
+		if expect := []field{{"A", ""}, {"B", "b"}}; !slices.Equal(expect, w.fields) {
 			t.Errorf("expected %v; got %v", expect, w.fields)
 		}
 	}

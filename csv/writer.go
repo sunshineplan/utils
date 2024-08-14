@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 )
 
 var utf8bom = []byte{0xEF, 0xBB, 0xBF}
@@ -185,7 +186,7 @@ func (w *Writer) Write(record any) error {
 		return fmt.Errorf("not support record format: %s", v.Kind())
 	}
 
-	if reflect.DeepEqual(r, make([]string, len(w.fields))) {
+	if slices.Equal(r, make([]string, len(w.fields))) {
 		return nil
 	}
 

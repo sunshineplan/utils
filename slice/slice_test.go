@@ -1,13 +1,13 @@
 package slice
 
 import (
-	"reflect"
+	"slices"
 	"testing"
 )
 
 func testDeduplicate[E comparable](t *testing.T, s1, s2 []E) {
 	res := Deduplicate(s1)
-	if !reflect.DeepEqual(res, s2) {
+	if !slices.Equal(res, s2) {
 		t.Errorf("expected %#v; got %#v", s2, res)
 	}
 }
