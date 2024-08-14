@@ -2,7 +2,7 @@ package csv
 
 import (
 	"encoding/json"
-	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -41,7 +41,7 @@ func TestConvert(t *testing.T) {
 	if err := setCell(&a, "[1,2]"); err != nil {
 		t.Fatal(err)
 	}
-	if expect := []int{1, 2}; !reflect.DeepEqual(expect, a) {
+	if expect := []int{1, 2}; !slices.Equal(expect, a) {
 		t.Errorf("expected %v; got %v", expect, a)
 	}
 

@@ -26,13 +26,22 @@ func (m *Map[Key, Value]) Store(key Key, value Value) {
 	m.m.Store(key, value)
 }
 
+// Clear deletes all the entries, resulting in an empty Map.
+func (m *Map[Key, Value]) Clear() {
+	m.m.Clear()
+}
+
 // LoadOrStore returns the existing value for the key if present.
 // Otherwise, it stores and returns the given value.
 // The loaded result is true if the value was loaded, false if stored.
 func (m *Map[Key, Value]) LoadOrStore(key Key, value Value) (actual Value, loaded bool) {
 	var v any
-	if v, loaded = m.m.LoadOrStore(key, value); v != nil {
-		actual = v.(Value)
+	if v, loaded = m.m.LoadOrStore(key, value); loaded {
+		if v != nil {
+			actual = v.(Value)
+		}
+	} else {
+		actual = value
 	}
 	return
 }
@@ -92,10 +101,10 @@ func (m *Map[Key, Value]) CompareAndDelete(key Key, old Value) (deleted bool) {
 func (m *Map[Key, Value]) Range(f func(Key, Value) bool) {
 	m.m.Range(func(key, value any) bool {
 		var k Key
+		var v Value
 		if key != nil {
 			k = key.(Key)
 		}
-		var v Value
 		if value != nil {
 			v = value.(Value)
 		}

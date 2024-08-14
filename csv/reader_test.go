@@ -3,6 +3,7 @@ package csv
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -19,7 +20,7 @@ a,1,"[1,2]"
 b,2,"[3,4]"
 `
 	r := NewReader(strings.NewReader(csv), true)
-	if expect := []string{"A", "B", "C"}; !reflect.DeepEqual(expect, r.fields) {
+	if expect := []string{"A", "B", "C"}; !slices.Equal(expect, r.fields) {
 		t.Errorf("expected %v; got %v", expect, r.fields)
 	}
 

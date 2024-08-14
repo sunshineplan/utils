@@ -39,7 +39,7 @@ func TestEmpty(t *testing.T) {
 			t.Error("expected ok; got not")
 		}
 	}
-	cache.Empty()
+	cache.Clear()
 	for _, i := range []string{"a", "b", "c"} {
 		if _, ok := cache.Get(i); ok {
 			t.Error("expected not ok; got ok")
@@ -49,7 +49,7 @@ func TestEmpty(t *testing.T) {
 
 func TestRenew(t *testing.T) {
 	cache := New[string, string](true)
-	defer cache.Empty()
+	defer cache.Clear()
 	expire := make(chan struct{})
 	cache.Set("renew", "old", 2*time.Second, func() (string, error) {
 		defer func() { close(expire) }()

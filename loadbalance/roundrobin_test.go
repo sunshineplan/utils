@@ -1,7 +1,7 @@
 package loadbalance
 
 import (
-	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -11,7 +11,7 @@ func TestRoundRobin(t *testing.T) {
 	for range 6 {
 		res = append(res, r1.Next())
 	}
-	if expect := []string{"a", "b", "c", "a", "b", "c"}; !reflect.DeepEqual(res, expect) {
+	if expect := []string{"a", "b", "c", "a", "b", "c"}; !slices.Equal(res, expect) {
 		t.Errorf("want %v, got %v", expect, res)
 	}
 	res = nil
@@ -20,7 +20,7 @@ func TestRoundRobin(t *testing.T) {
 	for range 12 {
 		res = append(res, r2.Next())
 	}
-	if expect := []string{"a", "a", "b", "c", "a", "a", "b", "c", "a", "a", "b", "c"}; !reflect.DeepEqual(res, expect) {
+	if expect := []string{"a", "a", "b", "c", "a", "a", "b", "c", "a", "a", "b", "c"}; !slices.Equal(res, expect) {
 		t.Errorf("want %v, got %v", expect, res)
 	}
 	res = nil
@@ -29,7 +29,7 @@ func TestRoundRobin(t *testing.T) {
 	for range 7 {
 		res = append(res, r1.Next())
 	}
-	if expect := []string{"a", "a", "a", "b", "c", "b", "c"}; !reflect.DeepEqual(res, expect) {
+	if expect := []string{"a", "a", "a", "b", "c", "b", "c"}; !slices.Equal(res, expect) {
 		t.Errorf("want %v, got %v", expect, res)
 	}
 }

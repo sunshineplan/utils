@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -51,11 +52,7 @@ func (r *Reader) Read() (record []string, err error) {
 	if err == nil {
 		r.once.Do(func() {
 			if len(record) > 0 {
-				if s := record[0]; len(s) >= 3 {
-					if b := s[:3]; b == string(utf8bom) {
-						record[0] = s[3:]
-					}
-				}
+				record[0] = strings.TrimPrefix(record[0], string(utf8bom))
 			}
 		})
 	}

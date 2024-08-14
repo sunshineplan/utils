@@ -3,18 +3,35 @@ package txt
 import (
 	"bufio"
 	"io"
+	"iter"
 	"os"
 )
 
-// ReadAll reads all contents from r.
-func ReadAll(r io.Reader) ([]string, error) {
-	var content []string
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		content = append(content, scanner.Text())
-	}
+type Reader struct {
+	scanner *bufio.Scanner
+}
 
-	return content, scanner.Err()
+func NewReader(r io.Reader) *Reader {
+	return &Reader{bufio.NewScanner(r)}
+}
+
+func (r *Reader) Iter() iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for r.scanner.Scan() {
+			if !yield(r.scanner.Text()) {
+				return
+			}
+		}
+	}
+}
+
+// ReadAll reads all contents from r.
+func ReadAll(r io.Reader) []string {
+	var s []string
+	for i := range NewReader(r).Iter() {
+		s = append(s, i)
+	}
+	return s
 }
 
 // ReadFile reads all contents from file.
@@ -25,5 +42,5 @@ func ReadFile(file string) ([]string, error) {
 	}
 	defer f.Close()
 
-	return ReadAll(f)
+	return ReadAll(f), nil
 }
