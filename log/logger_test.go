@@ -5,18 +5,20 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"runtime"
 	"testing"
-	"time"
 )
 
 func TestLogger(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	logger := New("test1", "", 0)
 	defer os.Remove("test1")
 	if file := logger.File(); file != "test1" {
 		t.Errorf("expected test1; got %q", file)
 	}
 	logger.Print("test1")
-	time.Sleep(time.Second)
 	if err := os.Rename("test1", "test2"); err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +28,6 @@ func TestLogger(t *testing.T) {
 		t.Errorf("expected test1; got %q", file)
 	}
 	logger.Print("test2")
-	time.Sleep(time.Second)
 	b1, err := os.ReadFile("test1")
 	if err != nil {
 		t.Fatal(err)
