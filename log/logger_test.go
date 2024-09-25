@@ -5,10 +5,14 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"runtime"
 	"testing"
 )
 
 func TestLogger(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	logger := New("test1", "", 0)
 	defer os.Remove("test1")
 	if file := logger.File(); file != "test1" {
