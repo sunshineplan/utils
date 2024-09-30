@@ -121,10 +121,10 @@ func (pb *ProgressBar) print(f format) {
 
 	width := buf.Len()
 	if width < pb.lastWidth {
-		io.WriteString(os.Stderr,
+		io.WriteString(os.Stdout,
 			fmt.Sprintf("\r%s\r%s", strings.Repeat(" ", pb.lastWidth), buf.Bytes()))
 	} else {
-		io.WriteString(os.Stderr, "\r\r"+buf.String())
+		io.WriteString(os.Stdout, "\r\r"+buf.String())
 	}
 
 	pb.lastWidth = width
@@ -236,13 +236,13 @@ func (pb *ProgressBar) startCount() {
 				f.Left = "Complete"
 
 				pb.print(f)
-				io.WriteString(os.Stderr, "\n")
+				io.WriteString(os.Stdout, "\n")
 
 				close(pb.done)
 				return
 			}
 		case <-pb.ctx.Done():
-			io.WriteString(os.Stderr, "\nCancelled\n")
+			io.WriteString(os.Stdout, "\nCancelled\n")
 			return
 		}
 	}
