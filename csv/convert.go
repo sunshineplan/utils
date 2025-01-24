@@ -91,7 +91,7 @@ func convert(t reflect.Type, s string) (reflect.Value, error) {
 			return v, nil
 		}
 	}
-	return v, errNotSet
+	return reflect.Value{}, errNotSet
 }
 
 // setCell copies to dest the value in src, converting it if possible.
@@ -132,7 +132,10 @@ func setCell(dest any, s string) error {
 		if d == nil {
 			return errNilPtr
 		}
-		return d.UnmarshalJSON([]byte(s))
+		if err := d.UnmarshalJSON([]byte(strconv.Quote(s))); err != nil {
+			return d.UnmarshalJSON([]byte(s))
+		}
+		return nil
 	case encoding.TextUnmarshaler:
 		if d == nil {
 			return errNilPtr
@@ -159,7 +162,10 @@ func setCell(dest any, s string) error {
 
 	if v, err := convert(dv.Type(), s); err != nil {
 		if err == errNotSet {
-			return json.Unmarshal([]byte(s), dest)
+			if err := json.Unmarshal([]byte(strconv.Quote(s)), dest); err != nil {
+				return json.Unmarshal([]byte(s), dest)
+			}
+			return nil
 		}
 		return err
 	} else {
