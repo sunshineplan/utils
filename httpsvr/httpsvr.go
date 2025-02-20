@@ -16,7 +16,7 @@ import (
 	"github.com/sunshineplan/utils/log"
 )
 
-var certCache = cache.New[string, *tls.Certificate](false)
+var certCache = cache.NewWithRenew[string, *tls.Certificate](false)
 
 var defaultReload = 24 * time.Hour
 
@@ -69,7 +69,7 @@ func (s *Server) run() error {
 					if s.reload == 0 {
 						s.reload = defaultReload
 					}
-					certCache.Set("cert", cert, s.reload, s.loadCertificate)
+					certCache.Set(s.certFile+s.keyFile, cert, s.reload, s.loadCertificate)
 				}
 			case syscall.SIGINT, syscall.SIGTERM:
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -133,7 +133,7 @@ func (s *Server) loadCertificate() (*tls.Certificate, error) {
 }
 
 func (s *Server) getCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	v, ok := certCache.Get("cert")
+	v, ok := certCache.Get(s.certFile + s.keyFile)
 	if ok {
 		return v, nil
 	}

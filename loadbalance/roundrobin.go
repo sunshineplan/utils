@@ -1,10 +1,10 @@
 package loadbalance
 
-import "github.com/sunshineplan/utils/cache"
+import "github.com/sunshineplan/utils/container"
 
 var _ LoadBalancer[any] = &roundrobin[any]{}
 
-type roundrobin[E any] cache.Ring[*E]
+type roundrobin[E any] container.Ring[*E]
 
 func newRoundRobin[E any, Items []E | []Weighted[E]](items Items) *roundrobin[E] {
 	if len(items) == 0 {
@@ -14,7 +14,7 @@ func newRoundRobin[E any, Items []E | []Weighted[E]](items Items) *roundrobin[E]
 	switch items := any(items).(type) {
 	case []E:
 		for _, i := range items {
-			r := cache.NewRing[*E](1)
+			r := container.NewRing[*E](1)
 			r.Set(&i)
 			if root == nil {
 				root = (*roundrobin[E])(r)
@@ -32,7 +32,7 @@ func newRoundRobin[E any, Items []E | []Weighted[E]](items Items) *roundrobin[E]
 				continue
 			}
 			item := &i.Item
-			r := cache.NewRing[*E](i.Weight)
+			r := container.NewRing[*E](i.Weight)
 			for range r.Len() {
 				r.Set(item)
 				r = r.Next()
@@ -73,8 +73,8 @@ func (r *roundrobin[E]) Next() (next E) {
 	return v
 }
 
-func (r *roundrobin[E]) Ring() *cache.Ring[*E] {
-	return (*cache.Ring[*E])(r)
+func (r *roundrobin[E]) Ring() *container.Ring[*E] {
+	return (*container.Ring[*E])(r)
 }
 
 func (r *roundrobin[E]) Link(s LoadBalancer[E]) LoadBalancer[E] {

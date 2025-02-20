@@ -86,32 +86,32 @@ func (m *Message) Bytes(id string) []byte {
 	w := textproto.NewWriter(bufio.NewWriter(&buf))
 
 	w.PrintfLine("MIME-Version: 1.0")
-	w.PrintfLine("Date: " + time.Now().Format(time.RFC1123Z))
+	w.PrintfLine("Date: %s", time.Now().Format(time.RFC1123Z))
 	w.PrintfLine("Message-ID: <%s>", id)
 	w.PrintfLine("Subject: =?UTF-8?B?%s?=", toBase64(m.Subject))
-	w.PrintfLine("From: " + m.From.String())
-	w.PrintfLine("To: " + m.To.String())
+	w.PrintfLine("From: %s", m.From)
+	w.PrintfLine("To: %s", m.To)
 	if len(m.Cc) > 0 {
-		w.PrintfLine("Cc: " + m.Cc.String())
+		w.PrintfLine("Cc: %s", m.Cc)
 	}
 
 	boundary := randomString(16)
 	if len(m.Attachments) > 0 {
 		w.PrintfLine("Content-Type: multipart/mixed; boundary=%q", boundary)
 		w.PrintfLine("")
-		w.PrintfLine("--" + boundary)
+		w.PrintfLine("--%s", boundary)
 	}
 
 	w.PrintfLine(`Content-Type: %s; charset="UTF-8"`, m.ContentType)
 	w.PrintfLine("Content-Transfer-Encoding: base64")
 	w.PrintfLine("")
-	w.PrintfLine(toBase64(m.Body))
+	w.PrintfLine("%s", toBase64(m.Body))
 
 	if l := len(m.Attachments); l > 0 {
 		for i, attachment := range m.Attachments {
-			w.PrintfLine("--" + boundary)
+			w.PrintfLine("--%s", boundary)
 			if mimetype := mime.TypeByExtension(filepath.Ext(attachment.Filename)); mimetype != "" {
-				w.PrintfLine("Content-Type: " + mimetype)
+				w.PrintfLine("Content-Type: %s", mimetype)
 			} else {
 				w.PrintfLine("Content-Type: application/octet-stream")
 			}
@@ -130,16 +130,16 @@ func (m *Message) Bytes(id string) []byte {
 			// write base64 content in lines of up to 76 chars
 			for i, l := 0, int(math.Ceil(float64(len(b))/76)); i < l; i++ {
 				if i == l-1 {
-					w.PrintfLine(string(b[i*76:]))
+					w.PrintfLine("%s", b[i*76:])
 				} else {
-					w.PrintfLine(string(b[i*76 : (i+1)*76]))
+					w.PrintfLine("%s", b[i*76:(i+1)*76])
 				}
 			}
 
 			if i < l-1 {
-				w.PrintfLine("--" + boundary)
+				w.PrintfLine("--%s", boundary)
 			} else {
-				w.PrintfLine("--" + boundary + "--")
+				w.PrintfLine("--%s--", boundary)
 			}
 		}
 	}

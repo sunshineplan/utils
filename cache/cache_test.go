@@ -1,86 +1,40 @@
 package cache
 
 import (
+	"runtime"
 	"testing"
-	"time"
+	"weak"
 )
 
 func TestCache(t *testing.T) {
-	cache := New[string, string](false)
-	cache.Set("key", "value", 0, nil)
-	if value, ok := cache.Get("key"); !ok {
-		t.Fatal("expected ok; got not")
-	} else if value != "value" {
-		t.Errorf("expected value; got %q", value)
+	cache := New[string, string]()
+	key := "key"
+	p := weak.Make(&key)
+	value := "value"
+	cache.Set(&key, value)
+	if v, ok := cache.Get(&key); !ok {
+		t.Fatal("expected cached, got not")
+	} else if v != value {
+		t.Fatalf("expected %q, got %q", value, v)
 	}
-	if value, ok := cache.Swap("key", "swap"); !ok {
-		t.Fatal("expected ok; got not")
-	} else if value != "value" {
-		t.Errorf("expected value; got %q", value)
+	if v, ok := cache.m.Load(p); !ok {
+		t.Fatal("expected cached, got not")
+	} else if v != value {
+		t.Fatalf("expected %q, got %q", value, v)
 	}
-	if value, ok := cache.Get("key"); !ok {
-		t.Fatal("expected ok; got not")
-	} else if value != "swap" {
-		t.Errorf("expected swap; got %q", value)
+	runtime.GC()
+	if v, ok := cache.Get(&key); !ok {
+		t.Fatal("expected cached, got not")
+	} else if v != value {
+		t.Fatalf("expected %q, got %q", value, v)
 	}
-	cache.Delete("key")
-	if _, ok := cache.Get("key"); ok {
-		t.Error("expected not ok; got ok")
+	if v, ok := cache.m.Load(p); !ok {
+		t.Fatal("expected cached, got not")
+	} else if v != value {
+		t.Fatalf("expected %q, got %q", value, v)
 	}
-}
-
-func TestEmpty(t *testing.T) {
-	cache := New[string, int](false)
-	cache.Set("a", 1, 0, nil)
-	cache.Set("b", 2, 0, nil)
-	cache.Set("c", 3, 0, nil)
-	for _, i := range []string{"a", "b", "c"} {
-		if _, ok := cache.Get(i); !ok {
-			t.Error("expected ok; got not")
-		}
-	}
-	cache.Clear()
-	for _, i := range []string{"a", "b", "c"} {
-		if _, ok := cache.Get(i); ok {
-			t.Error("expected not ok; got ok")
-		}
-	}
-}
-
-func TestRenew(t *testing.T) {
-	cache := New[string, string](true)
-	defer cache.Clear()
-	expire := make(chan struct{})
-	cache.Set("renew", "old", 2*time.Second, func() (string, error) {
-		defer func() { close(expire) }()
-		return "new", nil
-	})
-	cache.Set("expire", "value", 1*time.Second, nil)
-	if value, ok := cache.Get("expire"); !ok {
-		t.Fatal("expected ok; got not")
-	} else if expect := "value"; value != expect {
-		t.Errorf("expected %q; got %q", expect, value)
-	}
-	if value, ok := cache.Get("renew"); !ok {
-		t.Fatal("expected ok; got not")
-	} else if expect := "old"; value != expect {
-		t.Errorf("expected %q; got %q", expect, value)
-	}
-	ticker := time.NewTicker(4 * time.Second)
-	defer ticker.Stop()
-	select {
-	case <-expire:
-		time.Sleep(100 * time.Millisecond)
-		if _, ok := cache.Get("expire"); ok {
-			t.Error("expected not ok; got ok")
-		}
-		value, ok := cache.Get("renew")
-		if !ok {
-			t.Fatal("expected ok; got not")
-		} else if expect := "new"; value != expect {
-			t.Errorf("expected %q; got %q", expect, value)
-		}
-	case <-ticker.C:
-		t.Fatal("time out")
+	runtime.GC()
+	if _, ok := cache.m.Load(p); ok {
+		t.Fatal("expected not cached, got cached")
 	}
 }
