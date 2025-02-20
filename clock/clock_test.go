@@ -11,9 +11,9 @@ func TestClock(t *testing.T) {
 		c              Clock
 		str            string
 	}{
-		{0, 0, 0, Clock{}, "0:00:00"},
+		{0, 0, 0, New(0, 0, 0), "0:00:00"},
 		{1, 2, 3, New(1, 2, 3), "1:02:03"},
-		{24, 0, 0, Clock{}, "0:00:00"},
+		{24, 0, 0, New(0, 0, 0), "0:00:00"},
 		{0, 60, 0, New(1, 0, 0), "1:00:00"},
 		{0, 0, 60, New(0, 1, 0), "0:01:00"},
 		{0, 0, -1, New(23, 59, 59), "23:59:59"},
@@ -61,7 +61,7 @@ func TestParse(t *testing.T) {
 func TestSeconds(t *testing.T) {
 	for i, testcase := range []struct {
 		c        Clock
-		expected int
+		expected int64
 	}{
 		{New(0, 0, 0), 0},
 		{New(7, 1, 2), 7*secondsPerHour + 1*secondsPerMinute + 2},
@@ -80,9 +80,9 @@ func TestAdd(t *testing.T) {
 		d time.Duration
 		u Clock
 	}{
-		{Clock{}, 0, Clock{}},
-		{Clock{}, time.Second, New(0, 0, 1)},
-		{New(0, 0, 1), -time.Second, Clock{}},
+		{New(0, 0, 0), 0, New(0, 0, 0)},
+		{New(0, 0, 0), time.Second, New(0, 0, 1)},
+		{New(0, 0, 1), -time.Second, New(0, 0, 0)},
 	} {
 		if got := tc.c.Add(tc.d); got != tc.u {
 			t.Errorf("#%d: got %s; want %s", i, got, tc.u)
@@ -96,10 +96,10 @@ func TestSub(t *testing.T) {
 		u Clock
 		d time.Duration
 	}{
-		{Clock{}, Clock{}, 0},
-		{New(0, 0, 1), Clock{}, time.Second},
-		{Clock{}, New(0, 0, 1), -time.Second},
-		{New(6, 5, 4), Clock{}, 6*time.Hour + 5*time.Minute + 4*time.Second},
+		{New(0, 0, 0), New(0, 0, 0), 0},
+		{New(0, 0, 1), New(0, 0, 0), time.Second},
+		{New(0, 0, 0), New(0, 0, 1), -time.Second},
+		{New(6, 5, 4), New(0, 0, 0), 6*time.Hour + 5*time.Minute + 4*time.Second},
 		{New(1, 0, 0), New(0, 30, 0), 30 * time.Minute},
 		{New(12, 0, 0), New(12, 30, 0), -30 * time.Minute},
 	} {
@@ -115,10 +115,10 @@ func TestUntil(t *testing.T) {
 		u Clock
 		d time.Duration
 	}{
-		{Clock{}, Clock{}, 0},
-		{Clock{}, New(0, 0, 1), time.Second},
-		{New(0, 0, 1), Clock{}, 23*time.Hour + 59*time.Minute + 59*time.Second},
-		{Clock{}, New(6, 5, 4), 6*time.Hour + 5*time.Minute + 4*time.Second},
+		{New(0, 0, 0), New(0, 0, 0), 0},
+		{New(0, 0, 0), New(0, 0, 1), time.Second},
+		{New(0, 0, 1), New(0, 0, 0), 23*time.Hour + 59*time.Minute + 59*time.Second},
+		{New(0, 0, 0), New(6, 5, 4), 6*time.Hour + 5*time.Minute + 4*time.Second},
 		{New(0, 30, 0), New(1, 0, 0), 30 * time.Minute},
 		{New(12, 30, 0), New(12, 0, 0), 23*time.Hour + 30*time.Minute},
 	} {
