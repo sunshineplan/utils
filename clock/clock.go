@@ -5,6 +5,7 @@ import (
 	"encoding"
 	"fmt"
 	"time"
+	"unique"
 )
 
 const (
@@ -18,19 +19,21 @@ var (
 	_ encoding.TextUnmarshaler = new(Clock)
 )
 
+var w0 unique.Handle[uint64]
+
 type Clock struct {
-	wall uint64
+	wall unique.Handle[uint64]
 }
 
-func abs[Int int | float64 | uint64](wall Int) uint64 {
+func wall[Int int | float64 | uint64](wall Int) unique.Handle[uint64] {
 	for wall < 0 {
 		wall += secondsPerDay
 	}
-	return uint64(int64(wall) % secondsPerDay)
+	return unique.Make(uint64(int64(wall) % secondsPerDay))
 }
 
 func New(hour, min, sec int) Clock {
-	return Clock{abs(hour*secondsPerHour + min*secondsPerMinute + sec)}
+	return Clock{wall(hour*secondsPerHour + min*secondsPerMinute + sec)}
 }
 
 var clockLayout = []string{
@@ -67,11 +70,11 @@ func Now() Clock {
 }
 
 func (c Clock) Time() time.Time {
-	return time.Unix(int64(c.wall), 0).UTC()
+	return time.Unix(int64(c.wall.Value()), 0).UTC()
 }
 
 func (c Clock) Clock() (hour, min, sec int) {
-	sec = int(c.wall)
+	sec = int(c.wall.Value())
 	hour = sec / secondsPerHour
 	sec -= hour * secondsPerHour
 	min = sec / secondsPerMinute
@@ -79,23 +82,26 @@ func (c Clock) Clock() (hour, min, sec int) {
 	return
 }
 
+func (c Clock) Seconds() int64 {
+	return int64(c.wall.Value())
+}
+
 func (c Clock) Hour() int {
-	return int(c.wall%secondsPerDay) / secondsPerHour
+	return int(c.Seconds()%secondsPerDay) / secondsPerHour
 }
 
 func (c Clock) Minute() int {
-	return int(c.wall%secondsPerHour) / secondsPerMinute
+	return int(c.Seconds()%secondsPerHour) / secondsPerMinute
 }
 
 func (c Clock) Second() int {
-	return int(c.wall % secondsPerMinute)
-}
-
-func (c Clock) Seconds() int {
-	return int(c.wall)
+	return int(c.Seconds() % secondsPerMinute)
 }
 
 func (c Clock) String() string {
+	if c.wall == w0 {
+		return ""
+	}
 	return fmt.Sprintf("%d:%02d:%02d", c.Hour(), c.Minute(), c.Second())
 }
 
@@ -113,16 +119,16 @@ func (c *Clock) UnmarshalText(text []byte) error {
 	return nil
 }
 
-func (c Clock) IsZero() bool {
-	return c.wall == 0
+func (c Clock) IsValid() bool {
+	return c.wall != w0
 }
 
 func (c Clock) After(u Clock) bool {
-	return c.wall > u.wall
+	return c.wall.Value() > u.wall.Value()
 }
 
 func (c Clock) Before(u Clock) bool {
-	return c.wall < u.wall
+	return c.wall.Value() < u.wall.Value()
 }
 
 func (c Clock) Equal(u Clock) bool {
@@ -130,15 +136,15 @@ func (c Clock) Equal(u Clock) bool {
 }
 
 func (c Clock) Compare(u Clock) int {
-	return cmp.Compare(c.wall, u.wall)
+	return cmp.Compare(c.wall.Value(), u.wall.Value())
 }
 
 func (c Clock) Add(d time.Duration) Clock {
-	return Clock{abs(float64(c.wall) + d.Seconds())}
+	return Clock{wall(float64(c.wall.Value()) + d.Seconds())}
 }
 
 func (c Clock) Sub(u Clock) time.Duration {
-	return time.Duration(int64(c.wall)-int64(u.wall)) * time.Second
+	return time.Duration(c.Seconds()-u.Seconds()) * time.Second
 }
 
 func (c Clock) Since(u Clock) time.Duration {
@@ -146,7 +152,7 @@ func (c Clock) Since(u Clock) time.Duration {
 }
 
 func (c Clock) Until(u Clock) time.Duration {
-	d := int64(u.wall) - int64(c.wall)
+	d := u.Seconds() - c.Seconds()
 	if d == 0 {
 		return 0
 	} else if d < 0 {
