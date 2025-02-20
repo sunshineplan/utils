@@ -1,12 +1,12 @@
-package utils
+package confirm
 
 import (
 	"fmt"
 	"strings"
 )
 
-// Confirm asks the user for confirmation.
-func Confirm(prompt string, attempts int) bool {
+// Do asks the user for confirmation.
+func Do(prompt string, attempts int) bool {
 	if prompt == "" {
 		prompt = "Are you sure?"
 	}
