@@ -37,8 +37,8 @@ func NewScheduler() *Scheduler {
 	return &Scheduler{notify: make(chan time.Time, 1), tc: make(chan time.Time, 1)}
 }
 
-func (sched *Scheduler) WithDebug(debug *slog.Logger) *Scheduler {
-	sched.debugLogger = debug
+func (sched *Scheduler) WithDebug(logger *slog.Logger) *Scheduler {
+	sched.debugLogger = logger
 	return sched
 }
 
@@ -138,6 +138,9 @@ func (sched *Scheduler) checkMatched(t time.Time) {
 			return
 		}
 		sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", sched.next)
+	} else if sched.next.Before(t) {
+		sched.debug("Scheduler Missed Next", "Name", sched.sched, "Next", sched.next)
+		sched.notify <- time.Now()
 	}
 }
 
