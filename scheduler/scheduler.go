@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -28,10 +29,23 @@ type Scheduler struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	debugLogger *slog.Logger
 }
 
 func NewScheduler() *Scheduler {
 	return &Scheduler{notify: make(chan time.Time, 1), tc: make(chan time.Time, 1)}
+}
+
+func (sched *Scheduler) WithDebug(debug *slog.Logger) *Scheduler {
+	sched.debugLogger = debug
+	return sched
+}
+
+func (sched *Scheduler) debug(msg string, args ...any) {
+	if sched.debugLogger != nil {
+		sched.debugLogger.Debug(msg, args...)
+	}
 }
 
 func (sched *Scheduler) At(schedules ...Schedule) *Scheduler {
@@ -42,6 +56,7 @@ func (sched *Scheduler) At(schedules ...Schedule) *Scheduler {
 	defer sched.mu.Unlock()
 	sched.sched = multiSched(schedules)
 	sched.d = sched.sched.TickerDuration()
+	sched.debug("Scheduler At", "schedules", sched.sched, "duration", sched.d)
 	return sched
 }
 
@@ -53,7 +68,17 @@ func (sched *Scheduler) AtCondition(schedules ...Schedule) *Scheduler {
 	defer sched.mu.Unlock()
 	sched.sched = condSched(schedules)
 	sched.d = sched.sched.TickerDuration()
+	sched.debug("Scheduler At Condition", "schedules", sched.sched, "duration", sched.d)
 	return sched
+}
+
+func (sched *Scheduler) String() string {
+	sched.mu.Lock()
+	defer sched.mu.Unlock()
+	if sched.sched == nil {
+		return ""
+	}
+	return sched.sched.String()
 }
 
 func (sched *Scheduler) Clear() {
@@ -93,6 +118,7 @@ func (sched *Scheduler) init() error {
 		t := <-timer.C
 		sched.sched.init(t)
 		sched.next = sched.sched.Next(t)
+		sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", sched.next)
 		subscribeNotify(sched.notify)
 		sched.newTimer(time.Now())
 		return nil
@@ -103,39 +129,22 @@ func (sched *Scheduler) init() error {
 func (sched *Scheduler) checkMatched(t time.Time) {
 	sched.mu.Lock()
 	defer sched.mu.Unlock()
-	var matched time.Time
-	var notify bool
 	if sched.sched.IsMatched(t) {
 		sched.tc <- t
-		matched = t
-	} else if sched.sched.TickerDuration() >= time.Minute {
-		if minus1s := t.Add(-time.Second); sched.sched.IsMatched(minus1s) {
-			sched.tc <- minus1s
-			matched = minus1s
-			notify = true
-		} else if plus1s := t.Add(time.Second); sched.sched.IsMatched(plus1s) {
-			sched.tc <- plus1s
-			matched = plus1s
-			time.Sleep(2 * time.Second)
-			notify = true
-		}
-	}
-	if !matched.IsZero() && !notify {
-		if sched.next = sched.sched.Next(matched.Truncate(time.Second).Add(time.Second)); sched.next.IsZero() {
+		sched.debug("Scheduler Matched Time", "Name", sched.sched, "Time", t)
+		if sched.next = sched.sched.Next(t.Truncate(time.Second).Add(time.Second)); sched.next.IsZero() {
 			sched.Stop()
+			sched.debug("Scheduler No More Next", "Name", sched.sched)
 			return
 		}
-	} else if t.After(sched.next) {
-		notify = true
-	}
-	if notify {
-		sched.notify <- time.Now()
+		sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", sched.next)
 	}
 }
 
 func (sched *Scheduler) newTimer(t time.Time) {
 	if sched.next.IsZero() {
 		sched.Stop()
+		sched.debug("Scheduler No More Next", "Name", sched.sched)
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -148,10 +157,12 @@ func (sched *Scheduler) newTimer(t time.Time) {
 				case t := <-sched.ticker.C:
 					sched.checkMatched(t)
 				case t := <-sched.notify:
+					sched.debug("Time Change Detected", "Name", sched.sched)
 					sched.ticker.Stop()
 					sched.mu.Lock()
 					defer sched.mu.Unlock()
 					sched.next = sched.sched.Next(t)
+					sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", sched.next)
 					sched.newTimer(t)
 					return
 				case <-sched.ctx.Done():
@@ -166,15 +177,18 @@ func (sched *Scheduler) newTimer(t time.Time) {
 		for {
 			select {
 			case t := <-sched.notify:
+				sched.debug("Time Change Detected", "Name", sched.sched)
 				sched.mu.Lock()
 				if sched.timer.Stop() {
 					sched.next = sched.sched.Next(t)
 					if sched.next.IsZero() {
 						cancel()
 						sched.Stop()
+						sched.debug("Scheduler No More Next", "Name", sched.sched)
 						return
 					}
 					sched.timer.Reset(sched.next.Sub(t))
+					sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", sched.next)
 				}
 				sched.mu.Unlock()
 			case <-sched.ctx.Done():
