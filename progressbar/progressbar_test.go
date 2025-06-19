@@ -17,6 +17,7 @@ func TestProgessBar(t *testing.T) {
 
 	pb := New(15).SetRefresh(4 * time.Second)
 	pb.Start()
+	pb.Additional("refreshes in 4s")
 	for range pb.total {
 		pb.Add(1)
 		time.Sleep(time.Second)
@@ -25,6 +26,7 @@ func TestProgessBar(t *testing.T) {
 
 	pb = New(10).SetRefresh(500 * time.Millisecond)
 	pb.Start()
+	pb.Additional("refreshes in 500ms")
 	for range pb.total {
 		pb.Add(1)
 		time.Sleep(time.Second)

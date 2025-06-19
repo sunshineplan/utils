@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -16,8 +17,8 @@ import (
 	"github.com/sunshineplan/utils/unit"
 )
 
-const defaultTemplate = `[{{.Done}}{{.Undone}}]   {{.Speed}}   {{.Current -}}
-({{.Percent}}) of {{.Total}}   {{.Elapsed}}   {{.Left}} `
+const defaultTemplate = `[{{.Done}}{{.Undone}}]  {{.Speed}}  {{.Current -}}
+({{.Percent}}) of {{.Total}}{{if .Additional}} [{{.Additional}}]{{end}}  {{.Elapsed}}  {{.Left}} `
 
 // ProgressBar is a simple progress bar.
 type ProgressBar struct {
@@ -33,6 +34,7 @@ type ProgressBar struct {
 	template   *template.Template
 	current    counter.Counter
 	total      int64
+	additional atomic.Value
 	lastWidth  int
 	speed      float64
 	unit       string
@@ -42,6 +44,7 @@ type format struct {
 	Done, Undone   string
 	Speed, Percent string
 	Current, Total string
+	Additional     string
 	Elapsed, Left  string
 }
 
@@ -111,6 +114,11 @@ func (pb *ProgressBar) Add(n int64) {
 	pb.current.Add(n)
 }
 
+// Additional adds the specified string to the progress bar.
+func (pb *ProgressBar) Additional(s string) {
+	pb.additional.Store(s)
+}
+
 func (pb *ProgressBar) now() int64 {
 	return pb.current.Load()
 }
@@ -170,10 +178,7 @@ func (pb *ProgressBar) startCount() {
 	for {
 		select {
 		case <-ticker.C:
-			now := pb.now()
-			if now > pb.total {
-				now = pb.total
-			}
+			now := min(pb.now(), pb.total)
 			done := int(int64(pb.blockWidth) * now / pb.total)
 			percent := float64(now) * 100 / float64(pb.total)
 
@@ -193,25 +198,27 @@ func (pb *ProgressBar) startCount() {
 			var f format
 			if pb.unit == "bytes" {
 				f = format{
-					Done:    progressed,
-					Undone:  strings.Repeat(" ", pb.blockWidth-done),
-					Speed:   unit.ByteSize(pb.speed).String() + "/s",
-					Current: unit.ByteSize(now).String(),
-					Percent: fmt.Sprintf("%.2f%%", percent),
-					Total:   unit.ByteSize(pb.total).String(),
-					Elapsed: fmt.Sprintf("Elapsed: %s", time.Since(pb.start).Truncate(time.Second)),
-					Left:    fmt.Sprintf("Left: %s", left.Truncate(time.Second)),
+					Done:       progressed,
+					Undone:     strings.Repeat(" ", pb.blockWidth-done),
+					Speed:      unit.ByteSize(pb.speed).String() + "/s",
+					Current:    unit.ByteSize(now).String(),
+					Percent:    fmt.Sprintf("%.2f%%", percent),
+					Total:      unit.ByteSize(pb.total).String(),
+					Additional: pb.additional.Load().(string),
+					Elapsed:    fmt.Sprintf("Elapsed: %s", time.Since(pb.start).Truncate(time.Second)),
+					Left:       fmt.Sprintf("Left: %s", left.Truncate(time.Second)),
 				}
 			} else {
 				f = format{
-					Done:    progressed,
-					Undone:  strings.Repeat(" ", pb.blockWidth-done),
-					Speed:   fmt.Sprintf("%.2f/s", pb.speed),
-					Current: strconv.FormatInt(now, 10),
-					Percent: fmt.Sprintf("%.2f%%", percent),
-					Total:   strconv.FormatInt(pb.total, 10),
-					Elapsed: fmt.Sprintf("Elapsed: %s", time.Since(pb.start).Truncate(time.Second)),
-					Left:    fmt.Sprintf("Left: %s", left.Truncate(time.Second)),
+					Done:       progressed,
+					Undone:     strings.Repeat(" ", pb.blockWidth-done),
+					Speed:      fmt.Sprintf("%.2f/s", pb.speed),
+					Current:    strconv.FormatInt(now, 10),
+					Percent:    fmt.Sprintf("%.2f%%", percent),
+					Total:      strconv.FormatInt(pb.total, 10),
+					Additional: pb.additional.Load().(string),
+					Elapsed:    fmt.Sprintf("Elapsed: %s", time.Since(pb.start).Truncate(time.Second)),
+					Left:       fmt.Sprintf("Left: %s", left.Truncate(time.Second)),
 				}
 			}
 
@@ -255,6 +262,7 @@ func (pb *ProgressBar) Start() error {
 	}
 
 	pb.start = time.Now()
+	pb.additional.Store("")
 
 	go pb.startRefresh()
 	go pb.startCount()
