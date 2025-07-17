@@ -78,7 +78,7 @@ func TestTickerScheduler2(t *testing.T) {
 	}
 	s.mu.Unlock()
 
-	s.notify <- time.Now()
+	s.notify <- notify{time.Now(), 0}
 	time.Sleep(500 * time.Millisecond)
 
 	s.mu.Lock()
