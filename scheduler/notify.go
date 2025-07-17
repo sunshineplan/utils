@@ -6,9 +6,14 @@ import (
 )
 
 var (
-	subscriber = make(map[chan time.Time]struct{})
+	subscriber = make(map[chan notify]struct{})
 	mu         sync.Mutex
 )
+
+type notify struct {
+	t time.Time
+	d time.Duration
+}
 
 func init() {
 	go func() {
@@ -20,7 +25,7 @@ func init() {
 				if sub := t.Sub(last.Add(time.Second)); sub >= 10*time.Millisecond || sub <= -10*time.Millisecond {
 					mu.Lock()
 					for k := range subscriber {
-						k <- t
+						k <- notify{t, sub}
 					}
 					mu.Unlock()
 				}
@@ -30,13 +35,13 @@ func init() {
 	}()
 }
 
-func subscribeNotify(c chan time.Time) {
+func subscribeNotify(c chan notify) {
 	mu.Lock()
 	defer mu.Unlock()
 	subscriber[c] = struct{}{}
 }
 
-func unsubscribeNotify(c chan time.Time) {
+func unsubscribeNotify(c chan notify) {
 	mu.Lock()
 	defer mu.Unlock()
 	delete(subscriber, c)

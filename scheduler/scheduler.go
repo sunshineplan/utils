@@ -16,7 +16,7 @@ var (
 
 type Scheduler struct {
 	mu     sync.Mutex
-	notify chan time.Time
+	notify chan notify
 
 	timer  *time.Timer
 	ticker *time.Ticker
@@ -34,7 +34,7 @@ type Scheduler struct {
 }
 
 func NewScheduler() *Scheduler {
-	return &Scheduler{notify: make(chan time.Time, 1), tc: make(chan time.Time, 1)}
+	return &Scheduler{notify: make(chan notify, 1), tc: make(chan time.Time, 1)}
 }
 
 func (sched *Scheduler) WithDebug(logger *slog.Logger) *Scheduler {
@@ -140,7 +140,8 @@ func (sched *Scheduler) checkMatched(t time.Time) {
 		sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", sched.next)
 	} else if sched.next.Before(t) {
 		sched.debug("Scheduler Missed Next", "Name", sched.sched, "Next", sched.next)
-		sched.notify <- time.Now()
+		now := time.Now()
+		sched.notify <- notify{now, now.Sub(sched.next)}
 	}
 }
 
@@ -159,14 +160,14 @@ func (sched *Scheduler) newTimer(t time.Time) {
 				select {
 				case t := <-sched.ticker.C:
 					sched.checkMatched(t)
-				case t := <-sched.notify:
-					sched.debug("Time Change Detected", "Name", sched.sched)
+				case notify := <-sched.notify:
+					sched.debug("Time Change Detected", "Name", sched.sched, "Time", notify.t, "Duration", notify.d)
 					sched.ticker.Stop()
 					sched.mu.Lock()
 					defer sched.mu.Unlock()
-					sched.next = sched.sched.Next(t)
+					sched.next = sched.sched.Next(notify.t)
 					sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", sched.next)
-					sched.newTimer(t)
+					sched.newTimer(notify.t)
 					return
 				case <-sched.ctx.Done():
 					sched.ticker.Stop()
@@ -179,18 +180,18 @@ func (sched *Scheduler) newTimer(t time.Time) {
 	go func() {
 		for {
 			select {
-			case t := <-sched.notify:
-				sched.debug("Time Change Detected", "Name", sched.sched)
+			case notify := <-sched.notify:
+				sched.debug("Time Change Detected", "Name", sched.sched, "Time", notify.t, "Duration", notify.d)
 				sched.mu.Lock()
 				if sched.timer.Stop() {
-					sched.next = sched.sched.Next(t)
+					sched.next = sched.sched.Next(notify.t)
 					if sched.next.IsZero() {
 						cancel()
 						sched.Stop()
 						sched.debug("Scheduler No More Next", "Name", sched.sched)
 						return
 					}
-					sched.timer.Reset(sched.next.Sub(t))
+					sched.timer.Reset(sched.next.Sub(notify.t))
 					sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", sched.next)
 				}
 				sched.mu.Unlock()
