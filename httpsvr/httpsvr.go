@@ -146,7 +146,7 @@ func (s *Server) getCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error
 	if s.reload == 0 {
 		s.reload = defaultReload
 	}
-	certCache.Set("cert", cert, s.reload, s.loadCertificate)
+	certCache.Set(s.certFile+s.keyFile, cert, s.reload, s.loadCertificate)
 
 	return cert, nil
 }
