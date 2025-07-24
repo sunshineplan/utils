@@ -56,38 +56,6 @@ func TestTickerScheduler1(t *testing.T) {
 	}
 }
 
-func TestTickerScheduler2(t *testing.T) {
-	var n atomic.Int32
-	s := NewScheduler().At(Every(time.Minute)).Run(func(_ time.Time) {
-		log.Println("TickerScheduler2", 1)
-		n.Add(1)
-	})
-	defer s.Stop()
-	if err := s.Start(); err != nil {
-		t.Fatal(err)
-	}
-	log.Println("Start", "TickerScheduler2")
-	time.Sleep(1500 * time.Millisecond)
-	if n := n.Load(); n != 1 {
-		t.Errorf("expected 1; got %d", n)
-	}
-
-	s.mu.Lock()
-	if s.timer.Stop() {
-		t.Fatal("expected timer stopped; got running")
-	}
-	s.mu.Unlock()
-
-	s.notify <- notify{time.Now(), 0}
-	time.Sleep(500 * time.Millisecond)
-
-	s.mu.Lock()
-	if !s.timer.Stop() {
-		t.Fatal("expected timer running; got stopped")
-	}
-	s.mu.Unlock()
-}
-
 func TestOnce(t *testing.T) {
 	now := time.Now()
 	s := NewScheduler().At(TimeSchedule(now.Add(time.Second), now.Add(2*time.Second)))

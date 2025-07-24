@@ -27,11 +27,8 @@ func TestMultiSchedule(t *testing.T) {
 
 func TestConditionSchedule(t *testing.T) {
 	s := ConditionSchedule(Weekdays, MultiSchedule(AtClock(9, 30, 0), AtHour(15)))
-	if d := s.TickerDuration(); d != time.Second {
-		t.Fatalf("expected 1s: got %s", d)
-	}
 	if res := s.Next(time.Time{}).Format("15:04:05"); res != "09:30:00" {
-		t.Fatalf("expected 00:00:01: got %q", res)
+		t.Fatalf("expected 09:30:00: got %q", res)
 	}
 	for _, testcase := range []struct {
 		clock    *Clock

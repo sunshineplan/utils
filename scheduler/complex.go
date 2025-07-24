@@ -16,7 +16,6 @@ var (
 type complexSched interface {
 	IsMatched(time.Time) bool
 	Next(time.Time) time.Time
-	TickerDuration() time.Duration
 	String() string
 
 	init(t time.Time)
@@ -67,15 +66,6 @@ func (s multiSched) Next(t time.Time) (next time.Time) {
 		}
 	}
 	return
-}
-
-func (s multiSched) TickerDuration() time.Duration {
-	if l := len(s); l == 0 {
-		return 0
-	} else if l == 1 {
-		return s[0].TickerDuration()
-	}
-	return time.Second
 }
 
 func (s multiSched) String() string {
@@ -129,32 +119,15 @@ func (s condSched) Next(t time.Time) (next time.Time) {
 	} else if l == 1 {
 		return s[0].Next(t)
 	}
-	var start time.Time
-	var duration time.Duration
-	for _, s := range s {
-		if d := s.TickerDuration(); d > duration {
-			duration = d
-			start = s.Next(t)
-		} else if d == duration {
-			if next := s.Next(t); next.Before(start) {
-				start = next
-			}
-		}
+	if s.IsMatched(t) {
+		t = t.Add(time.Second)
 	}
-	for next = start; !s.IsMatched(next); next = next.Add(duration) {
+	for next = t.Truncate(time.Second); !s.IsMatched(next); next = next.Add(time.Second) {
 		if next.Sub(t) >= time.Hour*24*366 {
 			return time.Time{}
 		}
 	}
 	return
-}
-
-func (s condSched) TickerDuration() time.Duration {
-	var res time.Duration
-	for _, i := range s {
-		res = gcd(res, i.TickerDuration())
-	}
-	return res
 }
 
 func (s condSched) String() string {
