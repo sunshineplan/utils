@@ -26,6 +26,16 @@ var datetimeLayout = []string{
 	"2006-01-02 15:04:05",
 }
 
+func parseTime(value string, layout []string) (t time.Time, err error) {
+	for _, layout := range layout {
+		t, err = time.Parse(layout, value)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
 func ScheduleFromString(str ...string) Schedule {
 	var s multiSched
 	for _, str := range str {

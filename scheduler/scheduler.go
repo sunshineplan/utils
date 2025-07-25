@@ -17,11 +17,12 @@ var (
 type Scheduler struct {
 	mu sync.Mutex
 
-	tc chan time.Time
-	fn []func(time.Time)
+	tc chan Event
+	fn []func(Event)
+
+	ignoreMissed bool
 
 	sched complexSched
-	next  time.Time
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -30,11 +31,16 @@ type Scheduler struct {
 }
 
 func NewScheduler() *Scheduler {
-	return &Scheduler{tc: make(chan time.Time, 1)}
+	return &Scheduler{tc: make(chan Event, 1)}
 }
 
 func (sched *Scheduler) WithDebug(logger *slog.Logger) *Scheduler {
 	sched.debugLogger = logger
+	return sched
+}
+
+func (sched *Scheduler) SetIgnoreMissed(ignore bool) *Scheduler {
+	sched.ignoreMissed = ignore
 	return sched
 }
 
@@ -84,7 +90,7 @@ func (sched *Scheduler) Clear() {
 	}
 }
 
-func (sched *Scheduler) Run(fn ...func(time.Time)) *Scheduler {
+func (sched *Scheduler) Run(fn ...func(Event)) *Scheduler {
 	sched.mu.Lock()
 	defer sched.mu.Unlock()
 	for _, fn := range fn {
@@ -107,9 +113,9 @@ func (sched *Scheduler) init() error {
 		sched.ctx, sched.cancel = context.WithCancel(context.Background())
 		t := time.Now()
 		sched.sched.init(t)
-		sched.next = sched.sched.Next(t)
-		sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", sched.next)
-		subscribe(sched.next, sched.tc)
+		next := sched.sched.Next(t)
+		sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", next)
+		subscribe(next, sched.tc)
 		return nil
 	}
 	return ErrAlreadyRunning
@@ -122,20 +128,31 @@ func (sched *Scheduler) start(once bool) error {
 	go func() {
 		for {
 			select {
-			case t := <-sched.tc:
-				sched.mu.Lock()
-				for _, fn := range sched.fn {
-					go fn(t)
+			case e := <-sched.tc:
+				if e.Missed {
+					sched.debug("Scheduler Missed Run Time", "Name", sched.sched, "Time", e.Time, "Goal", e.Goal)
 				}
-				sched.mu.Unlock()
+				if once || !e.Missed || !sched.ignoreMissed {
+					sched.mu.Lock()
+					for _, fn := range sched.fn {
+						go fn(e)
+					}
+					sched.mu.Unlock()
+				}
 				if once {
 					unsubscribe(sched.tc)
 					return
 				}
-				sched.next = sched.sched.Next(t)
-				sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", sched.next)
-				subscribe(sched.next, sched.tc)
+				next := sched.sched.Next(e.Time)
+				if next.IsZero() {
+					sched.debug("Scheduler No More Next", "Name", sched.sched)
+					unsubscribe(sched.tc)
+					return
+				}
+				sched.debug("Scheduler Next Run Time", "Name", sched.sched, "Next", next)
+				subscribe(next, sched.tc)
 			case <-sched.ctx.Done():
+				unsubscribe(sched.tc)
 				return
 			}
 		}
@@ -155,7 +172,7 @@ func (sched *Scheduler) Once() <-chan error {
 	return c
 }
 
-func (sched *Scheduler) Do(fn func(time.Time)) error {
+func (sched *Scheduler) Do(fn func(Event)) error {
 	sched.Run(fn)
 	err := sched.Start()
 	if err == ErrAlreadyRunning {
@@ -166,7 +183,6 @@ func (sched *Scheduler) Do(fn func(time.Time)) error {
 
 func (sched *Scheduler) Stop() {
 	sched.cancel()
-	unsubscribe(sched.tc)
 }
 
 func (sched *Scheduler) immediately(t time.Time) <-chan struct{} {
@@ -176,9 +192,9 @@ func (sched *Scheduler) immediately(t time.Time) <-chan struct{} {
 	var wg sync.WaitGroup
 	wg.Add(len(sched.fn))
 	for _, fn := range sched.fn {
-		go func(f func(time.Time)) {
+		go func(f func(Event)) {
 			defer wg.Done()
-			f(t)
+			f(Event{Time: t, Goal: t})
 		}(fn)
 	}
 	done := make(chan struct{})

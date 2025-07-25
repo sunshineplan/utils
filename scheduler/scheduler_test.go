@@ -12,7 +12,7 @@ func TestScheduler(t *testing.T) {
 	s := NewScheduler().At(TimeSchedule(now.Add(2 * time.Second)))
 	defer s.Stop()
 	var n atomic.Int32
-	if err := s.Run(func(_ time.Time) {
+	if err := s.Run(func(_ Event) {
 		log.Println("Scheduler", 1)
 		n.Add(1)
 	}).Start(); err != nil {
@@ -32,14 +32,14 @@ func TestTickerScheduler1(t *testing.T) {
 	s := NewScheduler().At(Every(time.Second))
 	defer s.Stop()
 	var a, b atomic.Int32
-	if err := s.Do(func(_ time.Time) {
+	if err := s.Do(func(_ Event) {
 		log.Println("TickerScheduler1", "a", 1)
 		a.Add(1)
 	}); err != nil {
 		t.Fatal(err)
 	}
 	log.Println("Start", "TickerScheduler1", "a")
-	if err := s.Do(func(_ time.Time) {
+	if err := s.Do(func(_ Event) {
 		log.Println("TickerScheduler1", "b", 1)
 		b.Add(1)
 	}); err != nil {
@@ -61,7 +61,7 @@ func TestOnce(t *testing.T) {
 	s := NewScheduler().At(TimeSchedule(now.Add(time.Second), now.Add(2*time.Second)))
 	defer s.Stop()
 	var n atomic.Int32
-	done := s.Run(func(_ time.Time) {
+	done := s.Run(func(_ Event) {
 		log.Println("Once", 1)
 		n.Add(1)
 	}).Once()
