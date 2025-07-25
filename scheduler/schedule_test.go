@@ -109,3 +109,21 @@ func TestISOWeekScheduleNext(t *testing.T) {
 		}
 	}
 }
+
+func TestTickerScheduleNext(t *testing.T) {
+	for i, testcase := range []struct {
+		d     time.Duration
+		start string
+		t     string
+		next  string
+	}{
+		{time.Second, "2000/01/01 00:00:00", "2000/01/01 00:00:00", "2000/01/01 00:00:01"},
+		{time.Minute, "2000/01/01 00:00:00", "2000/01/01 00:00:00", "2000/01/01 00:01:00"},
+		{time.Minute, "2000/01/01 00:00:00", "2000/01/01 00:00:30", "2000/01/01 00:01:00"},
+	} {
+		s := &tickerSched{testcase.d, parse(testcase.start)}
+		if res := s.Next(parse(testcase.t)).Format(format); res != testcase.next {
+			t.Errorf("#%d expected %v; got %v", i, testcase.next, res)
+		}
+	}
+}
