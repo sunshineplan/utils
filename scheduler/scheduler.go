@@ -40,6 +40,8 @@ func (sched *Scheduler) WithDebug(logger *slog.Logger) *Scheduler {
 }
 
 func (sched *Scheduler) SetIgnoreMissed(ignore bool) *Scheduler {
+	sched.mu.Lock()
+	defer sched.mu.Unlock()
 	sched.ignoreMissed = ignore
 	return sched
 }
@@ -132,13 +134,13 @@ func (sched *Scheduler) start(once bool) error {
 				if e.Missed {
 					sched.debug("Scheduler Missed Run Time", "Name", sched.sched, "Time", e.Time, "Goal", e.Goal)
 				}
+				sched.mu.Lock()
 				if once || !e.Missed || !sched.ignoreMissed {
-					sched.mu.Lock()
 					for _, fn := range sched.fn {
 						go fn(e)
 					}
-					sched.mu.Unlock()
 				}
+				sched.mu.Unlock()
 				if once {
 					unsubscribe(sched.tc)
 					return
