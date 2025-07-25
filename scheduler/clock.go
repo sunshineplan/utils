@@ -143,6 +143,10 @@ func (c Clock) IsMatched(t time.Time) bool {
 }
 
 func (c Clock) Next(t time.Time) (next time.Time) {
+	t = t.Truncate(time.Second)
+	if c.IsMatched(t) {
+		t = t.Add(time.Second)
+	}
 	year, month, day := t.Date()
 	var hour, min, sec int
 	if c.sec {
@@ -160,7 +164,7 @@ func (c Clock) Next(t time.Time) (next time.Time) {
 	} else {
 		hour = t.Hour()
 	}
-	switch next = time.Date(year, month, day, hour, min, sec, 0, t.Location()); t.Truncate(time.Second).Compare(next) {
+	switch next = time.Date(year, month, day, hour, min, sec, 0, t.Location()); t.Compare(next) {
 	case 1:
 		if !c.sec {
 			next = next.Add(-time.Duration(sec) * time.Second)
@@ -187,18 +191,6 @@ func (c Clock) Next(t time.Time) (next time.Time) {
 		return
 	default:
 		return t
-	}
-}
-
-func (c Clock) TickerDuration() time.Duration {
-	if !c.sec {
-		return time.Second
-	} else if !c.min {
-		return time.Minute
-	} else if !c.hour {
-		return time.Hour
-	} else {
-		return 24 * time.Hour
 	}
 }
 
@@ -241,7 +233,7 @@ func (s clockSched) IsMatched(t time.Time) bool {
 
 func (s clockSched) Next(t time.Time) time.Time {
 	if s.IsMatched(t) {
-		return t
+		t = t.Add(time.Second)
 	}
 	start, end := s.start.Clock, s.end.Clock
 	for c := AtClock(t.Clock()); c.Compare(start) != -1 && c.Compare(end) != 1; c.Clock = c.Add(time.Second) {

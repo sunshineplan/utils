@@ -1,15 +1,9 @@
 package scheduler
 
-import (
-	"testing"
-	"time"
-)
+import "testing"
 
 func TestMultiSchedule(t *testing.T) {
 	s := MultiSchedule(AtHour(3), AtMinute(4), AtSecond(5))
-	if res := s.Next(time.Time{}).Format("15:04:05"); res != "00:00:05" {
-		t.Fatalf("expected 00:00:05: got %q", res)
-	}
 	for _, testcase := range []struct {
 		clock    *Clock
 		expected bool
@@ -25,14 +19,27 @@ func TestMultiSchedule(t *testing.T) {
 	}
 }
 
+func TestMultiScheduleNext(t *testing.T) {
+	s := MultiSchedule(AtHour(3), AtMinute(4), AtSecond(5))
+	for _, testcase := range []struct {
+		t    string
+		next string
+	}{
+		{"2000/01/01 00:00:00", "2000/01/01 00:00:05"},
+		{"2000/01/01 00:00:05", "2000/01/01 00:01:05"},
+		{"2000/01/01 00:03:05", "2000/01/01 00:04:00"},
+		{"2000/01/01 00:04:00", "2000/01/01 00:04:05"},
+		{"2000/01/01 02:59:05", "2000/01/01 03:00:00"},
+		{"2000/01/01 03:00:00", "2000/01/01 03:00:05"},
+	} {
+		if res := s.Next(parse(testcase.t)).Format(format); res != testcase.next {
+			t.Errorf("%s expected %v; got %v", testcase.t, testcase.next, res)
+		}
+	}
+}
+
 func TestConditionSchedule(t *testing.T) {
 	s := ConditionSchedule(Weekdays, MultiSchedule(AtClock(9, 30, 0), AtHour(15)))
-	if d := s.TickerDuration(); d != time.Second {
-		t.Fatalf("expected 1s: got %s", d)
-	}
-	if res := s.Next(time.Time{}).Format("15:04:05"); res != "09:30:00" {
-		t.Fatalf("expected 00:00:01: got %q", res)
-	}
 	for _, testcase := range []struct {
 		clock    *Clock
 		expected bool
@@ -44,6 +51,23 @@ func TestConditionSchedule(t *testing.T) {
 	} {
 		if res := s.IsMatched(testcase.clock.Time()); res != testcase.expected {
 			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.expected, res)
+		}
+	}
+}
+
+func TestConditionScheduleNext(t *testing.T) {
+	s := ConditionSchedule(Weekdays, MultiSchedule(AtClock(9, 30, 0), AtHour(15)))
+	for _, testcase := range []struct {
+		t    string
+		next string
+	}{
+		{"2000/01/01 00:00:00", "2000/01/03 09:30:00"},
+		{"2000/01/03 09:30:00", "2000/01/03 15:00:00"},
+		{"2000/01/03 15:00:00", "2000/01/04 09:30:00"},
+		{"2000/01/07 15:00:00", "2000/01/10 09:30:00"},
+	} {
+		if res := s.Next(parse(testcase.t)).Format(format); res != testcase.next {
+			t.Errorf("%s expected %v; got %v", testcase.t, testcase.next, res)
 		}
 	}
 }

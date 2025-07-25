@@ -12,7 +12,7 @@ func TestScheduler(t *testing.T) {
 	s := NewScheduler().At(TimeSchedule(now.Add(2 * time.Second)))
 	defer s.Stop()
 	var n atomic.Int32
-	if err := s.Run(func(_ time.Time) {
+	if err := s.Run(func(_ Event) {
 		log.Println("Scheduler", 1)
 		n.Add(1)
 	}).Start(); err != nil {
@@ -28,64 +28,59 @@ func TestScheduler(t *testing.T) {
 	}
 }
 
-func TestTickerScheduler1(t *testing.T) {
-	s := NewScheduler().At(Every(time.Second))
+func TestTickerScheduler(t *testing.T) {
+	s := NewScheduler().At(Every(2 * time.Second))
 	defer s.Stop()
 	var a, b atomic.Int32
-	if err := s.Do(func(_ time.Time) {
-		log.Println("TickerScheduler1", "a", 1)
+	if err := s.Do(func(_ Event) {
+		log.Println("TickerScheduler", "a", 1)
 		a.Add(1)
 	}); err != nil {
 		t.Fatal(err)
 	}
-	log.Println("Start", "TickerScheduler1", "a")
-	if err := s.Do(func(_ time.Time) {
-		log.Println("TickerScheduler1", "b", 1)
+	log.Println("Start", "TickerScheduler", "a")
+	if err := s.Do(func(_ Event) {
+		log.Println("TickerScheduler", "b", 1)
 		b.Add(1)
 	}); err != nil {
 		t.Fatal(err)
 	}
-	log.Println("Start", "TickerScheduler1", "b")
-	time.Sleep(1500 * time.Millisecond)
+	log.Println("Start", "TickerScheduler", "b")
+	time.Sleep(3 * time.Second)
 	if a, b := a.Load(), b.Load(); a != 1 || b != 1 {
 		t.Errorf("expected 1 1; got %d %d", a, b)
 	}
-	time.Sleep(1600 * time.Millisecond)
+	time.Sleep(4 * time.Second)
 	if a, b := a.Load(), b.Load(); a != 3 || b != 3 {
 		t.Errorf("expected 3 3; got %d %d", a, b)
 	}
 }
 
-func TestTickerScheduler2(t *testing.T) {
-	var n atomic.Int32
-	s := NewScheduler().At(Every(time.Minute)).Run(func(_ time.Time) {
-		log.Println("TickerScheduler2", 1)
-		n.Add(1)
-	})
+func TestIgnoreMissed(t *testing.T) {
+	s := NewScheduler().At(Every(time.Minute)).SetIgnoreMissed(true)
 	defer s.Stop()
-	if err := s.Start(); err != nil {
+	var n atomic.Int32
+	if err := s.Run(func(_ Event) {
+		log.Print("Event found")
+		n.Add(1)
+	}).Start(); err != nil {
 		t.Fatal(err)
 	}
-	log.Println("Start", "TickerScheduler2")
-	time.Sleep(1500 * time.Millisecond)
+	log.Print("ignore missed")
+	log.Print("send missed event")
+	s.tc <- Event{Time: time.Time{}, Goal: time.Time{}, Missed: true}
+	time.Sleep(time.Second)
+	if n := n.Load(); n != 0 {
+		t.Errorf("expected 0; got %d", n)
+	}
+	log.Print("unignore missed")
+	log.Print("send missed event")
+	s.SetIgnoreMissed(false)
+	s.tc <- Event{Time: time.Time{}, Goal: time.Time{}, Missed: true}
+	time.Sleep(time.Second)
 	if n := n.Load(); n != 1 {
 		t.Errorf("expected 1; got %d", n)
 	}
-
-	s.mu.Lock()
-	if s.timer.Stop() {
-		t.Fatal("expected timer stopped; got running")
-	}
-	s.mu.Unlock()
-
-	s.notify <- notify{time.Now(), 0}
-	time.Sleep(500 * time.Millisecond)
-
-	s.mu.Lock()
-	if !s.timer.Stop() {
-		t.Fatal("expected timer running; got stopped")
-	}
-	s.mu.Unlock()
 }
 
 func TestOnce(t *testing.T) {
@@ -93,7 +88,7 @@ func TestOnce(t *testing.T) {
 	s := NewScheduler().At(TimeSchedule(now.Add(time.Second), now.Add(2*time.Second)))
 	defer s.Stop()
 	var n atomic.Int32
-	done := s.Run(func(_ time.Time) {
+	done := s.Run(func(_ Event) {
 		log.Println("Once", 1)
 		n.Add(1)
 	}).Once()
@@ -106,7 +101,7 @@ func TestOnce(t *testing.T) {
 	case <-time.After(2500 * time.Millisecond):
 		t.Fatal("timeout")
 	}
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(3 * time.Second)
 	if n := n.Load(); n != 1 {
 		t.Errorf("expected 1; got %d", n)
 	}

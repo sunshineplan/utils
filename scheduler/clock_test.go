@@ -18,9 +18,6 @@ func TestClock(t *testing.T) {
 		t.Error("expected false: got true")
 	}
 	s = ScheduleFromString("7:00")
-	if res := s.TickerDuration(); res != 24*time.Hour {
-		t.Errorf("expected 24h; got %v", res)
-	}
 	if res := s.Next(AtClock(6, 0, 0).Time()).Format("15:04:05"); res != "07:00:00" {
 		t.Errorf("expected 07:00:00; got %q", res)
 	}
@@ -34,11 +31,11 @@ func TestClockNext1(t *testing.T) {
 		expected time.Duration
 	}{
 		{AtClock(0, 0, 0), "00:00:00", 11*time.Hour + 29*time.Minute + 30*time.Second},
-		{AtClock(-1, -1, -1), "12:30:30", 0},
-		{AtClock(-1, -1, 30), "12:30:30", 0},
-		{AtClock(-1, 30, -1), "12:30:30", 0},
-		{AtClock(12, -1, -1), "12:30:30", 0},
-		{AtClock(12, -1, 30), "12:30:30", 0},
+		{AtClock(-1, -1, -1), "12:30:31", time.Second},
+		{AtClock(-1, -1, 30), "12:31:30", time.Minute},
+		{AtClock(-1, 30, -1), "12:30:31", time.Second},
+		{AtClock(12, -1, -1), "12:30:31", time.Second},
+		{AtClock(12, -1, 30), "12:31:30", time.Minute},
 		{AtClock(-1, -1, 15), "12:31:15", 45 * time.Second},
 		{AtClock(-1, -1, 45), "12:30:45", 15 * time.Second},
 		{AtClock(-1, 15, -1), "13:15:00", 44*time.Minute + 30*time.Second},
@@ -65,7 +62,7 @@ func TestClockNext2(t *testing.T) {
 		s     string
 		d     time.Duration
 	}{
-		{AtClock(0, 0, -1), AtClock(0, 0, 59).Time(), "00:00:59", 0},
+		{AtClock(0, 0, -1), AtClock(0, 0, 59).Time(), "00:00:00", 23*time.Hour + 59*time.Minute + time.Second},
 		{AtClock(0, -1, 0), AtClock(0, 59, 59).Time(), "00:00:00", 23*time.Hour + time.Second},
 		{AtClock(-1, 0, 0), AtClock(23, 59, 0).Time(), "00:00:00", time.Minute},
 		{AtClock(0, -1, 0), AtClock(0, 0, 59).Time(), "00:01:00", time.Second},
@@ -81,24 +78,6 @@ func TestClockNext2(t *testing.T) {
 	}
 }
 
-func TestClockTickerDuration(t *testing.T) {
-	for _, testcase := range []struct {
-		clock    *Clock
-		expected time.Duration
-	}{
-		{AtClock(1, 0, 0), 24 * time.Hour},
-		{AtClock(-1, 2, 0), time.Hour},
-		{AtClock(0, -1, 3), time.Minute},
-		{AtClock(4, 0, -1), time.Second},
-		{AtClock(-1, 5, -1), time.Second},
-		{AtClock(-1, -1, -1), time.Second},
-	} {
-		if res := testcase.clock.TickerDuration(); res != testcase.expected {
-			t.Errorf("%s expected %v; got %v", testcase.clock, testcase.expected, res)
-		}
-	}
-}
-
 func TestClockSchedule(t *testing.T) {
 	s := ClockSchedule(AtHour(9).Minute(30), AtHour(15), 2*time.Minute)
 	for _, testcase := range []struct {
@@ -106,9 +85,9 @@ func TestClockSchedule(t *testing.T) {
 		time     string
 		expected bool
 	}{
-		{AtClock(9, 30, 0), "09:30:00", true},
-		{AtClock(15, 0, 0), "15:00:00", true},
-		{AtClock(13, 0, 0), "13:00:00", true},
+		{AtClock(9, 30, 0), "09:32:00", true},
+		{AtClock(15, 0, 0), "09:30:00", true},
+		{AtClock(13, 0, 0), "13:02:00", true},
 		{ClockFromString("9:29"), "09:30:00", false},
 		{ClockFromString("9:31"), "09:32:00", false},
 		{ClockFromString("16:00:00"), "09:30:00", false},

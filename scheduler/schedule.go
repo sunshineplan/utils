@@ -11,7 +11,6 @@ import (
 type Schedule interface {
 	IsMatched(time.Time) bool
 	Next(time.Time) time.Time
-	TickerDuration() time.Duration
 	String() string
 }
 
@@ -25,6 +24,16 @@ var datetimeLayout = []string{
 	"2006-01-02",
 	"2006-01-02 15:04",
 	"2006-01-02 15:04:05",
+}
+
+func parseTime(value string, layout []string) (t time.Time, err error) {
+	for _, layout := range layout {
+		t, err = time.Parse(layout, value)
+		if err == nil {
+			return
+		}
+	}
+	return
 }
 
 func ScheduleFromString(str ...string) Schedule {
@@ -78,7 +87,10 @@ func (s sched) IsMatched(t time.Time) bool {
 }
 
 func (s sched) Next(t time.Time) (next time.Time) {
-	year, month, day := t.Date()
+	t = t.Truncate(time.Second)
+	next = s.clock.Next(t)
+	t = t.Add(time.Second)
+	year, month, day := next.Date()
 	if s.year != 0 {
 		year = s.year
 	}
@@ -88,8 +100,8 @@ func (s sched) Next(t time.Time) (next time.Time) {
 	if s.day != 0 {
 		day = s.day
 	}
-	hour, min, sec := s.clock.Next(t).Clock()
-	switch next = time.Date(year, month, day, hour, min, sec, 0, t.Location()); t.Truncate(time.Second).Compare(next) {
+	hour, min, sec := next.Clock()
+	switch next = time.Date(year, month, day, hour, min, sec, 0, t.Location()); t.Compare(next) {
 	case 1:
 		if !s.clock.sec {
 			sec = 0
@@ -147,10 +159,6 @@ func (s sched) Next(t time.Time) (next time.Time) {
 		return time.Time{}
 	}
 	return
-}
-
-func (s sched) TickerDuration() time.Duration {
-	return s.clock.TickerDuration()
 }
 
 func (s sched) String() string {
@@ -216,12 +224,38 @@ func (s weekSched) IsMatched(t time.Time) bool {
 	return false
 }
 
+func newWeekdayTime(year int, week int, weekday time.Weekday, hour, min, sec int, loc *time.Location) time.Time {
+	t := time.Date(year, 1, 1, hour, min, sec, 0, loc)
+	if wd := t.Weekday(); wd != weekday {
+		days := int(weekday - wd)
+		if days < 0 {
+			days += 7
+		}
+		t = t.AddDate(0, 0, days)
+	}
+	y, w := t.ISOWeek()
+	if y != year {
+		t = t.AddDate(0, 0, 7)
+		w = 1
+	}
+	if week != w {
+		t = t.AddDate(0, 0, 7*(week-w))
+	}
+	if y, w := t.ISOWeek(); y != year || w != week {
+		return time.Time{}
+	}
+	return t
+}
+
 func (s weekSched) Next(t time.Time) (next time.Time) {
 	if s.week < 0 || s.week > 53 {
 		return time.Time{}
 	}
-	year, week := t.ISOWeek()
-	weekday := t.Weekday()
+	t = t.Truncate(time.Second)
+	next = s.clock.Next(t)
+	t = t.Add(time.Second)
+	year, week := next.ISOWeek()
+	weekday := next.Weekday()
 	if s.year != 0 {
 		year = s.year
 	}
@@ -231,30 +265,8 @@ func (s weekSched) Next(t time.Time) (next time.Time) {
 	if s.weekday != nil {
 		weekday = *s.weekday
 	}
-	hour, min, sec := s.clock.Next(t).Clock()
-	date := func(year int, week int, weekday time.Weekday, hour, min, sec int) time.Time {
-		t := time.Date(year, 1, 1, hour, min, sec, 0, t.Location())
-		if wd := t.Weekday(); wd != weekday {
-			days := int(weekday - wd)
-			if days < 0 {
-				days += 7
-			}
-			t = t.AddDate(0, 0, days)
-		}
-		y, w := t.ISOWeek()
-		if y != year {
-			t = t.AddDate(0, 0, 7)
-			w = 1
-		}
-		if week != w {
-			t = t.AddDate(0, 0, 7*(week-w))
-		}
-		if y, w := t.ISOWeek(); y != year || w != week {
-			return time.Time{}
-		}
-		return t
-	}
-	switch next = date(year, week, weekday, hour, min, sec); t.Truncate(time.Second).Compare(next) {
+	hour, min, sec := next.Clock()
+	switch next = newWeekdayTime(year, week, weekday, hour, min, sec, t.Location()); t.Compare(next) {
 	case 1:
 		if !s.clock.sec {
 			sec = 0
@@ -265,13 +277,13 @@ func (s weekSched) Next(t time.Time) (next time.Time) {
 		if !s.clock.hour {
 			hour = 0
 		}
-		next = date(year, week, weekday, hour, min, sec)
+		next = newWeekdayTime(year, week, weekday, hour, min, sec, t.Location())
 		if s.weekday == nil {
 			next = next.AddDate(0, 0, 1)
 			if y, w := next.ISOWeek(); (w != week && s.week != 0) ||
 				(y != year && s.year != 0) ||
 				t.After(next) {
-				next = date(year, week, time.Monday, hour, min, sec)
+				next = newWeekdayTime(year, week, time.Monday, hour, min, sec, t.Location())
 			} else {
 				break
 			}
@@ -279,7 +291,7 @@ func (s weekSched) Next(t time.Time) (next time.Time) {
 		if s.week == 0 {
 			next = next.AddDate(0, 0, 7)
 			if y, _ := next.ISOWeek(); y != year && s.year != 0 || t.After(next) {
-				next = date(year, 1, weekday, hour, min, sec)
+				next = newWeekdayTime(year, 1, weekday, hour, min, sec, t.Location())
 			} else {
 				break
 			}
@@ -312,7 +324,7 @@ func (s weekSched) Next(t time.Time) (next time.Time) {
 		if s.year == 0 {
 			year += 1
 		}
-		next = date(year, week, weekday, hour, min, sec)
+		next = newWeekdayTime(year, week, weekday, hour, min, sec, t.Location())
 	default:
 		return t
 	}
@@ -320,10 +332,6 @@ func (s weekSched) Next(t time.Time) (next time.Time) {
 		return time.Time{}
 	}
 	return
-}
-
-func (s weekSched) TickerDuration() time.Duration {
-	return s.clock.TickerDuration()
 }
 
 func (s weekSched) String() string {
@@ -363,7 +371,7 @@ func Every(d ...time.Duration) Schedule {
 }
 
 func (s *tickerSched) init(t time.Time) {
-	s.start = t.Truncate(time.Second).Add(time.Second)
+	s.start = t.Truncate(time.Second)
 }
 
 func (s tickerSched) IsMatched(t time.Time) bool {
@@ -374,14 +382,15 @@ func (s tickerSched) IsMatched(t time.Time) bool {
 }
 
 func (s tickerSched) Next(t time.Time) time.Time {
+	t = t.Truncate(time.Second)
 	if d := t.Sub(s.start); d > 0 {
-		return t.Add(d % s.d)
+		if d := d % s.d; d > 0 {
+			return t.Add(d)
+		} else {
+			return t.Add(s.d)
+		}
 	}
-	return s.start
-}
-
-func (s tickerSched) TickerDuration() time.Duration {
-	return s.d
+	return s.start.Add(s.d)
 }
 
 func (s tickerSched) String() string {
