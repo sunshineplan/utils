@@ -1,8 +1,10 @@
 package archive
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
-	"os"
+	"io"
 )
 
 // Format represents the archive format.
@@ -15,8 +17,30 @@ const (
 	TAR
 )
 
+type format struct {
+	format Format
+	magic  string
+}
+
+var formats = []format{
+	{ZIP, zipMagic},
+	{TAR, tarMagic},
+}
+
 // ErrFormat indicates that encountered an unknown format.
 var ErrFormat = errors.New("unknown format")
+
+type reader interface {
+	io.Reader
+	Peek(int) ([]byte, error)
+}
+
+func asReader(r io.Reader) reader {
+	if rr, ok := r.(reader); ok {
+		return rr
+	}
+	return bufio.NewReader(r)
+}
 
 func match(magic string, b []byte) bool {
 	if len(magic) != len(b) {
@@ -30,16 +54,19 @@ func match(magic string, b []byte) bool {
 	return true
 }
 
+func isArchive(r reader) (bool, Format) {
+	for _, f := range formats {
+		b, err := r.Peek(len(f.magic))
+		if err == nil && match(f.magic, b) {
+			return true, f.format
+		}
+	}
+	return false, -1
+}
+
 // IsArchive tests b is an archive file or not, if ok also return its format.
 func IsArchive(b []byte) (bool, Format) {
-	l := len(b)
-	if zip := len(zipMagic); l >= zip && match(zipMagic, b[:zip]) {
-		return true, ZIP
-	} else if tar := len(tarMagic); l >= tar && match(tarMagic, b[:tar]) {
-		return true, TAR
-	}
-
-	return false, -1
+	return isArchive(asReader(bytes.NewReader(b)))
 }
 
 // File struct contains bytes body and the provided name field.
@@ -47,17 +74,4 @@ type File struct {
 	Name  string
 	Body  []byte
 	IsDir bool
-}
-
-func readFiles(files ...string) (fs []File, err error) {
-	for _, f := range files {
-		var file File
-		file.Name = f
-		file.Body, err = os.ReadFile(f)
-		if err != nil {
-			return
-		}
-		fs = append(fs, file)
-	}
-	return
 }

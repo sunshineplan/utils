@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -9,17 +10,17 @@ import (
 
 // Unpack decompresses an archive to File struct.
 func Unpack(r io.Reader) ([]File, error) {
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	_, format := IsArchive(b)
+	rr := asReader(r)
+	_, format := isArchive(rr)
 	switch format {
 	case ZIP:
-		return unpackZip(b)
+		b, err := io.ReadAll(rr)
+		if err != nil {
+			return nil, err
+		}
+		return unpackZip(bytes.NewReader(b), int64(len(b)))
 	case TAR:
-		return unpackTar(b)
+		return unpackTar(rr)
 	default:
 		return nil, ErrFormat
 	}
