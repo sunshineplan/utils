@@ -9,24 +9,21 @@ import (
 	"github.com/sunshineplan/utils/container"
 )
 
-var valueKey int
-
 type item[T any] struct {
 	sync.Mutex
 	ctx       context.Context
 	cancel    context.CancelFunc
 	lifecycle time.Duration
+	value     T
 	fn        func() (T, error)
 }
 
-func (i *item[T]) set(value *T) {
-	if i.ctx = context.WithValue(context.Background(), &valueKey, value); i.lifecycle > 0 {
+func (i *item[T]) set(value T) {
+	i.ctx = context.Background()
+	if i.lifecycle > 0 {
 		i.ctx, i.cancel = context.WithTimeout(i.ctx, i.lifecycle)
 	}
-}
-
-func (i *item[T]) value() T {
-	return *i.ctx.Value(&valueKey).(*T)
+	i.value = value
 }
 
 func (i *item[T]) renew() T {
@@ -35,9 +32,9 @@ func (i *item[T]) renew() T {
 	defer i.Unlock()
 	if err != nil {
 		log.Print(err)
-		v = i.value()
+		v = i.value
 	}
-	i.set(&v)
+	i.set(v)
 	return v
 }
 
@@ -55,9 +52,7 @@ func NewWithRenew[Key comparable, Value any](autoRenew bool) *CacheWithRenew[Key
 // Set sets cache value for a key, if fn is presented, this value will regenerate when expired.
 func (c *CacheWithRenew[Key, Value]) Set(key Key, value Value, lifecycle time.Duration, fn func() (Value, error)) {
 	i := &item[Value]{lifecycle: lifecycle, fn: fn}
-	i.Lock()
-	defer i.Unlock()
-	i.set(&value)
+	i.set(value)
 	if c.autoRenew && lifecycle > 0 {
 		go func() {
 			for {
@@ -99,7 +94,7 @@ func (c *CacheWithRenew[Key, Value]) Get(key Key) (value Value, ok bool) {
 	}
 	i.Lock()
 	defer i.Unlock()
-	value = i.value()
+	value = i.value
 	return
 }
 
@@ -120,16 +115,16 @@ func (c *CacheWithRenew[Key, Value]) Swap(key Key, value Value) (previous Value,
 	if i, loaded = c.get(key); loaded {
 		i.Lock()
 		defer i.Unlock()
-		previous = i.value()
-		i.set(&value)
+		previous = i.value
+		i.set(value)
 	}
 	return
 }
 
 // Clear deletes all values in cache.
 func (c *CacheWithRenew[Key, Value]) Clear() {
-	c.m.Range(func(k Key, i *item[Value]) bool {
-		c.m.Delete(k)
+	c.m.Range(func(key Key, i *item[Value]) bool {
+		c.m.Delete(key)
 		i.Lock()
 		defer i.Unlock()
 		if i.cancel != nil {

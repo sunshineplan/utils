@@ -13,7 +13,7 @@ type Cache[Key any, Value any] struct {
 }
 
 // New creates a new cache with auto clean or not.
-func New[Key comparable, Value any]() *Cache[Key, Value] {
+func New[Key any, Value any]() *Cache[Key, Value] {
 	return &Cache[Key, Value]{}
 }
 
