@@ -10,10 +10,26 @@ import (
 
 // Unpack decompresses an archive to File struct.
 func Unpack(r io.Reader) ([]File, error) {
+	var ra io.ReaderAt
+	var size int64
+	if f, ok := r.(*os.File); ok {
+		stat, err := f.Stat()
+		if err != nil {
+			return nil, err
+		}
+		ra = f
+		size = stat.Size()
+	} else if r, ok := r.(*bytes.Reader); ok {
+		ra = r
+		size = r.Size()
+	}
 	rr := asReader(r)
 	_, format := isArchive(rr)
 	switch format {
 	case ZIP:
+		if ra != nil {
+			return unpackZip(ra, size)
+		}
 		b, err := io.ReadAll(rr)
 		if err != nil {
 			return nil, err
