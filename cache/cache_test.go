@@ -3,6 +3,7 @@ package cache
 import (
 	"runtime"
 	"testing"
+	"time"
 	"weak"
 )
 
@@ -34,6 +35,7 @@ func TestCache(t *testing.T) {
 		t.Fatalf("expected %q, got %q", value, v)
 	}
 	runtime.GC()
+	time.Sleep(time.Second)
 	if _, ok := cache.m.Load(p); ok {
 		t.Fatal("expected not cached, got cached")
 	}

@@ -35,8 +35,8 @@ func packTar(w io.Writer, files ...File) error {
 	return gw.Close()
 }
 
-func unpackTar(b []byte) ([]File, error) {
-	gr, err := gzip.NewReader(bytes.NewReader(b))
+func unpackTar(r io.Reader) ([]File, error) {
+	gr, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, err
 	}

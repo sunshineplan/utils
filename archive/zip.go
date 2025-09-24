@@ -25,14 +25,14 @@ func packZip(w io.Writer, files ...File) error {
 	return zw.Close()
 }
 
-func unpackZip(b []byte) ([]File, error) {
-	r, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
+func unpackZip(r io.ReaderAt, size int64) ([]File, error) {
+	zr, err := zip.NewReader(r, size)
 	if err != nil {
 		return nil, err
 	}
 
 	var fs []File
-	for _, f := range r.File {
+	for _, f := range zr.File {
 		switch {
 		case f.FileInfo().IsDir():
 			fs = append(fs, File{Name: f.Name, IsDir: true})

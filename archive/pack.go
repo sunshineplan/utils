@@ -1,8 +1,8 @@
 package archive
 
 import (
-	"errors"
 	"io"
+	"os"
 )
 
 // Pack creates an archive from File struct.
@@ -13,7 +13,7 @@ func Pack(w io.Writer, format Format, files ...File) error {
 	case TAR:
 		return packTar(w, files...)
 	default:
-		return errors.New("unknown format")
+		return ErrFormat
 	}
 }
 
@@ -24,4 +24,17 @@ func PackFromFiles(w io.Writer, format Format, files ...string) error {
 		return err
 	}
 	return Pack(w, format, fs...)
+}
+
+func readFiles(files ...string) (fs []File, err error) {
+	for _, f := range files {
+		var file File
+		file.Name = f
+		file.Body, err = os.ReadFile(f)
+		if err != nil {
+			return
+		}
+		fs = append(fs, file)
+	}
+	return
 }
