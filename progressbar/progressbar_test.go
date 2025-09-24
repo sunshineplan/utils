@@ -1,6 +1,7 @@
 package progressbar
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -15,7 +16,7 @@ func TestProgessBar(t *testing.T) {
 		}
 	}()
 
-	pb := New(15).SetRefresh(4 * time.Second)
+	pb := New(15).SetRefreshInterval(4 * time.Second)
 	pb.Start()
 	pb.Additional("refreshes in 4s")
 	for range pb.total {
@@ -24,7 +25,7 @@ func TestProgessBar(t *testing.T) {
 	}
 	pb.Done()
 
-	pb = New(10).SetRefresh(500 * time.Millisecond)
+	pb = New(10).SetRefreshInterval(500 * time.Millisecond)
 	pb.Start()
 	pb.Additional("refreshes in 500ms")
 	for range pb.total {
@@ -37,8 +38,45 @@ func TestProgessBar(t *testing.T) {
 	pb.Start()
 }
 
+func TestMessage(t *testing.T) {
+	pb := New(15)
+	pb.Start()
+	errCh := make(chan error, 1)
+	stopCh := make(chan struct{})
+	go func() {
+		i := 0
+		for {
+			select {
+			case <-stopCh:
+				return
+			default:
+				time.Sleep(500 * time.Millisecond)
+				if err := pb.Message(fmt.Sprintf("test messages (%d)", i)); err != nil {
+					errCh <- err
+					return
+				}
+			}
+			i++
+		}
+	}()
+	for range pb.total {
+		pb.Add(1)
+		time.Sleep(time.Second)
+	}
+	pb.Done()
+	close(stopCh)
+	select {
+	case err := <-errCh:
+		t.Fatal(err)
+	default:
+	}
+	if err := pb.Message("test messages"); err == nil {
+		t.Fatal("expected non-nil error; got nil error")
+	}
+}
+
 func TestCancel(t *testing.T) {
-	pb := New(15).SetRefresh(4 * time.Second)
+	pb := New(15).SetRefreshInterval(4 * time.Second)
 	pb.Start()
 	go func() {
 		time.Sleep(3 * time.Second)
