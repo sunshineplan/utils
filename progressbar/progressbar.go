@@ -27,7 +27,7 @@ var dots = []string{".  ", ".. ", "..."}
 
 // ProgressBar represents a customizable progress bar for tracking task progress.
 // It supports configurable templates, units, and refresh intervals.
-type ProgressBar struct {
+type ProgressBar[T int | int64] struct {
 	mu  sync.Mutex
 	buf strings.Builder
 
@@ -61,17 +61,12 @@ type format struct {
 
 // New creates a new ProgressBar with the specified total count and default options.
 // It panics if total is less than or equal to zero.
-func New(total int) *ProgressBar {
-	return New64(int64(total))
-}
-
-// New64 returns a new ProgressBar with default options.
-func New64(total int64) *ProgressBar {
+func New[T int | int64](total T) *ProgressBar[T] {
 	if total <= 0 {
 		panic(fmt.Sprintf("invalid total number: %d", total))
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &ProgressBar{
+	return &ProgressBar[T]{
 		ctx:             ctx,
 		cancel:          cancel,
 		msgChan:         make(chan string, 1),
@@ -85,7 +80,7 @@ func New64(total int64) *ProgressBar {
 
 // SetWidth sets the progress bar block width.
 // It panics if called after the progress bar has started or if blockWidth is less than or equal to zero.
-func (pb *ProgressBar) SetWidth(blockWidth int) *ProgressBar {
+func (pb *ProgressBar[T]) SetWidth(blockWidth int) *ProgressBar[T] {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 	if !pb.start.IsZero() {
@@ -100,7 +95,7 @@ func (pb *ProgressBar) SetWidth(blockWidth int) *ProgressBar {
 
 // SetRefreshInterval sets progress bar refresh interval time for check speed.
 // It panics if called after the progress bar has started or if interval is less than or equal to zero.
-func (pb *ProgressBar) SetRefreshInterval(interval time.Duration) *ProgressBar {
+func (pb *ProgressBar[T]) SetRefreshInterval(interval time.Duration) *ProgressBar[T] {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 	if !pb.start.IsZero() {
@@ -115,7 +110,7 @@ func (pb *ProgressBar) SetRefreshInterval(interval time.Duration) *ProgressBar {
 
 // SetRenderInterval sets the interval for updating the progress bar display.
 // It panics if called after the progress bar has started or if interval is less than or equal to zero.
-func (pb *ProgressBar) SetRenderInterval(interval time.Duration) *ProgressBar {
+func (pb *ProgressBar[T]) SetRenderInterval(interval time.Duration) *ProgressBar[T] {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 	if !pb.start.IsZero() {
@@ -129,7 +124,7 @@ func (pb *ProgressBar) SetRenderInterval(interval time.Duration) *ProgressBar {
 }
 
 // SetTemplate sets progress bar template.
-func (pb *ProgressBar) SetTemplate(tmplt string) error {
+func (pb *ProgressBar[T]) SetTemplate(tmplt string) error {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 	if !pb.start.IsZero() {
@@ -148,7 +143,7 @@ func (pb *ProgressBar) SetTemplate(tmplt string) error {
 
 // SetUnit sets progress bar unit.
 // It panics if called after the progress bar has started.
-func (pb *ProgressBar) SetUnit(unit string) *ProgressBar {
+func (pb *ProgressBar[T]) SetUnit(unit string) *ProgressBar[T] {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 	if !pb.start.IsZero() {
@@ -159,22 +154,22 @@ func (pb *ProgressBar) SetUnit(unit string) *ProgressBar {
 }
 
 // Add adds the specified amount to the progress bar.
-func (pb *ProgressBar) Add(n int64) {
-	pb.current.Add(n)
+func (pb *ProgressBar[T]) Add(n T) {
+	pb.current.Add(int64(n))
 }
 
 // Additional adds the specified string to the progress bar.
-func (pb *ProgressBar) Additional(s string) {
+func (pb *ProgressBar[T]) Additional(s string) {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 	pb.additional = s
 }
 
-func (pb *ProgressBar) now() int64 {
+func (pb *ProgressBar[T]) now() int64 {
 	return pb.current.Load()
 }
 
-func (pb *ProgressBar) print(s string, msg bool) {
+func (pb *ProgressBar[T]) print(s string, msg bool) {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 	pb.buf.Reset()
@@ -197,7 +192,7 @@ func (pb *ProgressBar) print(s string, msg bool) {
 	io.WriteString(os.Stdout, pb.buf.String())
 }
 
-func (pb *ProgressBar) startRefresh() {
+func (pb *ProgressBar[T]) startRefresh() {
 	start := pb.start
 	maxRefresh := pb.refreshInterval * maxRefreshMultiple
 	ticker := time.NewTicker(pb.refreshInterval)
@@ -228,7 +223,7 @@ func (pb *ProgressBar) startRefresh() {
 	}
 }
 
-func (pb *ProgressBar) startCount() {
+func (pb *ProgressBar[T]) startCount() {
 	interval := pb.renderInterval
 	if interval == 0 {
 		interval = time.Second
@@ -314,7 +309,7 @@ func (pb *ProgressBar) startCount() {
 }
 
 // Start starts the progress bar.
-func (pb *ProgressBar) Start() error {
+func (pb *ProgressBar[T]) Start() error {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 	if !pb.start.IsZero() {
@@ -327,7 +322,7 @@ func (pb *ProgressBar) Start() error {
 }
 
 // Message sets a message to be displayed on the progress bar.
-func (pb *ProgressBar) Message(msg string) error {
+func (pb *ProgressBar[T]) Message(msg string) error {
 	defer func() { recover() }()
 	select {
 	case <-pb.done:
@@ -341,23 +336,18 @@ func (pb *ProgressBar) Message(msg string) error {
 	return nil
 }
 
-// Done waits the progress bar finished. Same as [ProgressBar.Wait]().
-func (pb *ProgressBar) Done() {
-	pb.Wait()
-}
-
 // Wait blocks until the progress bar is finished.
-func (pb *ProgressBar) Wait() {
+func (pb *ProgressBar[T]) Wait() {
 	<-pb.done
 }
 
 // Cancel cancels the progress bar.
-func (pb *ProgressBar) Cancel() {
+func (pb *ProgressBar[T]) Cancel() {
 	pb.cancel()
 }
 
 // FromReader starts the progress bar from a reader.
-func (pb *ProgressBar) FromReader(r io.Reader, w io.Writer) (int64, error) {
+func (pb *ProgressBar[T]) FromReader(r io.Reader, w io.Writer) (int64, error) {
 	if err := pb.Start(); err != nil {
 		return 0, err
 	}
