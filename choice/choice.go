@@ -29,17 +29,13 @@ func Menu[E any](choices []E, showQuit bool) string {
 	if len(choices) == 0 {
 		return ""
 	}
-	var digit int
-	for n := len(choices); n != 0; digit++ {
-		n /= 10
-	}
-	option := fmt.Sprintf("%%%dd", digit)
+	digit := len(strconv.Itoa(len(choices)))
 	var b strings.Builder
 	for i, choice := range choices {
-		fmt.Fprintf(&b, "%s. %s\n", fmt.Sprintf(option, i+1), choiceStr(choice))
+		fmt.Fprintf(&b, "%*d. %s\n", digit, i+1, choiceStr(choice))
 	}
 	if showQuit {
-		fmt.Fprintf(&b, "%s. Quit\n", fmt.Sprintf(fmt.Sprintf("%%%ds", digit), "q"))
+		fmt.Fprintf(&b, "%*d. Quit\n", digit, 0)
 	}
 	return b.String()
 }
@@ -51,13 +47,8 @@ var _ error = choiceError("")
 
 type choiceError string
 
-func (err choiceError) Error() string {
-	return "bad choice: " + string(err)
-}
-
-func (choiceError) Unwrap() error {
-	return ErrBadChoice
-}
+func (err choiceError) Error() string { return "bad choice: " + string(err) }
+func (choiceError) Unwrap() error     { return ErrBadChoice }
 
 func choose[E any](choice string, choices []E) (res E, err error) {
 	n, err := strconv.Atoi(choice)
@@ -92,26 +83,31 @@ func ChooseWithDefault[E any](choices []E, def int) (choice bool, res E, err err
 	} else {
 		prompt = "Please choose: "
 	}
-	scanner := bufio.NewScanner(os.Stdin)
-	var b []byte
-	if def <= 0 {
-		for len(b) == 0 {
-			fmt.Print(prompt)
-			scanner.Scan()
-			b = bytes.TrimSpace(scanner.Bytes())
-		}
-	} else {
-		fmt.Print(prompt)
-		scanner.Scan()
-		b = bytes.TrimSpace(scanner.Bytes())
-		if len(b) == 0 {
-			return true, choices[def-1], nil
-		}
+	b, err := readLine(bufio.NewScanner(os.Stdin), prompt, def <= 0)
+	if err != nil {
+		return
 	}
-	if bytes.EqualFold(b, []byte("q")) {
+	if len(b) == 0 && def > 0 {
+		return true, choices[def-1], nil
+	}
+	if bytes.EqualFold(b, []byte("0")) || bytes.EqualFold(b, []byte("q")) {
 		return
 	}
 	choice = true
 	res, err = choose(string(b), choices)
 	return
+}
+
+func readLine(scanner *bufio.Scanner, prompt string, required bool) ([]byte, error) {
+	for {
+		fmt.Print(prompt)
+		if !scanner.Scan() {
+			return nil, scanner.Err()
+		}
+		b := bytes.TrimSpace(scanner.Bytes())
+		if required && len(b) == 0 {
+			continue
+		}
+		return b, nil
+	}
 }
