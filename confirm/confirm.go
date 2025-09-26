@@ -25,14 +25,17 @@ func do(prompt string, attempts int, w io.Writer, r io.Reader) bool {
 		fmt.Println("Error writing to output:", err)
 		return false
 	}
-	br := bufio.NewReader(r)
+	scanner := bufio.NewScanner(r)
 	for ; attempts > 0; attempts-- {
-		input, err := br.ReadString('\n')
-		if err != nil {
-			fmt.Fprintln(w, "Error reading input:", err)
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				fmt.Fprintln(w, "Error reading input:", err)
+			} else {
+				fmt.Fprintln(w, "No input received (EOF).")
+			}
 			continue
 		}
-		switch strings.ToLower(strings.TrimSpace(input)) {
+		switch strings.ToLower(strings.TrimSpace(scanner.Text())) {
 		case "y", "yes":
 			return true
 		case "n", "no":
