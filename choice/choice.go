@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -70,6 +71,10 @@ func Choose[E any](choices []E) (choice bool, res E, err error) {
 
 // ChooseWithDefault function allows the user to make a choice from the given options with an optional default value.
 func ChooseWithDefault[E any](choices []E, def int) (choice bool, res E, err error) {
+	return chooseWithDefault(os.Stdin, choices, def)
+}
+
+func chooseWithDefault[E any](r io.Reader, choices []E, def int) (choice bool, res E, err error) {
 	if n := len(choices); n == 0 {
 		err = errors.New("no choices")
 		return
@@ -83,7 +88,7 @@ func ChooseWithDefault[E any](choices []E, def int) (choice bool, res E, err err
 	} else {
 		prompt = "Please choose: "
 	}
-	b, err := readLine(bufio.NewScanner(os.Stdin), prompt, def <= 0)
+	b, err := readLine(bufio.NewScanner(r), prompt, def <= 0)
 	if err != nil {
 		return
 	}
