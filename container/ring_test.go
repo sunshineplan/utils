@@ -5,13 +5,12 @@
 package container
 
 import (
-	"container/ring"
 	"fmt"
 	"testing"
 )
 
 // For debugging - keep around.
-func dump(r *ring.Ring) {
+func dump[T any](r *Ring[T]) {
 	if r == nil {
 		fmt.Println("empty")
 		return
@@ -24,7 +23,7 @@ func dump(r *ring.Ring) {
 	fmt.Println()
 }
 
-func verify[T int](t *testing.T, r *Ring[T], N int, sum int) {
+func verify(t *testing.T, r *Ring[int], N int, sum int) {
 	// Len
 	n := r.Len()
 	if n != N {
@@ -34,11 +33,9 @@ func verify[T int](t *testing.T, r *Ring[T], N int, sum int) {
 	// iteration
 	n = 0
 	s := 0
-	r.Do(func(p *T) {
+	r.Do(func(p int) {
 		n++
-		if p != nil {
-			s += int(*p)
-		}
+		s += p
 	})
 	if n != N {
 		t.Errorf("number of forward iterations == %d; expected %d", n, N)
@@ -47,41 +44,41 @@ func verify[T int](t *testing.T, r *Ring[T], N int, sum int) {
 		t.Errorf("forward ring sum = %d; expected %d", s, sum)
 	}
 
-	if r == nil || r.r == nil {
+	if r == nil {
 		return
 	}
 
 	// connections
-	if r.Next().r != nil {
-		var p *ring.Ring // previous element
-		for q := r.r; p == nil || q != r.r; q = q.Next() {
+	if r.Next() != nil {
+		var p *Ring[int] // previous element
+		for q := r; p == nil || q != r; q = q.next {
 			if p != nil && p != q.Prev() {
 				t.Errorf("prev = %p, expected q.prev = %p\n", p, q.Prev())
 			}
 			p = q
 		}
-		if p != r.Prev().r {
+		if p != r.Prev() {
 			t.Errorf("prev = %p, expected r.prev = %p\n", p, r.Prev())
 		}
 	}
 
 	// Move
-	if r.Move(0).r != r.r {
+	if r.Move(0) != r {
 		t.Errorf("r.Move(0) != r")
 	}
-	if r.Move(N).r != r.r {
+	if r.Move(N) != r {
 		t.Errorf("r.Move(%d) != r", N)
 	}
-	if r.Move(-N).r != r.r {
+	if r.Move(-N) != r {
 		t.Errorf("r.Move(%d) != r", -N)
 	}
 	for i := 0; i < 10; i++ {
 		ni := N + i
 		mi := ni % N
-		if r.Move(ni).r != r.Move(mi).r {
+		if r.Move(ni) != r.Move(mi) {
 			t.Errorf("r.Move(%d) != r.Move(%d)", ni, mi)
 		}
-		if r.Move(-ni).r != r.Move(-mi).r {
+		if r.Move(-ni) != r.Move(-mi) {
 			t.Errorf("r.Move(%d) != r.Move(%d)", -ni, -mi)
 		}
 	}
@@ -89,8 +86,8 @@ func verify[T int](t *testing.T, r *Ring[T], N int, sum int) {
 
 func TestCornerCases(t *testing.T) {
 	var (
-		r0 = &Ring[int]{newMutex(), nil}
-		r1 = Ring[int]{newMutex(), new(ring.Ring)}
+		r0 *Ring[int]
+		r1 Ring[int]
 	)
 	// Basics
 	verify(t, r0, 0, 0)
@@ -132,16 +129,16 @@ func TestNew(t *testing.T) {
 
 func TestLink1(t *testing.T) {
 	r1a := makeN(1)
-	var r1b = Ring[int]{newMutex(), &ring.Ring{}}
+	var r1b Ring[int]
 	r2a := r1a.Link(&r1b)
 	verify(t, r2a, 2, 1)
-	if r2a.r != r1a.r {
+	if r2a != r1a {
 		t.Errorf("a) 2-element link failed")
 	}
 
 	r2b := r2a.Link(r2a.Next())
 	verify(t, r2b, 2, 1)
-	if r2b.r != r2a.Next().r {
+	if r2b != r2a.Next() {
 		t.Errorf("b) 2-element link failed")
 	}
 
@@ -151,7 +148,7 @@ func TestLink1(t *testing.T) {
 }
 
 func TestLink2(t *testing.T) {
-	var r0 = &Ring[int]{newMutex(), nil}
+	var r0 *Ring[int]
 	r1a := NewRing[int](1)
 	r1a.Set(42)
 	r1b := NewRing[int](1)
@@ -172,7 +169,7 @@ func TestLink2(t *testing.T) {
 }
 
 func TestLink3(t *testing.T) {
-	var r = Ring[int]{newMutex(), new(ring.Ring)}
+	var r Ring[int]
 	n := 1
 	for i := 1; i < 10; i++ {
 		n += i
@@ -216,7 +213,7 @@ func TestLinkUnlink(t *testing.T) {
 
 // Test that calling Move() on an empty Ring initializes it.
 func TestMoveEmptyRing(t *testing.T) {
-	var r = Ring[int]{newMutex(), &ring.Ring{}}
+	var r Ring[int]
 
 	r.Move(1)
 	verify(t, &r, 1, 0)

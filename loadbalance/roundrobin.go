@@ -1,54 +1,51 @@
 package loadbalance
 
-import "github.com/sunshineplan/utils/container"
+import (
+	"sync"
+
+	"github.com/sunshineplan/utils/container"
+)
 
 var _ LoadBalancer[any] = &roundrobin[any]{}
 
-type roundrobin[E any] container.Ring[*E]
+type roundrobin[E any] struct {
+	sync.RWMutex
+	ring *container.Ring[E]
+}
 
 func newRoundRobin[E any, Items []E | []Weighted[E]](items Items) *roundrobin[E] {
 	if len(items) == 0 {
 		panic(ErrEmptyLoadBalancer)
 	}
-	var root *roundrobin[E]
+	var ring *container.Ring[E]
 	switch items := any(items).(type) {
 	case []E:
+		ring = container.NewRing[E](len(items))
 		for _, i := range items {
-			r := container.NewRing[*E](1)
-			r.Set(&i)
-			if root == nil {
-				root = (*roundrobin[E])(r)
-			} else {
-				root.Ring().Link(r)
-				root = (*roundrobin[E])(root.Ring().Next())
-			}
-		}
-		if root != nil {
-			root = (*roundrobin[E])(root.Ring().Next())
+			ring.Set(i)
+			ring = ring.Next()
 		}
 	case []Weighted[E]:
 		for _, i := range items {
 			if i.Weight == 0 {
 				continue
 			}
-			item := &i.Item
-			r := container.NewRing[*E](i.Weight)
-			for range r.Len() {
-				r.Set(item)
-				r = r.Next()
+			subring := container.NewRing[E](i.Weight)
+			for range i.Weight {
+				subring.Set(i.Item)
+				subring = subring.Next()
 			}
-			if root == nil {
-				root = (*roundrobin[E])(r)
+			if ring == nil {
+				ring = subring
 			} else {
-				root.Ring().Link(r)
-				root = (*roundrobin[E])(root.Ring().Next())
+				ring = ring.Link(subring).Prev()
 			}
 		}
-		if root != nil {
-			root = (*roundrobin[E])(root.Ring().Next())
+		if ring != nil {
+			ring = ring.Next()
 		}
 	}
-	return root
+	return &roundrobin[E]{ring: ring}
 }
 
 func RoundRobin[E any](items ...E) LoadBalancer[E] {
@@ -60,31 +57,36 @@ func WeightedRoundRobin[E any](items ...Weighted[E]) LoadBalancer[E] {
 }
 
 func (r *roundrobin[E]) Len() int {
-	mu.RLock()
-	defer mu.RUnlock()
-	return r.Ring().Len()
+	r.RLock()
+	defer r.RUnlock()
+	return r.ring.Len()
 }
 
 func (r *roundrobin[E]) Next() (next E) {
-	mu.Lock()
-	defer mu.Unlock()
-	v := **r.Ring().Value()
-	*r = *(*roundrobin[E])(r.Ring().Next())
-	return v
+	r.Lock()
+	defer r.Unlock()
+	next = r.ring.Value()
+	r.ring = r.ring.Next()
+	return
 }
 
-func (r *roundrobin[E]) Ring() *container.Ring[*E] {
-	return (*container.Ring[*E])(r)
+func (r *roundrobin[E]) Ring() *container.Ring[E] {
+	r.RLock()
+	defer r.RUnlock()
+	return r.ring
 }
 
 func (r *roundrobin[E]) Link(s LoadBalancer[E]) LoadBalancer[E] {
-	mu.Lock()
-	defer mu.Unlock()
-	return (*roundrobin[E])(r.Ring().Link(s.Ring()))
+	sr := s.Ring()
+	r.Lock()
+	defer r.Unlock()
+	r.ring = r.ring.Prev().Link(sr)
+	return r
 }
 
 func (r *roundrobin[E]) Unlink(n int) LoadBalancer[E] {
-	mu.Lock()
-	defer mu.Unlock()
-	return (*roundrobin[E])(r.Ring().Unlink(n))
+	r.Lock()
+	defer r.Unlock()
+	r.ring = r.ring.Unlink(n)
+	return r
 }

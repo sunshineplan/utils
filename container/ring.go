@@ -1,57 +1,6 @@
 package container
 
-import (
-	"container/ring"
-	"sync"
-)
-
-var ringMutex sync.RWMutex
-
-type mutex ring.Ring
-
-func newMutex() *mutex {
-	r := ring.New(1)
-	r.Value = new(sync.RWMutex)
-	return (*mutex)(r)
-}
-
-func (mu *mutex) Lock() {
-	ringMutex.RLock()
-	defer ringMutex.RUnlock()
-	(*ring.Ring)(mu).Do(func(a any) {
-		a.(*sync.RWMutex).Lock()
-	})
-}
-
-func (mu *mutex) Unlock() {
-	ringMutex.RLock()
-	defer ringMutex.RUnlock()
-	(*ring.Ring)(mu).Do(func(a any) {
-		a.(*sync.RWMutex).Unlock()
-	})
-}
-
-func (mu *mutex) RLock() {
-	ringMutex.RLock()
-	defer ringMutex.RUnlock()
-	(*ring.Ring)(mu).Do(func(a any) {
-		a.(*sync.RWMutex).RLock()
-	})
-}
-
-func (mu *mutex) RUnlock() {
-	ringMutex.RLock()
-	defer ringMutex.RUnlock()
-	(*ring.Ring)(mu).Do(func(a any) {
-		a.(*sync.RWMutex).RUnlock()
-	})
-}
-
-func (mu *mutex) Link(s *mutex) *mutex {
-	ringMutex.Lock()
-	defer ringMutex.Unlock()
-	return (*mutex)((*ring.Ring)(mu).Link((*ring.Ring)(s)))
-}
+import "sync"
 
 // A Ring is an element of a circular list, or ring.
 // Rings do not have a beginning or end; a pointer to any ring element
@@ -59,30 +8,69 @@ func (mu *mutex) Link(s *mutex) *mutex {
 // as nil Ring pointers. The zero value for a Ring is a one-element
 // ring with a nil Value.
 type Ring[T any] struct {
-	mu *mutex
-	r  *ring.Ring
+	mu     sync.RWMutex
+	ringMu *sync.RWMutex
+
+	next, prev *Ring[T]
+	value      T // for use by client; untouched by this library
+}
+
+func (r *Ring[T]) init() *Ring[T] {
+	r.ringMu = new(sync.RWMutex)
+	r.next = r
+	r.prev = r
+	return r
 }
 
 // Next returns the next ring element. r must not be empty.
 func (r *Ring[T]) Next() *Ring[T] {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return &Ring[T]{r.mu, r.r.Next()}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.ringMu == nil {
+		return r.init()
+	}
+	r.ringMu.RLock()
+	defer r.ringMu.RUnlock()
+	return r.next
 }
 
 // Prev returns the previous ring element. r must not be empty.
 func (r *Ring[T]) Prev() *Ring[T] {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return &Ring[T]{r.mu, r.r.Prev()}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.ringMu == nil {
+		return r.init()
+	}
+	r.ringMu.RLock()
+	defer r.ringMu.RUnlock()
+	return r.prev
+}
+
+func (r *Ring[T]) move(n int) *Ring[T] {
+	switch {
+	case n < 0:
+		for ; n < 0; n++ {
+			r = r.prev
+		}
+	case n > 0:
+		for ; n > 0; n-- {
+			r = r.next
+		}
+	}
+	return r
 }
 
 // Move moves n % r.Len() elements backward (n < 0) or forward (n >= 0)
 // in the ring and returns that ring element. r must not be empty.
 func (r *Ring[T]) Move(n int) *Ring[T] {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return &Ring[T]{newMutex(), r.r.Move(n)}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.ringMu == nil {
+		return r.init()
+	}
+	r.ringMu.Lock()
+	defer r.ringMu.Unlock()
+	return r.move(n)
 }
 
 // NewRing creates a ring of n elements.
@@ -90,20 +78,61 @@ func NewRing[T any](n int) *Ring[T] {
 	if n <= 0 {
 		return nil
 	}
-	return &Ring[T]{newMutex(), ring.New(n)}
+	r := &Ring[T]{ringMu: new(sync.RWMutex)}
+	p := r
+	for i := 1; i < n; i++ {
+		p.next = &Ring[T]{ringMu: p.ringMu, prev: p}
+		p = p.next
+	}
+	p.next = r
+	r.prev = p
+	return r
 }
 
-func (r *Ring[T]) Set(v T) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.r.Value = &v
+func linkLock[T any](r, s *Ring[T]) (unlock func()) {
+	r.ringMu.Lock()
+	if s.ringMu == r.ringMu {
+		unlock = r.ringMu.Unlock
+	} else {
+		s.mu.Lock()
+		if s.ringMu == nil {
+			s.init()
+			unlock = func() {
+				s.mu.Unlock()
+				r.ringMu.Unlock()
+			}
+		} else {
+			s.ringMu.Lock()
+			unlock = func() {
+				s.ringMu.Unlock()
+				s.mu.Unlock()
+				r.ringMu.Unlock()
+			}
+		}
+	}
+	return
 }
 
-func (r *Ring[T]) Value() *T {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	v, _ := r.r.Value.(*T)
-	return v
+func (r *Ring[T]) link(s *Ring[T]) *Ring[T] {
+	n := r.next
+	p := s.prev
+	// Note: Cannot use multiple assignment because
+	// evaluation order of LHS is not specified.
+	r.next = s
+	s.prev = r
+	n.prev = p
+	p.next = n
+	if s.ringMu == r.ringMu {
+		n.ringMu = new(sync.RWMutex)
+		for p := n.next; p != n; p = p.next {
+			p.ringMu = n.ringMu
+		}
+	} else {
+		for p := s.next; p != s; p = p.next {
+			p.ringMu = r.ringMu
+		}
+	}
+	return n
 }
 
 // Link connects ring r with ring s such that r.Next()
@@ -122,52 +151,87 @@ func (r *Ring[T]) Value() *T {
 // after r. The result points to the element following the
 // last element of s after insertion.
 func (r *Ring[T]) Link(s *Ring[T]) *Ring[T] {
-	if s == nil {
-		return r.Next()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.ringMu == nil {
+		r.init()
 	}
-	m := r.mu.Link(s.mu)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return &Ring[T]{m, r.r.Link(s.r)}
+	n := r.next
+	if s == nil {
+		return n
+	}
+	unlock := linkLock(r, s)
+	defer unlock()
+	return r.link(s)
 }
 
 // Unlink removes n % r.Len() elements from the ring r, starting
 // at r.Next(). If n % r.Len() == 0, r remains unchanged.
 // The result is the removed subring. r must not be empty.
 func (r *Ring[T]) Unlink(n int) *Ring[T] {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	u := r.r.Unlink(n)
-	if u == nil {
+	if n <= 0 {
 		return nil
 	}
-	return &Ring[T]{newMutex(), u}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.ringMu == nil {
+		return r.init()
+	}
+	r.ringMu.Lock()
+	defer r.ringMu.Unlock()
+	return r.link(r.move(n + 1))
 }
 
 // Len computes the number of elements in ring r.
 // It executes in time proportional to the number of elements.
 func (r *Ring[T]) Len() int {
-	if r == nil {
-		return 0
+	n := 0
+	if r != nil {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		if r.ringMu == nil {
+			r.init()
+			return 1
+		}
+		r.ringMu.RLock()
+		defer r.ringMu.RUnlock()
+		n = 1
+		for p := r.next; p != r; p = p.next {
+			n++
+		}
 	}
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.r.Len()
+	return n
 }
 
 // Do calls function f on each element of the ring, in forward order.
 // The behavior of Do is undefined if f changes *r.
-func (r *Ring[T]) Do(f func(*T)) {
-	if r == nil {
-		return
+func (r *Ring[T]) Do(f func(T)) {
+	if r != nil {
+		r.mu.RLock()
+		if r.ringMu == nil {
+			r.mu.RUnlock()
+			return
+		}
+		r.ringMu.RLock()
+		defer r.ringMu.RUnlock()
+		f(r.value)
+		r.mu.RUnlock()
+		for p := r.next; p != r; p = p.next {
+			p.mu.RLock()
+			f(p.value)
+			p.mu.RUnlock()
+		}
 	}
+}
+
+func (r *Ring[T]) Set(v T) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.value = v
+}
+
+func (r *Ring[T]) Value() T {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	r.r.Do(func(a any) {
-		if v, ok := a.(*T); ok {
-			f(v)
-		} else {
-			f(nil)
-		}
-	})
+	return r.value
 }
