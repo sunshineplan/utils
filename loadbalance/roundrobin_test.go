@@ -6,7 +6,10 @@ import (
 )
 
 func TestRoundRobin(t *testing.T) {
-	r1 := newRoundRobin[string]([]string{"a", "b", "c"})
+	r1, err := newRoundRobin[string]([]string{"a", "b", "c"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if r1.Len() != 3 {
 		t.Fatalf("want 3, got %d", r1.Len())
 	}
@@ -19,7 +22,10 @@ func TestRoundRobin(t *testing.T) {
 	}
 	res = nil
 
-	r2 := newRoundRobin[string]([]Weighted[string]{{"a", 2}, {"b", 1}, {"c", 1}})
+	r2, err := newRoundRobin[string]([]Weighted[string]{{"a", 2}, {"b", 1}, {"c", 1}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if r2.Len() != 4 {
 		t.Fatalf("want 4, got %d", r2.Len())
 	}
