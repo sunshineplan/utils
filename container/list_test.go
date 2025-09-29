@@ -4,10 +4,7 @@
 
 package container
 
-import (
-	"container/list"
-	"testing"
-)
+import "testing"
 
 func checkListLen[T int](t *testing.T, l *List[T], len int) bool {
 	if n := l.Len(); n != len {
@@ -140,7 +137,7 @@ func TestInsertBeforeUnknownMark(t *testing.T) {
 	l.PushBack(1)
 	l.PushBack(2)
 	l.PushBack(3)
-	l.InsertBefore(1, &Element[int]{new(list.Element), nil})
+	l.InsertBefore(1, new(Element[int]))
 	checkList(t, &l, []int{1, 2, 3})
 }
 
@@ -150,7 +147,7 @@ func TestInsertAfterUnknownMark(t *testing.T) {
 	l.PushBack(1)
 	l.PushBack(2)
 	l.PushBack(3)
-	l.InsertAfter(1, &Element[int]{new(list.Element), nil})
+	l.InsertAfter(1, new(Element[int]))
 	checkList(t, &l, []int{1, 2, 3})
 }
 
