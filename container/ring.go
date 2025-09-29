@@ -5,17 +5,17 @@ import (
 	"unsafe"
 )
 
-// A Ring is an element of a circular list, or ring.
+// A Ring is an element of a thread-safe, generic circular list, or ring.
 // Rings do not have a beginning or end; a pointer to any ring element
 // serves as reference to the entire ring. Empty rings are represented
-// as nil Ring pointers. The zero value for a Ring is a one-element
-// ring with a nil Value.
+// as nil Ring pointers. The zero value for a Ring[T] is a one-element
+// ring with a zero Value of type T.
 type Ring[T any] struct {
 	mu     sync.RWMutex
 	ringMu *sync.RWMutex
 
 	next, prev *Ring[T]
-	value      T // for use by client; untouched by this library
+	value      T
 }
 
 func (r *Ring[T]) init() *Ring[T] {
@@ -269,15 +269,18 @@ func (r *Ring[T]) Do(f func(T)) {
 	}
 }
 
-func (r *Ring[T]) Set(v T) {
+// Set assigns value v to the ring element and returns it.
+func (r *Ring[T]) Set(v T) *Ring[T] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.ringMu == nil {
 		r.init()
 	}
 	r.value = v
+	return r
 }
 
+// Value returns the value of the ring element.
 func (r *Ring[T]) Value() T {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
