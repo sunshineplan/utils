@@ -17,8 +17,8 @@ func WeightedRandom[E any](items ...Weighted[E]) LoadBalancer[E] {
 }
 
 func (r *random[E]) Next() E {
-	r.RLock()
-	defer r.RUnlock()
-	r.roundrobin.ring = r.ring.Move(rand.IntN(r.Len()))
-	return r.Ring().Value()
+	r.Lock()
+	defer r.Unlock()
+	r.ring = r.ring.Move(rand.IntN(r.len))
+	return r.ring.Value()
 }

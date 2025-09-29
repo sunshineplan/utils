@@ -11,8 +11,7 @@ var ErrEmptyLoadBalancer = errors.New("empty load balancer")
 type LoadBalancer[E any] interface {
 	Len() int
 	Next() E
-	Ring() *container.Ring[E]
-	Link(LoadBalancer[E]) LoadBalancer[E]
+	Link(*container.Ring[E]) LoadBalancer[E]
 	Unlink(int) LoadBalancer[E]
 }
 
