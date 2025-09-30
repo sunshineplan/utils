@@ -1,12 +1,15 @@
 package container
 
 import (
+	"cmp"
 	"sync"
 	"unsafe"
 )
 
-// Element is an element of a linked list.
+// Element is a thread-safe element of a linked list.
 type Element[T any] struct {
+	mu sync.RWMutex
+
 	// Next and previous pointers in the doubly-linked list of elements.
 	// To simplify the implementation, internally a list l is implemented
 	// as a ring, such that &l.root is both the next element of the last
@@ -23,20 +26,16 @@ type Element[T any] struct {
 
 // Set assigns value v to the element and returns it.
 func (e *Element[T]) Set(v T) *Element[T] {
-	if e.list != nil {
-		e.list.mu.RLock()
-		defer e.list.mu.RUnlock()
-	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.value = v
 	return e
 }
 
 // Value returns the value stored with this element.
 func (e *Element[T]) Value() T {
-	if e.list != nil {
-		e.list.mu.RLock()
-		defer e.list.mu.RUnlock()
-	}
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.value
 }
 
@@ -49,11 +48,12 @@ func (e *Element[T]) nextElement() *Element[T] {
 
 // Next returns the next list element or nil.
 func (e *Element[T]) Next() *Element[T] {
-	if e.list == nil {
-		return nil
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.list != nil {
+		e.list.mu.RLock()
+		defer e.list.mu.RUnlock()
 	}
-	e.list.mu.RLock()
-	defer e.list.mu.RUnlock()
 	return e.nextElement()
 }
 
@@ -66,15 +66,16 @@ func (e *Element[T]) prevElement() *Element[T] {
 
 // Prev returns the previous list element or nil.
 func (e *Element[T]) Prev() *Element[T] {
-	if e.list == nil {
-		return nil
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.list != nil {
+		e.list.mu.RLock()
+		defer e.list.mu.RUnlock()
 	}
-	e.list.mu.RLock()
-	defer e.list.mu.RUnlock()
 	return e.prevElement()
 }
 
-// List represents a doubly linked list like [list.List].
+// List represents a thread-safe doubly linked list.
 // The zero value for List is an empty list ready to use.
 type List[T any] struct {
 	mu   sync.RWMutex
@@ -186,9 +187,11 @@ func (l *List[T]) move(e, at *Element[T]) {
 // It returns the element value e.Value.
 // The element must not be nil.
 func (l *List[T]) Remove(e *Element[T]) T {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	if e.list == l {
+		l.mu.Lock()
+		defer l.mu.Unlock()
 		// if e.list == l, l must have been initialized when e was inserted
 		// in l or l == nil (e is a zero Element) and l.remove will crash
 		l.remove(e)
@@ -216,6 +219,8 @@ func (l *List[T]) PushBack(v T) *Element[T] {
 // If mark is not an element of l, the list is not modified.
 // The mark must not be nil.
 func (l *List[T]) InsertBefore(v T, mark *Element[T]) *Element[T] {
+	mark.mu.RLock()
+	defer mark.mu.RUnlock()
 	if mark.list != l {
 		return nil
 	}
@@ -229,6 +234,8 @@ func (l *List[T]) InsertBefore(v T, mark *Element[T]) *Element[T] {
 // If mark is not an element of l, the list is not modified.
 // The mark must not be nil.
 func (l *List[T]) InsertAfter(v T, mark *Element[T]) *Element[T] {
+	mark.mu.RLock()
+	defer mark.mu.RUnlock()
 	if mark.list != l {
 		return nil
 	}
@@ -242,6 +249,8 @@ func (l *List[T]) InsertAfter(v T, mark *Element[T]) *Element[T] {
 // If e is not an element of l, the list is not modified.
 // The element must not be nil.
 func (l *List[T]) MoveToFront(e *Element[T]) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	if e.list != l {
 		return
 	}
@@ -258,6 +267,8 @@ func (l *List[T]) MoveToFront(e *Element[T]) {
 // If e is not an element of l, the list is not modified.
 // The element must not be nil.
 func (l *List[T]) MoveToBack(e *Element[T]) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	if e.list != l {
 		return
 	}
@@ -274,7 +285,12 @@ func (l *List[T]) MoveToBack(e *Element[T]) {
 // If e or mark is not an element of l, or e == mark, the list is not modified.
 // The element and mark must not be nil.
 func (l *List[T]) MoveBefore(e, mark *Element[T]) {
-	if e.list != l || e == mark || mark.list != l {
+	if e == mark {
+		return
+	}
+	unlock := lock(&e.mu, &mark.mu, true, true)
+	defer unlock()
+	if e.list != l || mark.list != l {
 		return
 	}
 	l.mu.Lock()
@@ -286,7 +302,12 @@ func (l *List[T]) MoveBefore(e, mark *Element[T]) {
 // If e or mark is not an element of l, or e == mark, the list is not modified.
 // The element and mark must not be nil.
 func (l *List[T]) MoveAfter(e, mark *Element[T]) {
-	if e.list != l || e == mark || mark.list != l {
+	if e == mark {
+		return
+	}
+	unlock := lock(&e.mu, &mark.mu, true, true)
+	defer unlock()
+	if e.list != l || mark.list != l {
 		return
 	}
 	l.mu.Lock()
@@ -297,7 +318,7 @@ func (l *List[T]) MoveAfter(e, mark *Element[T]) {
 // PushBackList inserts a copy of another list at the back of list l.
 // The lists l and other may be the same. They must not be nil.
 func (l *List[T]) PushBackList(other *List[T]) {
-	unlock := pushLock(l, other)
+	unlock := lock(&l.mu, &other.mu, false, true)
 	defer unlock()
 	l.lazyInit()
 	for i, e := other.len, other.front(); i > 0; i, e = i-1, e.nextElement() {
@@ -308,7 +329,7 @@ func (l *List[T]) PushBackList(other *List[T]) {
 // PushFrontList inserts a copy of another list at the front of list l.
 // The lists l and other may be the same. They must not be nil.
 func (l *List[T]) PushFrontList(other *List[T]) {
-	unlock := pushLock(l, other)
+	unlock := lock(&l.mu, &other.mu, false, true)
 	defer unlock()
 	l.lazyInit()
 	for i, e := other.len, other.back(); i > 0; i, e = i-1, e.prevElement() {
@@ -316,23 +337,37 @@ func (l *List[T]) PushFrontList(other *List[T]) {
 	}
 }
 
-func pushLock[T any](l, other *List[T]) (unlock func()) {
-	if l == other {
-		l.mu.Lock()
-		unlock = l.mu.Unlock
-	} else if uintptr(unsafe.Pointer(l)) < uintptr(unsafe.Pointer(other)) {
-		l.mu.Lock()
-		other.mu.RLock()
-		unlock = func() {
-			other.mu.RUnlock()
-			l.mu.Unlock()
+func lock(s, r *sync.RWMutex, sReadOnly, rReadOnly bool) (unlock func()) {
+	var sl sync.Locker = s
+	var rl sync.Locker = r
+	if sReadOnly {
+		sl = s.RLocker()
+	}
+	if rReadOnly {
+		rl = r.RLocker()
+	}
+	switch cmp.Compare(uintptr(unsafe.Pointer(s)), uintptr(unsafe.Pointer(r))) {
+	case 0:
+		if sReadOnly && rReadOnly {
+			s.RLock()
+			unlock = s.RUnlock
+		} else {
+			s.Lock()
+			unlock = s.Unlock
 		}
-	} else {
-		other.mu.RLock()
-		l.mu.Lock()
+	case 1:
+		sl.Lock()
+		rl.Lock()
 		unlock = func() {
-			l.mu.Unlock()
-			other.mu.RUnlock()
+			rl.Unlock()
+			sl.Unlock()
+		}
+	case -1:
+		rl.Lock()
+		sl.Lock()
+		unlock = func() {
+			sl.Unlock()
+			rl.Unlock()
 		}
 	}
 	return
