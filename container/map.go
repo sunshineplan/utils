@@ -2,11 +2,14 @@ package container
 
 import "sync"
 
-type Map[Key, Value any] struct {
+// Map is a generic concurrency-safe map that wraps sync.Map
+// and provides type-safe access for keys and values.
+type Map[Key comparable, Value any] struct {
 	m sync.Map
 }
 
-func NewMap[Key, Value any]() *Map[Key, Value] {
+// NewMap creates and returns a new, empty generic concurrency-safe Map.
+func NewMap[Key comparable, Value any]() *Map[Key, Value] {
 	return &Map[Key, Value]{}
 }
 
@@ -15,8 +18,8 @@ func NewMap[Key, Value any]() *Map[Key, Value] {
 // The ok result indicates whether value was found in the map.
 func (m *Map[Key, Value]) Load(key Key) (value Value, ok bool) {
 	var v any
-	if v, ok = m.m.Load(key); ok && v != nil {
-		value = v.(Value)
+	if v, ok = m.m.Load(key); ok {
+		value, _ = v.(Value)
 	}
 	return
 }
@@ -37,9 +40,7 @@ func (m *Map[Key, Value]) Clear() {
 func (m *Map[Key, Value]) LoadOrStore(key Key, value Value) (actual Value, loaded bool) {
 	var v any
 	if v, loaded = m.m.LoadOrStore(key, value); loaded {
-		if v != nil {
-			actual = v.(Value)
-		}
+		actual, _ = v.(Value)
 	} else {
 		actual = value
 	}
@@ -50,8 +51,8 @@ func (m *Map[Key, Value]) LoadOrStore(key Key, value Value) (actual Value, loade
 // The loaded result reports whether the key was present.
 func (m *Map[Key, Value]) LoadAndDelete(key Key) (value Value, loaded bool) {
 	var v any
-	if v, loaded = m.m.LoadAndDelete(key); loaded && v != nil {
-		value = v.(Value)
+	if v, loaded = m.m.LoadAndDelete(key); loaded {
+		value, _ = v.(Value)
 	}
 	return
 }
@@ -65,8 +66,8 @@ func (m *Map[Key, Value]) Delete(key Key) {
 // The loaded result reports whether the key was present.
 func (m *Map[Key, Value]) Swap(key Key, value Value) (previous Value, loaded bool) {
 	var v any
-	if v, loaded = m.m.Swap(key, value); loaded && v != nil {
-		previous = v.(Value)
+	if v, loaded = m.m.Swap(key, value); loaded {
+		previous, _ = v.(Value)
 	}
 	return
 }
@@ -100,14 +101,11 @@ func (m *Map[Key, Value]) CompareAndDelete(key Key, old Value) (deleted bool) {
 // false after a constant number of calls.
 func (m *Map[Key, Value]) Range(f func(Key, Value) bool) {
 	m.m.Range(func(key, value any) bool {
-		var k Key
-		var v Value
-		if key != nil {
-			k = key.(Key)
+		if k, ok := key.(Key); ok {
+			if v, ok := value.(Value); ok {
+				return f(k, v)
+			}
 		}
-		if value != nil {
-			v = value.(Value)
-		}
-		return f(k, v)
+		return true
 	})
 }
