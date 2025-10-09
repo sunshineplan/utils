@@ -112,7 +112,7 @@ func TestMap_ConcurrentAccess(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	// Concurrent store
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -124,7 +124,7 @@ func TestMap_ConcurrentAccess(t *testing.T) {
 
 	// Concurrent load
 	wg = sync.WaitGroup{}
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
