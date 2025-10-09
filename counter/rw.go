@@ -2,20 +2,20 @@ package counter
 
 import "io"
 
-type reader struct {
+type readerCounter struct {
 	*Counter
 	r io.Reader
 }
 
-func newReader(n *Counter, r io.Reader) io.Reader {
-	reader := &reader{n, r}
+func newReaderCounter(n *Counter, r io.Reader) io.Reader {
+	reader := &readerCounter{n, r}
 	if _, ok := r.(io.WriterTo); ok {
-		return readerWriterTo{reader}
+		return writerTo{reader}
 	}
 	return reader
 }
 
-func (r *reader) Read(p []byte) (n int, err error) {
+func (r *readerCounter) Read(p []byte) (n int, err error) {
 	n, err = r.r.Read(p)
 	if n > 0 {
 		r.Add(int64(n))
@@ -23,32 +23,32 @@ func (r *reader) Read(p []byte) (n int, err error) {
 	return
 }
 
-type readerWriterTo struct {
-	*reader
+type writerTo struct {
+	*readerCounter
 }
 
-func (r *readerWriterTo) WriteTo(w io.Writer) (n int64, err error) {
-	n, err = r.r.(io.WriterTo).WriteTo(w)
+func (r *writerTo) WriteTo(w io.Writer) (n int64, err error) {
+	n, err = io.Copy(w, r.r)
 	if n > 0 {
 		r.Add(n)
 	}
 	return
 }
 
-type writer struct {
+type writerCounter struct {
 	*Counter
 	w io.Writer
 }
 
-func newWriter(n *Counter, w io.Writer) io.Writer {
-	writer := &writer{n, w}
+func newWriterCounter(n *Counter, w io.Writer) io.Writer {
+	writer := &writerCounter{n, w}
 	if _, ok := w.(io.ReaderFrom); ok {
-		return writerReaderFrom{writer}
+		return readerFrom{writer}
 	}
 	return writer
 }
 
-func (w *writer) Write(p []byte) (n int, err error) {
+func (w *writerCounter) Write(p []byte) (n int, err error) {
 	n, err = w.w.Write(p)
 	if n > 0 {
 		w.Add(int64(n))
@@ -56,12 +56,12 @@ func (w *writer) Write(p []byte) (n int, err error) {
 	return
 }
 
-type writerReaderFrom struct {
-	*writer
+type readerFrom struct {
+	*writerCounter
 }
 
-func (w *writerReaderFrom) ReadFrom(r io.Reader) (n int64, err error) {
-	n, err = w.w.(io.ReaderFrom).ReadFrom(r)
+func (w *readerFrom) ReadFrom(r io.Reader) (n int64, err error) {
+	n, err = io.Copy(w.w, r)
 	if n > 0 {
 		w.Add(n)
 	}

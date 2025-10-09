@@ -19,11 +19,11 @@ func (c *Counter) Load() int64 {
 }
 
 func (c *Counter) AddWriter(w io.Writer) io.Writer {
-	return newWriter(c, w)
+	return newWriterCounter(c, w)
 }
 
 func (c *Counter) AddReader(r io.Reader) io.Reader {
-	return newReader(c, r)
+	return newReaderCounter(c, r)
 }
 
 type RateCounter struct {
