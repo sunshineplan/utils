@@ -1,8 +1,6 @@
 package counter
 
-import (
-	"io"
-)
+import "io"
 
 type reader struct {
 	*Counter
@@ -19,10 +17,9 @@ func newReader(n *Counter, r io.Reader) io.Reader {
 
 func (r *reader) Read(p []byte) (n int, err error) {
 	n, err = r.r.Read(p)
-	if err != nil {
-		return
+	if n > 0 {
+		r.Add(int64(n))
 	}
-	r.Add(int64(n))
 	return
 }
 
@@ -32,10 +29,9 @@ type readerWriterTo struct {
 
 func (r *readerWriterTo) WriteTo(w io.Writer) (n int64, err error) {
 	n, err = r.r.(io.WriterTo).WriteTo(w)
-	if err != nil {
-		return
+	if n > 0 {
+		r.Add(n)
 	}
-	r.Add(int64(n))
 	return
 }
 
@@ -54,10 +50,9 @@ func newWriter(n *Counter, w io.Writer) io.Writer {
 
 func (w *writer) Write(p []byte) (n int, err error) {
 	n, err = w.w.Write(p)
-	if err != nil {
-		return
+	if n > 0 {
+		w.Add(int64(n))
 	}
-	w.Add(int64(n))
 	return
 }
 
@@ -67,9 +62,8 @@ type writerReaderFrom struct {
 
 func (w *writerReaderFrom) ReadFrom(r io.Reader) (n int64, err error) {
 	n, err = w.w.(io.ReaderFrom).ReadFrom(r)
-	if err != nil {
-		return
+	if n > 0 {
+		w.Add(n)
 	}
-	w.Add(int64(n))
 	return
 }

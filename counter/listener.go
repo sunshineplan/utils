@@ -1,6 +1,9 @@
 package counter
 
-import "net"
+import (
+	"io"
+	"net"
+)
 
 var (
 	_ net.Listener = &Listener{}
@@ -22,7 +25,11 @@ func (l *Listener) Accept() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &conn{c, l}, nil
+	return &conn{
+		Conn: c,
+		r:    l.read.AddReader(c),
+		w:    l.written.AddWriter(c),
+	}, nil
 }
 
 func (l *Listener) Close() error {
@@ -43,13 +50,9 @@ func (l *Listener) WriteCount() int64 {
 
 type conn struct {
 	net.Conn
-	listener *Listener
+	r io.Reader
+	w io.Writer
 }
 
-func (conn *conn) Write(b []byte) (n int, err error) {
-	return conn.listener.written.AddWriter(conn.Conn).Write(b)
-}
-
-func (conn *conn) Read(b []byte) (n int, err error) {
-	return conn.listener.read.AddReader(conn.Conn).Read(b)
-}
+func (c *conn) Read(b []byte) (int, error)  { return c.r.Read(b) }
+func (c *conn) Write(b []byte) (int, error) { return c.w.Write(b) }
