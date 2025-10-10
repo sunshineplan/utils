@@ -14,19 +14,19 @@ func TestReader(t *testing.T) {
 	c, buf := new(Counter), new(bytes.Buffer)
 	buf.Write(data1)
 	buf.Write(data2)
-	r := c.AddReader(buf)
+	r := CountReader(buf, c)
 	io.ReadAll(r)
-	if count := c.Load(); count != dataLen {
-		t.Fatalf("expected %d; got %d", dataLen, count)
+	if n := c.Get(); n != dataLen {
+		t.Fatalf("expected %d; got %d", dataLen, n)
 	}
 }
 
 func TestWriter(t *testing.T) {
 	c, buf := new(Counter), new(bytes.Buffer)
-	w := c.AddWriter(buf)
+	w := CountWriter(buf, c)
 	w.Write(data1)
 	w.Write(data2)
-	if count := c.Load(); count != dataLen {
-		t.Fatalf("expected %d; got %d", dataLen, count)
+	if n := c.Get(); n != dataLen {
+		t.Fatalf("expected %d; got %d", dataLen, n)
 	}
 }

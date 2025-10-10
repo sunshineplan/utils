@@ -3,47 +3,72 @@ package counter
 import (
 	"io"
 	"sync/atomic"
-	"time"
 )
 
 type Counter struct {
-	v atomic.Int64
+	n atomic.Int64
 }
 
 func (c *Counter) Add(delta int64) (new int64) {
-	return c.v.Add(delta)
+	return c.n.Add(delta)
 }
 
-func (c *Counter) Load() int64 {
-	return c.v.Load()
+func (c *Counter) Get() int64 {
+	return c.n.Load()
 }
 
-func (c *Counter) AddWriter(w io.Writer) io.Writer {
-	return newWriterCounter(c, w)
+type CounterReader struct {
+	r io.Reader
+	c *Counter
 }
 
-func (c *Counter) AddReader(r io.Reader) io.Reader {
-	return newReaderCounter(c, r)
+func CountReader(r io.Reader, c *Counter) io.Reader {
+	return NewCounterReader(r, c)
 }
 
-type RateCounter struct {
-	Counter
-	start time.Time
-}
-
-func NewRateCounter() *RateCounter {
-	return &RateCounter{start: time.Now()}
-}
-
-func (rc *RateCounter) Reset() {
-	rc.Counter.v.Store(0)
-	rc.start = time.Now()
-}
-
-func (rc *RateCounter) Rate() float64 {
-	duration := time.Since(rc.start).Seconds()
-	if duration == 0 {
-		return 0
+func NewCounterReader(r io.Reader, c *Counter) *CounterReader {
+	if c == nil {
+		c = new(Counter)
 	}
-	return float64(rc.Load()) / duration
+	return &CounterReader{r, c}
+}
+
+func (r *CounterReader) Read(p []byte) (n int, err error) {
+	n, err = r.r.Read(p)
+	if n > 0 {
+		r.c.Add(int64(n))
+	}
+	return
+}
+
+func (r *CounterReader) Bytes() int64 {
+	return r.c.Get()
+}
+
+type CounterWriter struct {
+	w io.Writer
+	c *Counter
+}
+
+func CountWriter(w io.Writer, c *Counter) io.Writer {
+	return NewCounterWriter(w, c)
+}
+
+func NewCounterWriter(w io.Writer, c *Counter) *CounterWriter {
+	if c == nil {
+		c = new(Counter)
+	}
+	return &CounterWriter{w, c}
+}
+
+func (w *CounterWriter) Write(p []byte) (n int, err error) {
+	n, err = w.w.Write(p)
+	if n > 0 {
+		w.c.Add(int64(n))
+	}
+	return
+}
+
+func (w *CounterWriter) Bytes() int64 {
+	return w.c.Get()
 }

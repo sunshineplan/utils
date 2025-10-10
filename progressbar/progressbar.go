@@ -11,7 +11,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/sunshineplan/utils/counter"
 	"github.com/sunshineplan/utils/unit"
 )
 
@@ -44,7 +43,7 @@ type ProgressBar[T int | int64] struct {
 	renderInterval  time.Duration
 	template        *template.Template
 
-	current    counter.Counter
+	current    genericCounter
 	total      int64
 	additional string
 	speed      float64
@@ -74,6 +73,7 @@ func New[T int | int64](total T) *ProgressBar[T] {
 		blockWidth:      40,
 		refreshInterval: defaultRefresh,
 		template:        template.Must(template.New("ProgressBar").Parse(defaultTemplate)),
+		current:         newNumberCounter(),
 		total:           int64(total),
 	}
 }
@@ -166,7 +166,7 @@ func (pb *ProgressBar[T]) Additional(s string) {
 }
 
 func (pb *ProgressBar[T]) now() int64 {
-	return pb.current.Load()
+	return pb.current.Get()
 }
 
 func (pb *ProgressBar[T]) print(s string, msg bool) {
@@ -348,13 +348,13 @@ func (pb *ProgressBar[T]) Cancel() {
 
 // FromReader starts the progress bar from a reader.
 func (pb *ProgressBar[T]) FromReader(r io.Reader, w io.Writer) (int64, error) {
+	pb.current = newWriterCounter(w)
 	if err := pb.Start(); err != nil {
 		return 0, err
 	}
-	n, err := io.Copy(pb.current.AddWriter(w), r)
+	n, err := io.Copy(pb.current, r)
 	if err != nil {
 		pb.Cancel()
-		return n, err
 	}
-	return n, nil
+	return n, err
 }

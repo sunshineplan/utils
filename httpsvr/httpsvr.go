@@ -165,18 +165,18 @@ func (s *Server) RunTLS(certFile, keyFile string) error {
 	return s.run()
 }
 
-func (s *Server) ReadCount() int64 {
+func (s *Server) ReadBytes() int64 {
 	if s.l == nil {
 		return 0
 	}
-	return s.l.ReadCount()
+	return s.l.ReadBytes()
 }
 
-func (s *Server) WriteCount() int64 {
+func (s *Server) WriteBytes() int64 {
 	if s.l == nil {
 		return 0
 	}
-	return s.l.WriteCount()
+	return s.l.WriteBytes()
 }
 
 // TCP runs an HTTP server on TCP network listener.

@@ -11,41 +11,33 @@ var (
 )
 
 type Listener struct {
-	listener net.Listener
-	read     Counter
-	written  Counter
+	net.Listener
+	readBytes  Counter
+	writeBytes Counter
 }
 
 func NewListener(listener net.Listener) *Listener {
-	return &Listener{listener: listener}
+	return &Listener{Listener: listener}
 }
 
 func (l *Listener) Accept() (net.Conn, error) {
-	c, err := l.listener.Accept()
+	c, err := l.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
 	return &conn{
 		Conn: c,
-		r:    l.read.AddReader(c),
-		w:    l.written.AddWriter(c),
+		r:    CountReader(c, &l.readBytes),
+		w:    CountWriter(c, &l.writeBytes),
 	}, nil
 }
 
-func (l *Listener) Close() error {
-	return l.listener.Close()
+func (l *Listener) ReadBytes() int64 {
+	return l.readBytes.Get()
 }
 
-func (l *Listener) Addr() net.Addr {
-	return l.listener.Addr()
-}
-
-func (l *Listener) ReadCount() int64 {
-	return l.read.Load()
-}
-
-func (l *Listener) WriteCount() int64 {
-	return l.written.Load()
+func (l *Listener) WriteBytes() int64 {
+	return l.writeBytes.Get()
 }
 
 type conn struct {
