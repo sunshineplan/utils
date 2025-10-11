@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/textproto"
@@ -65,6 +66,14 @@ func NewClient(conn net.Conn) (*Client, error) {
 	return c, nil
 }
 
+func (c *Client) Auth(user, pass string) error {
+	if _, err := c.Cmd("USER %s", false, user); err != nil {
+		return err
+	}
+	_, err := c.Cmd("PASS %s", false, pass)
+	return err
+}
+
 // Stat returns the number of messages and their total size in bytes in the inbox.
 func (c *Client) Stat() (count int, size int, err error) {
 	s, err := c.Cmd("STAT", false)
@@ -74,6 +83,9 @@ func (c *Client) Stat() (count int, size int, err error) {
 
 	// count size
 	f := strings.Fields(s)
+	if len(f) < 2 {
+		return 0, 0, fmt.Errorf("invalid STAT response: %q", s)
+	}
 
 	// Total number of messages.
 	count, err = strconv.Atoi(f[0])
@@ -100,6 +112,26 @@ type MessageID struct {
 	UID string
 }
 
+func (c *Client) multiList(cmd string, parse func([]string) (MessageID, error)) ([]MessageID, error) {
+	s, err := c.Cmd(cmd, true)
+	if err != nil {
+		return nil, err
+	}
+	var out []MessageID
+	for _, line := range strings.Split(s, lineBreak) {
+		f := strings.Fields(line)
+		if len(f) == 0 {
+			continue
+		}
+		id, err := parse(f)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, nil
+}
+
 // List returns a list of (message ID, message Size) pairs.
 // If the optional id > 0, then only that particular message is listed.
 // The message IDs are sequential, 1 to N.
@@ -120,31 +152,23 @@ func (c *Client) List(id int) ([]MessageID, error) {
 		return nil, err
 	}
 
-	var (
-		out   []MessageID
-		lines = strings.Split(s, lineBreak)
-	)
-
-	for _, l := range lines {
+	var out []MessageID
+	for l := range strings.SplitSeq(s, lineBreak) {
 		// id size
 		f := strings.Fields(l)
 		if len(f) == 0 {
-			break
+			continue
 		}
-
 		id, err := strconv.Atoi(f[0])
 		if err != nil {
 			return nil, err
 		}
-
 		size, err := strconv.Atoi(f[1])
 		if err != nil {
 			return nil, err
 		}
-
 		out = append(out, MessageID{ID: id, Size: size})
 	}
-
 	return out, nil
 }
 
@@ -168,26 +192,19 @@ func (c *Client) Uidl(id int) ([]MessageID, error) {
 		return nil, err
 	}
 
-	var (
-		out   []MessageID
-		lines = strings.Split(s, lineBreak)
-	)
-
-	for _, l := range lines {
+	var out []MessageID
+	for l := range strings.SplitSeq(s, lineBreak) {
 		// id uid
 		f := strings.Fields(l)
 		if len(f) == 0 {
-			break
+			continue
 		}
-
 		id, err := strconv.Atoi(f[0])
 		if err != nil {
 			return nil, err
 		}
-
 		out = append(out, MessageID{ID: id, UID: f[1]})
 	}
-
 	return out, nil
 }
 
@@ -231,6 +248,7 @@ func (c *Client) Noop() error {
 // quit and close.
 func (c *Client) Quit() error {
 	if _, err := c.Cmd("QUIT", false); err != nil {
+		c.Close()
 		return err
 	}
 	return c.Close()
@@ -256,39 +274,45 @@ func (c *Client) Cmd(s string, isMulti bool, args ...any) (string, error) {
 		return s, nil
 	}
 
-	var res string
+	var b strings.Builder
 	for {
 		s, err := c.ReadLine()
 		if err != nil {
+			if err == io.EOF {
+				err = io.ErrUnexpectedEOF
+			}
 			return "", err
 		}
 		slog.Debug("<<< " + s)
-		if s == "." {
-			break
+		// Dot by itself marks end; otherwise cut one dot.
+		if len(s) > 0 && s[0] == '.' {
+			if len(s) == 1 {
+				break
+			}
+			s = s[1:]
 		}
-
-		res += s + lineBreak
+		b.WriteString(s)
+		b.WriteString(lineBreak)
 	}
-
-	return res, nil
+	return b.String(), nil
 }
 
 func parseResp(s string) (string, error) {
-	if len(s) == 0 {
+	switch s {
+	case "", respOK:
 		return "", nil
-	}
-
-	if s == respOK {
-		return "", nil
-	} else if strings.HasPrefix(s, respOKInfo) {
-		return strings.TrimPrefix(s, respOKInfo), nil
-	} else if s == respErr {
-		return "", errors.New("unknown error (no info specified in response)")
-	} else if strings.HasPrefix(s, respErrInfo) {
-		return "", errors.New(strings.TrimPrefix(s, respErrInfo))
-	} else if strings.HasPrefix(s, respContinue) {
-		return strings.TrimPrefix(s, respContinue), nil
-	} else {
-		return "", fmt.Errorf("unknown response: %q", s)
+	case respErr:
+		return "", errors.New("server returned -ERR without info")
+	default:
+		switch {
+		case strings.HasPrefix(s, respOKInfo):
+			return strings.TrimPrefix(s, respOKInfo), nil
+		case strings.HasPrefix(s, respErrInfo):
+			return "", errors.New(strings.TrimPrefix(s, respErrInfo))
+		case strings.HasPrefix(s, respContinue):
+			return strings.TrimPrefix(s, respContinue), nil
+		default:
+			return "", fmt.Errorf("unknown response: %q", s)
+		}
 	}
 }
