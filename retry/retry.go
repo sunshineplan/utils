@@ -2,39 +2,29 @@ package retry
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
-var errNoMoreRetry error = errorNoMoreRetry("no more retry")
+// ErrNoMoreRetry is a sentinel error indicating that no more retries should be performed.
+var ErrNoMoreRetry = errors.New("no more retry")
 
-type errorNoMoreRetry string
-
-func (err errorNoMoreRetry) Error() string {
-	return string(err)
+// StopRetry creates a wrapped error indicating that retries should stop.
+func StopRetry(msg string) error {
+	return fmt.Errorf("%w: %s", ErrNoMoreRetry, msg)
 }
 
-func (errorNoMoreRetry) Unwrap() error {
-	return errNoMoreRetry
-}
-
-// IsNoMoreRetry reports whether error is NoMoreRetry error.
+// IsNoMoreRetry reports whether the given error indicates to stop retrying.
 func IsNoMoreRetry(err error) bool {
-	if e, ok := err.(interface{ Unwrap() []error }); ok {
-		for _, err := range e.Unwrap() {
-			if IsNoMoreRetry(err) {
-				return true
-			}
-		}
-		return false
-	}
-	return errors.Is(err, errNoMoreRetry)
+	return errors.Is(err, ErrNoMoreRetry)
 }
 
-// ErrNoMoreRetry tells function does no more retry.
-func ErrNoMoreRetry(err string) error { return errorNoMoreRetry(err) }
-
-// Do keeps retrying the function until no error is returned.
-func Do(fn func() error, attempts, delay int) error {
+// Do executes fn repeatedly until it succeeds, the attempts are exhausted,
+// or fn returns an error that indicates no more retries.
+func Do(fn func() error, attempts int, delay time.Duration) error {
+	if attempts <= 0 {
+		return errors.New("invalid attempts count")
+	}
 	var errs []error
 	for i := range attempts {
 		err := fn()
@@ -44,8 +34,9 @@ func Do(fn func() error, attempts, delay int) error {
 		errs = append(errs, err)
 		if IsNoMoreRetry(err) {
 			break
-		} else if i < attempts-1 {
-			time.Sleep(time.Second * time.Duration(delay))
+		}
+		if i < attempts-1 {
+			time.Sleep(delay)
 		}
 	}
 	return errors.Join(errs...)
