@@ -13,6 +13,8 @@ import (
 	"strings"
 )
 
+// Client represents a POP3 client connection.
+// It embeds a textproto.Conn for low-level protocol communication.
 type Client struct {
 	*textproto.Conn
 }
@@ -27,6 +29,8 @@ const (
 	respContinue = "+ "
 )
 
+// Dial establishes a plain TCP connection to the POP3 server at the given address.
+// The connection respects the provided context for timeout or cancellation.
 func Dial(ctx context.Context, addr string) (*Client, error) {
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "tcp", addr)
@@ -36,6 +40,8 @@ func Dial(ctx context.Context, addr string) (*Client, error) {
 	return NewClient(conn)
 }
 
+// DialTLS establishes a secure POP3-over-TLS connection to the given address.
+// The server name is automatically derived from the address for certificate verification.
 func DialTLS(ctx context.Context, addr string) (*Client, error) {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -50,6 +56,8 @@ func DialTLS(ctx context.Context, addr string) (*Client, error) {
 	return NewClient(conn)
 }
 
+// NewClient initializes a POP3 client from an existing connection.
+// It reads the server greeting line and validates that it starts with "+OK".
 func NewClient(conn net.Conn) (*Client, error) {
 	c := &Client{textproto.NewConn(conn)}
 	s, err := c.ReadLine()
@@ -66,6 +74,8 @@ func NewClient(conn net.Conn) (*Client, error) {
 	return c, nil
 }
 
+// Auth authenticates the user using the USER/PASS commands.
+// Returns an error if either step fails.
 func (c *Client) Auth(user, pass string) error {
 	if _, err := c.Cmd("USER %s", false, user); err != nil {
 		return err
@@ -74,20 +84,16 @@ func (c *Client) Auth(user, pass string) error {
 	return err
 }
 
-// Stat returns the number of messages and their total size in bytes in the inbox.
+// Stat returns the number of messages and the total mailbox size (in bytes).
 func (c *Client) Stat() (count int, size int, err error) {
 	s, err := c.Cmd("STAT", false)
 	if err != nil {
 		return
 	}
-
-	// count size
 	f := strings.Fields(s)
 	if len(f) < 2 {
 		return 0, 0, fmt.Errorf("invalid STAT response: %q", s)
 	}
-
-	// Total number of messages.
 	count, err = strconv.Atoi(f[0])
 	if err != nil {
 		return
@@ -95,46 +101,21 @@ func (c *Client) Stat() (count int, size int, err error) {
 	if count == 0 {
 		return
 	}
-
-	// Total size of all messages in bytes.
 	size, err = strconv.Atoi(f[1])
-
 	return
 }
 
-// MessageID contains the ID and size of an individual message.
+// MessageID represents a single message entry as returned by LIST or UIDL.
+// It includes the message index, size, and optional UID.
 type MessageID struct {
-	// ID is the numerical index (non-unique) of the message.
-	ID   int
-	Size int
-
-	// UID is only present if the response is to the UIDL command.
-	UID string
+	ID   int    // Numerical message index (1-based)
+	Size int    // Message size in bytes
+	UID  string // Optional UID (only for UIDL command)
 }
 
-func (c *Client) multiList(cmd string, parse func([]string) (MessageID, error)) ([]MessageID, error) {
-	s, err := c.Cmd(cmd, true)
-	if err != nil {
-		return nil, err
-	}
-	var out []MessageID
-	for _, line := range strings.Split(s, lineBreak) {
-		f := strings.Fields(line)
-		if len(f) == 0 {
-			continue
-		}
-		id, err := parse(f)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, id)
-	}
-	return out, nil
-}
-
-// List returns a list of (message ID, message Size) pairs.
-// If the optional id > 0, then only that particular message is listed.
-// The message IDs are sequential, 1 to N.
+// List returns message IDs and sizes from the mailbox.
+// If id > 0, only that specific message is listed (single-line response).
+// If id == 0, all messages are listed (multi-line response).
 func (c *Client) List(id int) ([]MessageID, error) {
 	var (
 		s   string
@@ -142,10 +123,8 @@ func (c *Client) List(id int) ([]MessageID, error) {
 	)
 
 	if id > 0 {
-		// Single line response listing one message.
 		s, err = c.Cmd("LIST %d", false, id)
 	} else {
-		// Multiline response listing all messages.
 		s, err = c.Cmd("LIST", true)
 	}
 	if err != nil {
@@ -154,7 +133,6 @@ func (c *Client) List(id int) ([]MessageID, error) {
 
 	var out []MessageID
 	for l := range strings.SplitSeq(s, lineBreak) {
-		// id size
 		f := strings.Fields(l)
 		if len(f) == 0 {
 			continue
@@ -172,9 +150,9 @@ func (c *Client) List(id int) ([]MessageID, error) {
 	return out, nil
 }
 
-// Uidl returns a list of (message ID, message UID) pairs. If the optional msgID
-// is > 0, then only that particular message is listed. It works like Top() but only works on
-// servers that support the UIDL command. Messages size field is not available in the UIDL response.
+// Uidl returns message IDs and their unique identifiers (UIDs).
+// If id > 0, only that specific message is listed.
+// The UIDL command may not be supported by all servers.
 func (c *Client) Uidl(id int) ([]MessageID, error) {
 	var (
 		s   string
@@ -182,10 +160,8 @@ func (c *Client) Uidl(id int) ([]MessageID, error) {
 	)
 
 	if id > 0 {
-		// Single line response listing one message.
 		s, err = c.Cmd("UIDL %d", false, id)
 	} else {
-		// Multiline response listing all messages.
 		s, err = c.Cmd("UIDL", true)
 	}
 	if err != nil {
@@ -194,7 +170,6 @@ func (c *Client) Uidl(id int) ([]MessageID, error) {
 
 	var out []MessageID
 	for l := range strings.SplitSeq(s, lineBreak) {
-		// id uid
 		f := strings.Fields(l)
 		if len(f) == 0 {
 			continue
@@ -208,19 +183,18 @@ func (c *Client) Uidl(id int) ([]MessageID, error) {
 	return out, nil
 }
 
-// Retr downloads a message by the given id and returns the data
-// of the entire message.
+// Retr retrieves the full message text by ID, including headers and body.
 func (c *Client) Retr(id int) (string, error) {
 	return c.Cmd("RETR %d", true, id)
 }
 
-// Top retrieves a message by its ID with full headers and numLines lines of the body.
+// Top retrieves message headers and the first numLines of the body.
 func (c *Client) Top(id int, numLines int) (string, error) {
 	return c.Cmd("TOP %d %d", true, id, numLines)
 }
 
-// Dele deletes one or more messages. The server only executes the
-// deletions after a successful Quit().
+// Dele marks one or more messages for deletion.
+// The deletions are finalized only after a successful Quit().
 func (c *Client) Dele(ids ...int) error {
 	for _, id := range ids {
 		if _, err := c.Cmd("DELE %d", false, id); err != nil {
@@ -230,22 +204,21 @@ func (c *Client) Dele(ids ...int) error {
 	return nil
 }
 
-// Rset clears the messages marked for deletion in the current session.
+// Rset resets the deletion marks on all messages in the current session.
 func (c *Client) Rset() error {
 	_, err := c.Cmd("RSET", false)
 	return err
 }
 
-// Noop issues a do-nothing NOOP command to the server. This is useful for
-// prolonging open connections.
+// Noop sends a NOOP command to keep the connection alive.
+// Useful for preventing idle timeouts.
 func (c *Client) Noop() error {
 	_, err := c.Cmd("NOOP", false)
 	return err
 }
 
-// Quit sends the QUIT command to server and gracefully closes the connection.
-// Message deletions (DELE command) are only excuted by the server on a graceful
-// quit and close.
+// Quit sends the QUIT command and closes the connection gracefully.
+// Deletions are committed only if QUIT succeeds.
 func (c *Client) Quit() error {
 	if _, err := c.Cmd("QUIT", false); err != nil {
 		c.Close()
@@ -254,6 +227,9 @@ func (c *Client) Quit() error {
 	return c.Close()
 }
 
+// Cmd sends a POP3 command with optional arguments and reads the response.
+// If isMulti is true, the response is treated as multi-line and read until
+// a line containing only "." is encountered. All lines are concatenated and returned.
 func (c *Client) Cmd(s string, isMulti bool, args ...any) (string, error) {
 	slog.Debug(">>> " + fmt.Sprintf(s, args...))
 	if _, err := c.Conn.Cmd(s, args...); err != nil {
@@ -284,7 +260,9 @@ func (c *Client) Cmd(s string, isMulti bool, args ...any) (string, error) {
 			return "", err
 		}
 		slog.Debug("<<< " + s)
-		// Dot by itself marks end; otherwise cut one dot.
+
+		// A single dot line marks the end of multi-line response.
+		// Lines beginning with a dot have one dot removed as per POP3 spec.
 		if len(s) > 0 && s[0] == '.' {
 			if len(s) == 1 {
 				break
@@ -297,6 +275,9 @@ func (c *Client) Cmd(s string, isMulti bool, args ...any) (string, error) {
 	return b.String(), nil
 }
 
+// parseResp interprets a single-line POP3 response.
+// It distinguishes between +OK, -ERR, and continuation ("+ ") responses,
+// returning the response message or an error if the response is invalid.
 func parseResp(s string) (string, error) {
 	switch s {
 	case "", respOK:
@@ -310,6 +291,7 @@ func parseResp(s string) (string, error) {
 		case strings.HasPrefix(s, respErrInfo):
 			return "", errors.New(strings.TrimPrefix(s, respErrInfo))
 		case strings.HasPrefix(s, respContinue):
+			// Some servers send "+ " for continuation prompts (rare in simple POP3).
 			return strings.TrimPrefix(s, respContinue), nil
 		default:
 			return "", fmt.Errorf("unknown response: %q", s)
