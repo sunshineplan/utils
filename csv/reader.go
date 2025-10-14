@@ -51,6 +51,15 @@ func ReadFile(file string, hasFields bool) (*Reader, error) {
 	return reader, nil
 }
 
+// Read reads one record (a slice of fields) from r.
+// If the record has an unexpected number of fields,
+// Read returns the record along with the error [ErrFieldCount].
+// If the record contains a field that cannot be parsed,
+// Read returns a partial record along with the parse error.
+// The partial record contains all fields read before the error.
+// If there is no data left to be read, Read returns nil, [io.EOF].
+// If [Reader.ReuseRecord] is true, the returned slice may be shared
+// between multiple calls to Read.
 func (r *Reader) Read() (record []string, err error) {
 	record, err = r.Reader.Read()
 	if err == nil {
@@ -115,6 +124,7 @@ func (r *Reader) Decode(dest any) error {
 	return setRow(dest, m)
 }
 
+// Close closes the underlying reader if it implements the io.Closer interface.
 func (r *Reader) Close() error {
 	if r.closer != nil {
 		return r.closer.Close()
