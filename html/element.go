@@ -2,8 +2,11 @@ package html
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
+
+	"github.com/sunshineplan/utils/pool"
 )
 
 var _ HTMLer = new(Element)
@@ -15,6 +18,9 @@ type Element struct {
 }
 
 func (e *Element) Attribute(name, value string) *Element {
+	if e.attrs == nil {
+		e.attrs = make(map[string]string)
+	}
 	e.attrs[name] = value
 	return e
 }
@@ -80,7 +86,7 @@ func (e *Element) AppendContent(v ...any) *Element {
 
 func (e *Element) AppendChild(child ...*Element) *Element {
 	for _, i := range child {
-		e.AppendContent(i)
+		e.content += i.HTML()
 	}
 	return e
 }
@@ -93,56 +99,93 @@ func (e *Element) AppendHTML(html ...string) *Element {
 }
 
 // https://developer.mozilla.org/en-US/docs/Glossary/Void_element
-func (e Element) isVoidElement() bool {
-	return slices.Contains([]string{
-		"area",
-		"base",
-		"br",
-		"col",
-		"embed",
-		"hr",
-		"img",
-		"input",
-		"link",
-		"meta",
-		"param",
-		"source",
-		"track",
-		"wbr",
-	}, strings.ToLower(e.tag))
+var voidElements = map[string]struct{}{
+	"area":   {},
+	"base":   {},
+	"br":     {},
+	"col":    {},
+	"embed":  {},
+	"hr":     {},
+	"img":    {},
+	"input":  {},
+	"link":   {},
+	"meta":   {},
+	"param":  {},
+	"source": {},
+	"track":  {},
+	"wbr":    {},
 }
+
+func (e Element) isVoidElement() bool {
+	_, ok := voidElements[strings.ToLower(e.tag)]
+	return ok
+}
+
+var builderPool = pool.New[strings.Builder]()
 
 // https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes
 func (e Element) printAttrs() string {
-	var s []string
-	for k, v := range e.attrs {
-		if v == "" || v == "true" {
-			s = append(s, k)
-		} else if v == "false" {
+	if len(e.attrs) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(e.attrs))
+	for k := range e.attrs {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	b := builderPool.Get()
+	defer func() {
+		b.Reset()
+		builderPool.Put(b)
+	}()
+	first := true
+	for _, k := range keys {
+		v := e.attrs[k]
+		switch v {
+		case "", "true":
+			if !first {
+				b.WriteByte(' ')
+			}
+			b.WriteString(k)
+			first = false
+		case "false":
 			continue
-		} else {
-			s = append(s, fmt.Sprintf("%s=%q", k, v))
+		default:
+			if !first {
+				b.WriteByte(' ')
+			}
+			b.WriteString(k)
+			b.WriteByte('=')
+			b.WriteByte('"')
+			b.WriteString(EscapeString(v))
+			b.WriteByte('"')
+			first = false
 		}
 	}
-	slices.Sort(s)
-	return strings.Join(s, " ")
+	return b.String()
 }
 
 func (e *Element) String() string {
-	var b strings.Builder
-	if e.tag != "" {
-		fmt.Fprint(&b, "<", e.tag)
-		if attrs := e.printAttrs(); attrs != "" {
-			fmt.Fprint(&b, " ", attrs)
-		}
-	}
 	if e.tag == "" {
-		fmt.Fprint(&b, e.content)
-	} else if e.isVoidElement() {
-		fmt.Fprint(&b, ">")
-	} else {
-		fmt.Fprint(&b, ">", e.content)
-		fmt.Fprintf(&b, "</%s>", e.tag)
+		return string(e.content)
+	}
+	b := builderPool.Get()
+	defer func() {
+		b.Reset()
+		builderPool.Put(b)
+	}()
+	b.WriteByte('<')
+	b.WriteString(e.tag)
+	if attrs := e.printAttrs(); attrs != "" {
+		b.WriteByte(' ')
+		b.WriteString(attrs)
+	}
+	b.WriteByte('>')
+	if !e.isVoidElement() {
+		b.WriteString(string(e.content))
+		b.WriteString("</")
+		b.WriteString(e.tag)
+		b.WriteByte('>')
 	}
 	return b.String()
 }
@@ -151,6 +194,16 @@ func (e *Element) HTML() HTML {
 	return HTML(e.String())
 }
 
+func (e *Element) Clone() *Element {
+	attrs := make(map[string]string, len(e.attrs))
+	maps.Copy(attrs, e.attrs)
+	return &Element{
+		tag:     e.tag,
+		attrs:   attrs,
+		content: e.content,
+	}
+}
+
 func NewElement(tag string) *Element {
-	return &Element{tag, make(map[string]string), ""}
+	return &Element{tag: tag, attrs: make(map[string]string)}
 }
