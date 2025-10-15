@@ -3,19 +3,29 @@ package html
 import "html"
 
 var (
-	EscapeString   = html.EscapeString
+	// EscapeString is alias of [html.EscapeString],
+	// used for encoding HTML entities.
+	EscapeString = html.EscapeString
+	// UnescapeString is alias of [html.UnescapeString],
+	// used for decoding HTML entities.
 	UnescapeString = html.UnescapeString
 )
 
+// HTML represents a string that contains valid HTML markup.
 type HTML string
 
+// HTMLer defines types that can render themselves as HTML.
 type HTMLer interface {
 	HTML() HTML
 }
 
+// Background creates an element with no tag, typically used for raw content.
 func Background() *Element { return NewElement("") }
 
+// NewHTML creates a new <html> element.
 func NewHTML() *Element { return NewElement("html") }
+
+// Common HTML element constructors for convenience.
 
 func A() *Element     { return NewElement("a") }
 func B() *Element     { return NewElement("b") }
