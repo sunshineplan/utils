@@ -15,30 +15,30 @@ var (
 )
 
 const (
-	Ldate         = 1 << iota     // the date in the local time zone: 2009/01/23
-	Ltime                         // the time in the local time zone: 01:23:23
-	Lmicroseconds                 // microsecond resolution: 01:23:23.123123.  assumes Ltime.
-	Llongfile                     // full file name and line number: /a/b/c/d.go:23
-	Lshortfile                    // final file name element and line number: d.go:23. overrides Llongfile
-	LUTC                          // if Ldate or Ltime is set, use UTC rather than the local time zone
-	Lmsgprefix                    // move the "prefix" from the beginning of the line to before the message
-	LstdFlags     = Ldate | Ltime // initial values for the standard logger
+	Ldate         = log.Ldate         // the date in the local time zone: 2009/01/23
+	Ltime         = log.Ltime         // the time in the local time zone: 01:23:23
+	Lmicroseconds = log.Lmicroseconds // microsecond resolution: 01:23:23.123123.  assumes Ltime.
+	Llongfile     = log.Llongfile     // full file name and line number: /a/b/c/d.go:23
+	Lshortfile    = log.Lshortfile    // final file name element and line number: d.go:23. overrides Llongfile
+	LUTC          = log.LUTC          // if Ldate or Ltime is set, use UTC rather than the local time zone
+	Lmsgprefix    = log.Lmsgprefix    // move the "prefix" from the beginning of the line to before the message
+	LstdFlags     = log.LstdFlags     // initial values for the standard logger
 )
 
 type Logger struct {
+	mu sync.Mutex
 	*log.Logger
+
 	file  *os.File
 	extra io.Writer
 
-	slog *slog.Logger
-
-	mu    *sync.Mutex
+	slog  *slog.Logger
 	level *slog.LevelVar
 }
 
 func newLogger(l *log.Logger, file *os.File) *Logger {
-	logger := &Logger{Logger: l, file: file, mu: new(sync.Mutex), level: new(slog.LevelVar)}
-	logger.slog = slog.New(newDefaultHandler(logger.mu, l, &slog.HandlerOptions{Level: logger.level}))
+	logger := &Logger{Logger: l, file: file, level: new(slog.LevelVar)}
+	logger.slog = slog.New(newDefaultHandler(&logger.mu, l, logger.level))
 	return logger
 }
 
@@ -118,7 +118,7 @@ func (l *Logger) Error(msg string, args ...any) {
 func (l *Logger) ErrorContext(ctx context.Context, msg string, args ...any) {
 	l.slog.ErrorContext(ctx, msg, args...)
 }
-func (l *Logger) LoggerHandler() slog.Handler {
+func (l *Logger) Handler() slog.Handler {
 	return l.slog.Handler()
 }
 func (l *Logger) Info(msg string, args ...any) {
@@ -140,12 +140,10 @@ func (l *Logger) WarnContext(ctx context.Context, msg string, args ...any) {
 	l.slog.WarnContext(ctx, msg, args...)
 }
 func (l *Logger) With(args ...any) *Logger {
-	l.slog = l.slog.With(args...)
-	return l
+	return &Logger{Logger: l.Logger, file: l.file, extra: l.extra, slog: l.slog.With(args...), level: l.level}
 }
 func (l *Logger) WithGroup(name string) *Logger {
-	l.slog = l.slog.WithGroup(name)
-	return l
+	return &Logger{Logger: l.Logger, file: l.file, extra: l.extra, slog: l.slog.WithGroup(name), level: l.level}
 }
 
 func (l *Logger) Rotate() {

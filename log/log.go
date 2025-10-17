@@ -104,8 +104,8 @@ func Error(msg string, args ...any) {
 func ErrorContext(ctx context.Context, msg string, args ...any) {
 	std.ErrorContext(ctx, msg, args...)
 }
-func LoggerHandler() slog.Handler {
-	return std.LoggerHandler()
+func Handler() slog.Handler {
+	return std.Handler()
 }
 func Info(msg string, args ...any) {
 	std.Info(msg, args...)
@@ -126,10 +126,8 @@ func WarnContext(ctx context.Context, msg string, args ...any) {
 	std.WarnContext(ctx, msg, args...)
 }
 func With(args ...any) *Logger {
-	std = std.With(args...)
-	return std
+	return std.With(args...)
 }
 func WithGroup(name string) *Logger {
-	std = std.WithGroup(name)
-	return std
+	return std.WithGroup(name)
 }
