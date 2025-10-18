@@ -6,7 +6,9 @@ import (
 	"log"
 	"log/slog"
 	"os"
-	"sync"
+	"sync/atomic"
+
+	"github.com/sunshineplan/utils/container"
 )
 
 var (
@@ -26,19 +28,17 @@ const (
 )
 
 type Logger struct {
-	mu sync.Mutex
 	*log.Logger
-
-	file  *os.File
-	extra io.Writer
-
-	slog  *slog.Logger
+	file  atomic.Pointer[os.File]
+	extra container.Value[io.Writer]
+	slog  atomic.Pointer[slog.Logger]
 	level *slog.LevelVar
 }
 
 func newLogger(l *log.Logger, file *os.File) *Logger {
-	logger := &Logger{Logger: l, file: file, level: new(slog.LevelVar)}
-	logger.slog = slog.New(newDefaultHandler(&logger.mu, l, logger.level))
+	logger := &Logger{Logger: l, level: new(slog.LevelVar)}
+	logger.file.Store(file)
+	logger.slog.Store(slog.New(newDefaultHandler(l, logger.level)))
 	return logger
 }
 
@@ -51,8 +51,8 @@ func New(file, prefix string, flag int) *Logger {
 }
 
 func (l *Logger) File() string {
-	if l.file != nil {
-		return l.file.Name()
+	if file := l.file.Load(); file != nil {
+		return file.Name()
 	}
 	return ""
 }
@@ -69,33 +69,29 @@ func (l *Logger) setOutput(file *os.File, extra io.Writer) {
 		writers = append(writers, io.Discard)
 	}
 	l.Logger.SetOutput(io.MultiWriter(writers...))
-	if l.file != nil && l.file != file {
-		l.file.Close()
+	if oldFile := l.file.Load(); oldFile != nil && oldFile != file {
+		oldFile.Close()
 	}
-	l.file = file
-	l.extra = extra
+	l.file.Store(file)
+	if extra != nil {
+		l.extra.Store(extra)
+	}
 }
 
 func (l *Logger) SetOutput(file string, extra io.Writer) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.setOutput(openFile(file), extra)
 }
 
 func (l *Logger) SetFile(file string) {
-	l.SetOutput(file, l.extra)
+	l.SetOutput(file, l.extra.Load())
 }
 
 func (l *Logger) SetExtra(extra io.Writer) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.setOutput(l.file, extra)
+	l.setOutput(l.file.Load(), extra)
 }
 
 func (l *Logger) SetHandler(h slog.Handler) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.slog = slog.New(h)
+	l.slog.Store(slog.New(h))
 }
 func (l *Logger) Level() *slog.LevelVar {
 	return l.level
@@ -104,54 +100,68 @@ func (l *Logger) SetLevel(level slog.Level) {
 	l.level.Set(level)
 }
 func (l *Logger) Debug(msg string, args ...any) {
-	l.slog.Debug(msg, args...)
+	l.slog.Load().Debug(msg, args...)
 }
 func (l *Logger) DebugContext(ctx context.Context, msg string, args ...any) {
-	l.slog.DebugContext(ctx, msg, args...)
+	l.slog.Load().DebugContext(ctx, msg, args...)
 }
 func (l *Logger) Enabled(ctx context.Context, level slog.Level) bool {
-	return l.slog.Enabled(ctx, level)
+	return l.slog.Load().Enabled(ctx, level)
 }
 func (l *Logger) Error(msg string, args ...any) {
-	l.slog.Error(msg, args...)
+	l.slog.Load().Error(msg, args...)
 }
 func (l *Logger) ErrorContext(ctx context.Context, msg string, args ...any) {
-	l.slog.ErrorContext(ctx, msg, args...)
+	l.slog.Load().ErrorContext(ctx, msg, args...)
 }
 func (l *Logger) Handler() slog.Handler {
-	return l.slog.Handler()
+	return l.slog.Load().Handler()
 }
 func (l *Logger) Info(msg string, args ...any) {
-	l.slog.Info(msg, args...)
+	l.slog.Load().Info(msg, args...)
 }
 func (l *Logger) InfoContext(ctx context.Context, msg string, args ...any) {
-	l.slog.InfoContext(ctx, msg, args...)
+	l.slog.Load().InfoContext(ctx, msg, args...)
 }
 func (l *Logger) Log(ctx context.Context, level slog.Level, msg string, args ...any) {
-	l.slog.Log(ctx, level, msg, args...)
+	l.slog.Load().Log(ctx, level, msg, args...)
 }
 func (l *Logger) LogAttrs(ctx context.Context, level slog.Level, msg string, attrs ...slog.Attr) {
-	l.slog.LogAttrs(ctx, level, msg, attrs...)
+	l.slog.Load().LogAttrs(ctx, level, msg, attrs...)
 }
 func (l *Logger) Warn(msg string, args ...any) {
-	l.slog.Warn(msg, args...)
+	l.slog.Load().Warn(msg, args...)
 }
 func (l *Logger) WarnContext(ctx context.Context, msg string, args ...any) {
-	l.slog.WarnContext(ctx, msg, args...)
+	l.slog.Load().WarnContext(ctx, msg, args...)
 }
 func (l *Logger) With(args ...any) *Logger {
-	return &Logger{Logger: l.Logger, file: l.file, extra: l.extra, slog: l.slog.With(args...), level: l.level}
+	logger := &Logger{Logger: l.Logger, extra: l.extra, level: l.level}
+	logger.file.Store(l.file.Load())
+	if extra := l.extra.Load(); extra != nil {
+		logger.extra.Store(extra)
+	}
+	logger.slog.Store(l.slog.Load().With(args...))
+	return logger
 }
 func (l *Logger) WithGroup(name string) *Logger {
-	return &Logger{Logger: l.Logger, file: l.file, extra: l.extra, slog: l.slog.WithGroup(name), level: l.level}
+	logger := &Logger{Logger: l.Logger, extra: l.extra, level: l.level}
+	logger.file.Store(l.file.Load())
+	if extra := l.extra.Load(); extra != nil {
+		logger.extra.Store(extra)
+	}
+	logger.slog.Store(l.slog.Load().WithGroup(name))
+	return logger
 }
 
 func (l *Logger) Rotate() {
-	if i, ok := l.extra.(Rotatable); ok {
-		i.Rotate()
+	if extra := l.extra.Load(); extra != nil {
+		if i, ok := extra.(Rotatable); ok {
+			i.Rotate()
+		}
 	}
-	if l.file != nil {
-		l.SetFile(l.file.Name())
+	if file := l.file.Load(); file != nil {
+		l.SetFile(file.Name())
 	}
 }
 

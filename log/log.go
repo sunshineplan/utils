@@ -6,128 +6,135 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"sync/atomic"
 )
 
-var std = newLogger(log.Default(), os.Stderr)
+var defaultLogger atomic.Pointer[Logger]
 
-func Default() *Logger { return std }
+func init() {
+	defaultLogger.Store(newLogger(log.Default(), os.Stderr))
+}
+
+func Default() *Logger { return defaultLogger.Load() }
+
+func SetDefault(l *Logger) {
+	defaultLogger.Store(l)
+}
 
 func File() string {
-	return std.File()
+	return Default().File()
 }
 
 func SetOutput(file string, extra io.Writer) {
-	std.SetOutput(file, extra)
+	Default().SetOutput(file, extra)
 }
 
 func SetFile(file string) {
-	std.SetFile(file)
+	Default().SetFile(file)
 }
 
 func SetExtra(extra io.Writer) {
-	std.SetExtra(extra)
+	Default().SetExtra(extra)
 }
 
 func Rotate() {
-	std.Rotate()
+	Default().Rotate()
 }
 
 func Flags() int {
-	return std.Flags()
+	return Default().Flags()
 }
 func SetFlags(flag int) {
-	std.SetFlags(flag)
+	Default().SetFlags(flag)
 }
 func Prefix() string {
-	return std.Prefix()
+	return Default().Prefix()
 }
 func SetPrefix(prefix string) {
-	std.SetPrefix(prefix)
+	Default().SetPrefix(prefix)
 }
 func Writer() io.Writer {
-	return std.Writer()
+	return Default().Writer()
 }
 func Print(v ...any) {
-	std.Print(v...)
+	Default().Print(v...)
 }
 func Printf(format string, v ...any) {
-	std.Printf(format, v...)
+	Default().Printf(format, v...)
 }
 func Println(v ...any) {
-	std.Println(v...)
+	Default().Println(v...)
 }
 func Fatal(v ...any) {
-	std.Fatal(v...)
+	Default().Fatal(v...)
 }
 func Fatalf(format string, v ...any) {
-	std.Fatalf(format, v...)
+	Default().Fatalf(format, v...)
 }
 func Fatalln(v ...any) {
-	std.Fatalln(v...)
+	Default().Fatalln(v...)
 }
 func Panic(v ...any) {
-	std.Panic(v...)
+	Default().Panic(v...)
 }
 func Panicf(format string, v ...any) {
-	std.Panicf(format, v...)
+	Default().Panicf(format, v...)
 }
 func Panicln(v ...any) {
-	std.Panicln(v...)
+	Default().Panicln(v...)
 }
 func Output(calldepth int, s string) error {
-	return std.Output(calldepth+1, s) // +1 for this frame.
+	return Default().Output(calldepth+1, s) // +1 for this frame.
 }
 
 func SetHandler(h slog.Handler) {
-	std.mu.Lock()
-	defer std.mu.Unlock()
-	std.slog = slog.New(h)
+	Default().slog.Store(slog.New(h))
 }
 func Level() *slog.LevelVar {
-	return std.level
+	return Default().level
 }
 func SetLevel(level slog.Level) {
-	std.level.Set(level)
+	Default().level.Set(level)
 }
 func Debug(msg string, args ...any) {
-	std.Debug(msg, args...)
+	Default().Debug(msg, args...)
 }
 func DebugContext(ctx context.Context, msg string, args ...any) {
-	std.DebugContext(ctx, msg, args...)
+	Default().DebugContext(ctx, msg, args...)
 }
 func Enabled(ctx context.Context, level slog.Level) bool {
-	return std.Enabled(ctx, level)
+	return Default().Enabled(ctx, level)
 }
 func Error(msg string, args ...any) {
-	std.Error(msg, args...)
+	Default().Error(msg, args...)
 }
 func ErrorContext(ctx context.Context, msg string, args ...any) {
-	std.ErrorContext(ctx, msg, args...)
+	Default().ErrorContext(ctx, msg, args...)
 }
 func Handler() slog.Handler {
-	return std.Handler()
+	return Default().Handler()
 }
 func Info(msg string, args ...any) {
-	std.Info(msg, args...)
+	Default().Info(msg, args...)
 }
 func InfoContext(ctx context.Context, msg string, args ...any) {
-	std.InfoContext(ctx, msg, args...)
+	Default().InfoContext(ctx, msg, args...)
 }
 func Log(ctx context.Context, level slog.Level, msg string, args ...any) {
-	std.Log(ctx, level, msg, args...)
+	Default().Log(ctx, level, msg, args...)
 }
 func LogAttrs(ctx context.Context, level slog.Level, msg string, attrs ...slog.Attr) {
-	std.LogAttrs(ctx, level, msg, attrs...)
+	Default().LogAttrs(ctx, level, msg, attrs...)
 }
 func Warn(msg string, args ...any) {
-	std.Warn(msg, args...)
+	Default().Warn(msg, args...)
 }
 func WarnContext(ctx context.Context, msg string, args ...any) {
-	std.WarnContext(ctx, msg, args...)
+	Default().WarnContext(ctx, msg, args...)
 }
 func With(args ...any) *Logger {
-	return std.With(args...)
+	return Default().With(args...)
 }
 func WithGroup(name string) *Logger {
-	return std.WithGroup(name)
+	return Default().WithGroup(name)
 }

@@ -17,9 +17,9 @@ type defaultHandler struct {
 	slog.Handler
 }
 
-func newDefaultHandler(mu *sync.Mutex, logger *log.Logger, level *slog.LevelVar) *defaultHandler {
+func newDefaultHandler(logger *log.Logger, level *slog.LevelVar) *defaultHandler {
 	buf := new(bytes.Buffer)
-	return &defaultHandler{mu, buf, logger, slog.NewTextHandler(buf, &slog.HandlerOptions{Level: level})}
+	return &defaultHandler{new(sync.Mutex), buf, logger, slog.NewTextHandler(buf, &slog.HandlerOptions{Level: level})}
 }
 
 func (h *defaultHandler) Handle(ctx context.Context, r slog.Record) error {
