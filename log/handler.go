@@ -5,7 +5,9 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"strings"
 	"sync"
+	"time"
 )
 
 var _ slog.Handler = new(defaultHandler)
@@ -25,12 +27,11 @@ func newDefaultHandler(logger *log.Logger, level *slog.LevelVar) *defaultHandler
 func (h *defaultHandler) Handle(ctx context.Context, r slog.Record) error {
 	h.Lock()
 	defer h.Unlock()
+	r.Time = time.Time{}
 	if err := h.Handler.Handle(ctx, r); err != nil {
 		return err
 	}
-	if _, err := h.Writer().Write(h.Bytes()); err != nil {
-		return err
-	}
+	h.Print(strings.TrimPrefix(h.String(), "level="))
 	h.Reset()
 	return nil
 }

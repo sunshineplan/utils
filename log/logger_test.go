@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -52,7 +53,8 @@ func TestSLogger(t *testing.T) {
 		t.Errorf("expected empty string; got %q", file)
 	}
 	l.Info("test")
-	if s, expected := buf.String(), "level=INFO msg=test\n"; !strings.HasSuffix(s, expected) {
+	fmt.Print(buf.String())
+	if s, expected := buf.String(), "INFO msg=test\n"; !strings.HasSuffix(s, expected) {
 		t.Errorf("expected %q; got %q", expected, s)
 	}
 	buf.Reset()
@@ -63,13 +65,15 @@ func TestSLogger(t *testing.T) {
 	buf.Reset()
 	l.SetLevel(slog.LevelDebug)
 	l.Debug("test")
-	if s, expected := buf.String(), "level=DEBUG msg=test\n"; !strings.HasSuffix(s, expected) {
+	fmt.Print(buf.String())
+	if s, expected := buf.String(), "DEBUG msg=test\n"; !strings.HasSuffix(s, expected) {
 		t.Errorf("expected %q; got %q", expected, s)
 	}
 	buf.Reset()
 	l = l.WithGroup("g").With("a", 1)
 	l.Info("test")
-	if s, expected := buf.String(), "level=INFO msg=test g.a=1\n"; !strings.HasSuffix(s, expected) {
+	fmt.Print(buf.String())
+	if s, expected := buf.String(), "INFO msg=test g.a=1\n"; !strings.HasSuffix(s, expected) {
 		t.Errorf("expected %q; got %q", expected, s)
 	}
 }

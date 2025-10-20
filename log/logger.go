@@ -46,7 +46,10 @@ func New(file, prefix string, flag int) *Logger {
 	if file == "" {
 		return newLogger(log.New(io.Discard, prefix, flag), nil)
 	}
-	f := openFile(file)
+	f, err := openFile(file)
+	if err != nil {
+		panic(err)
+	}
 	return newLogger(log.New(f, prefix, flag), f)
 }
 
@@ -70,7 +73,9 @@ func (l *Logger) setOutput(file *os.File, extra io.Writer) {
 	}
 	l.Logger.SetOutput(io.MultiWriter(writers...))
 	if oldFile := l.file.Load(); oldFile != nil && oldFile != file {
-		oldFile.Close()
+		if err := oldFile.Close(); err != nil {
+			l.Error("failed to close log file", "error", err)
+		}
 	}
 	l.file.Store(file)
 	if extra != nil {
@@ -78,8 +83,13 @@ func (l *Logger) setOutput(file *os.File, extra io.Writer) {
 	}
 }
 
-func (l *Logger) SetOutput(file string, extra io.Writer) {
-	l.setOutput(openFile(file), extra)
+func (l *Logger) SetOutput(file string, extra io.Writer) error {
+	f, err := openFile(file)
+	if err != nil {
+		return err
+	}
+	l.setOutput(f, extra)
+	return nil
 }
 
 func (l *Logger) SetFile(file string) {
@@ -169,13 +179,13 @@ func (l *Logger) Write(b []byte) (int, error) {
 	return l.Writer().Write(b)
 }
 
-func openFile(file string) *os.File {
+func openFile(file string) (*os.File, error) {
 	if file != "" {
 		f, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0640)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
-		return f
+		return f, nil
 	}
-	return nil
+	return nil, nil
 }
