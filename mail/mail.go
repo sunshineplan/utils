@@ -20,6 +20,8 @@ type Dialer struct {
 	Timeout  time.Duration
 }
 
+// Dial dials the SMTP server and performs optional STARTTLS / AUTH.
+// It returns a connected smtp.Client. Caller should call client.Quit() when done.
 func (d *Dialer) Dial() (client *smtp.Client, err error) {
 	if d.Timeout == 0 {
 		d.Timeout = 3 * time.Minute
@@ -37,6 +39,7 @@ func (d *Dialer) Dial() (client *smtp.Client, err error) {
 		return
 	}
 
+	// If connection is not TLS but server supports STARTTLS, upgrade.
 	if !d.TLS {
 		if ok, _ := client.Extension("STARTTLS"); ok {
 			if err = client.StartTLS(nil); err != nil {
@@ -45,6 +48,7 @@ func (d *Dialer) Dial() (client *smtp.Client, err error) {
 		}
 	}
 
+	// Authenticate if server advertises AUTH and credentials are provided.
 	if ok, _ := client.Extension("AUTH"); ok && d.Account != "" && d.Password != "" {
 		if err = client.Auth2(&smtp.Auth{Identity: "", Username: d.Account, Password: d.Password, Server: d.Server}); err != nil {
 			client.Quit()
@@ -55,15 +59,19 @@ func (d *Dialer) Dial() (client *smtp.Client, err error) {
 	return client, nil
 }
 
-// Send sends the given messages.
+// Send sends the given messages using one established connection.
+// It honors Dialer.Timeout for each message via context timeouts.
+// The client connection will be Quit() when Send returns.
 func (d *Dialer) Send(msg ...*Message) error {
 	client, err := d.Dial()
 	if err != nil {
 		return err
 	}
+	// ensure we close the SMTP connection when the function returns
 	defer client.Quit()
 
 	for _, m := range msg {
+		// default From to the dialer's account if not set
 		if m.From == nil {
 			m.From = Receipt("", d.Account)
 		}
