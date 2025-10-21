@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -15,6 +16,12 @@ const (
 )
 
 var errNoResult = errors.New("no ocr result")
+
+type ocrResponse struct {
+	ParsedResults []struct {
+		ParsedText string
+	}
+}
 
 // OCR reads image from reader r and converts it into string.
 func OCR(r io.Reader) (string, error) {
@@ -49,16 +56,16 @@ func OCRWithClient(r io.Reader, client *http.Client) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("ocr request failed: %s", resp.Status)
+	}
+
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
 
-	var res struct {
-		ParsedResults []struct {
-			ParsedText string
-		}
-	}
+	var res ocrResponse
 	if err := json.Unmarshal(b, &res); err != nil {
 		return "", err
 	}
