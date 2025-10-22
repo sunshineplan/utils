@@ -134,7 +134,7 @@ func (c *Client) helo() error {
 func (c *Client) ehlo() error {
 	_, msg, err := c.Cmd(250, "EHLO %s", c.localName)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to send HELO: %w", err)
 	}
 	ext := make(map[string]string)
 	extList := strings.Split(msg, "\n")
@@ -149,7 +149,7 @@ func (c *Client) ehlo() error {
 		c.auth = strings.Split(mechs, " ")
 	}
 	c.ext = ext
-	return err
+	return nil
 }
 
 // StartTLS sends the STARTTLS command and encrypts all further communication.
@@ -161,7 +161,7 @@ func (c *Client) StartTLS(config *tls.Config) error {
 	}
 	_, _, err := c.Cmd(220, "STARTTLS")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to send STARTTLS: %w", err)
 	}
 	if config == nil {
 		config = &tls.Config{ServerName: c.serverName}
