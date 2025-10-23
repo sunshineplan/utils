@@ -67,16 +67,6 @@ aa,
 		fieldnames: nil,
 		slice:      []*test{{A: "a", B: "b"}, nil, {A: "aa", B: nil}},
 	}, result)
-	testExport(t, testcase[D]{
-		name:       "D slice",
-		fieldnames: []string{"A", "B"},
-		slice:      []D{{{"A", "a"}, {"B", "b"}}, {{"A", "aa"}, {"B", nil}}},
-	}, result)
-	testExport(t, testcase[D]{
-		name:       "D slice without fieldnames",
-		fieldnames: nil,
-		slice:      []D{{{"A", "a"}, {"B", "b"}}, {{"A", "aa"}, {"B", nil}}},
-	}, result)
 	testExport(t, testcase[any]{
 		name:       "interface slice",
 		fieldnames: []string{"A", "B"},

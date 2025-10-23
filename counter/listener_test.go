@@ -50,7 +50,7 @@ func TestListener(t *testing.T) {
 	}
 	conn.Close()
 
-	if count := l.ReadCount(); count != dataLen {
-		t.Fatalf("expected %d; got %d", dataLen, count)
+	if n := l.ReadBytes(); n != dataLen {
+		t.Fatalf("expected %d; got %d", dataLen, n)
 	}
 }

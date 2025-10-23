@@ -31,7 +31,6 @@ func (w *Writer) WriteLine(s string) (int, error) {
 	if w.UseCRLF {
 		return w.WriteString(s + "\r\n")
 	}
-
 	return w.WriteString(s + "\n")
 }
 
@@ -50,6 +49,5 @@ func (w *Writer) WriteAll(contents []string) error {
 			return err
 		}
 	}
-
 	return w.Flush()
 }

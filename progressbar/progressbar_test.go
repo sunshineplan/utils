@@ -23,7 +23,7 @@ func TestProgessBar(t *testing.T) {
 		pb.Add(1)
 		time.Sleep(time.Second)
 	}
-	pb.Done()
+	pb.Wait()
 
 	pb = New(10).SetRefreshInterval(500 * time.Millisecond)
 	pb.Start()
@@ -32,7 +32,7 @@ func TestProgessBar(t *testing.T) {
 		pb.Add(1)
 		time.Sleep(time.Second)
 	}
-	pb.Done()
+	pb.Wait()
 
 	pb = New(0)
 	pb.Start()
@@ -63,7 +63,7 @@ func TestMessage(t *testing.T) {
 		pb.Add(1)
 		time.Sleep(time.Second)
 	}
-	pb.Done()
+	pb.Wait()
 	close(stopCh)
 	select {
 	case err := <-errCh:
@@ -88,7 +88,7 @@ func TestCancel(t *testing.T) {
 			time.Sleep(time.Second)
 		}
 	}()
-	pb.Done()
+	pb.Wait()
 }
 
 func TestFromReader(t *testing.T) {
@@ -97,7 +97,7 @@ func TestFromReader(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	total, err := strconv.Atoi(resp.Header.Get("content-length"))
+	total, err := strconv.ParseInt(resp.Header.Get("content-length"), 10, 64)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,11 +105,11 @@ func TestFromReader(t *testing.T) {
 	if _, err := pb.FromReader(resp.Body, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	pb.Done()
+	pb.Wait()
 }
 
 func TestSetTemplate(t *testing.T) {
-	pb := &ProgressBar{}
+	pb := &ProgressBar[int]{}
 	if err := pb.SetTemplate(`{{.Done}}`); err != nil {
 		t.Error(err)
 	}

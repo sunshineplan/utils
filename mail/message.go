@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"math"
 	"mime"
 	"net/mail"
 	"net/textproto"
@@ -51,24 +50,27 @@ type Message struct {
 	Attachments []*Attachment
 }
 
+// RcptList returns a de-duplicated list of recipient email addresses while preserving order:
+// first To, then Cc, then Bcc.
 func (m *Message) RcptList() (rcpts []string) {
-	list := make(map[string]struct{})
-	for _, to := range m.To {
-		list[to.Address] = struct{}{}
-	}
-	for _, cc := range m.Cc {
-		list[cc.Address] = struct{}{}
-	}
-	for _, bcc := range m.Bcc {
-		list[bcc.Address] = struct{}{}
-	}
-	for k := range list {
-		rcpts = append(rcpts, k)
+	seen := make(map[string]bool)
+	for _, list := range [][]*mail.Address{m.To, m.Cc, m.Bcc} {
+		for _, addr := range list {
+			if !seen[addr.Address] {
+				rcpts = append(rcpts, addr.Address)
+				seen[addr.Address] = true
+			}
+		}
 	}
 	return
 }
 
+// Bytes renders the RFC822-style message bytes for the message.
+// id is used to create the Message-ID domain if provided; if empty, fallback to hostname.
+// The produced message uses CRLF line endings as required by SMTP and includes correct
+// MIME headers for single-part or multipart/mixed with attachments.
 func (m *Message) Bytes(id string) []byte {
+	// determine hostname part for Message-ID
 	if id == "" {
 		if m.From != nil && m.From.Address != "" {
 			id = m.From.Address
@@ -85,12 +87,18 @@ func (m *Message) Bytes(id string) []byte {
 	var buf bytes.Buffer
 	w := textproto.NewWriter(bufio.NewWriter(&buf))
 
+	// Basic headers
 	w.PrintfLine("MIME-Version: 1.0")
 	w.PrintfLine("Date: %s", time.Now().Format(time.RFC1123Z))
 	w.PrintfLine("Message-ID: <%s>", id)
-	w.PrintfLine("Subject: =?UTF-8?B?%s?=", toBase64(m.Subject))
-	w.PrintfLine("From: %s", m.From)
-	w.PrintfLine("To: %s", m.To)
+	w.PrintfLine("Subject: %s", encodeHeader(m.Subject))
+	if m.From != nil {
+		w.PrintfLine("From: %s", m.From.String())
+	}
+	// To / Cc headers (these are header fields visible in the message)
+	if len(m.To) > 0 {
+		w.PrintfLine("To: %s", m.To)
+	}
 	if len(m.Cc) > 0 {
 		w.PrintfLine("Cc: %s", m.Cc)
 	}
@@ -105,7 +113,7 @@ func (m *Message) Bytes(id string) []byte {
 	w.PrintfLine(`Content-Type: %s; charset="UTF-8"`, m.ContentType)
 	w.PrintfLine("Content-Transfer-Encoding: base64")
 	w.PrintfLine("")
-	w.PrintfLine("%s", toBase64(m.Body))
+	writeBase64BytesLines(w, []byte(m.Body))
 
 	if l := len(m.Attachments); l > 0 {
 		for i, attachment := range m.Attachments {
@@ -116,25 +124,14 @@ func (m *Message) Bytes(id string) []byte {
 				w.PrintfLine("Content-Type: application/octet-stream")
 			}
 			if attachment.ContentID != "" {
-				w.PrintfLine(`Content-Disposition: inline; filename="=?UTF-8?B?%s?="`, toBase64(attachment.Filename))
+				w.PrintfLine(`Content-Disposition: inline; filename="%s"`, encodeHeader(attachment.Filename))
 				w.PrintfLine("Content-ID: <%s>", attachment.ContentID)
 			} else {
-				w.PrintfLine(`Content-Disposition: attachment; filename="=?UTF-8?B?%s?="`, toBase64(attachment.Filename))
+				w.PrintfLine(`Content-Disposition: attachment; filename="%s"`, encodeHeader(attachment.Filename))
 			}
 			w.PrintfLine("Content-Transfer-Encoding: base64")
 			w.PrintfLine("")
-
-			b := make([]byte, base64.StdEncoding.EncodedLen(len(attachment.Bytes)))
-			base64.StdEncoding.Encode(b, attachment.Bytes)
-
-			// write base64 content in lines of up to 76 chars
-			for i, l := 0, int(math.Ceil(float64(len(b))/76)); i < l; i++ {
-				if i == l-1 {
-					w.PrintfLine("%s", b[i*76:])
-				} else {
-					w.PrintfLine("%s", b[i*76:(i+1)*76])
-				}
-			}
+			writeBase64BytesLines(w, attachment.Bytes)
 
 			if i < l-1 {
 				w.PrintfLine("--%s", boundary)
@@ -147,10 +144,28 @@ func (m *Message) Bytes(id string) []byte {
 	return buf.Bytes()
 }
 
-func toBase64(str string) string {
-	return base64.StdEncoding.EncodeToString([]byte(str))
+// encodeHeader encodes a header value using RFC2047 only when non-ASCII chars are present.
+// For pure ASCII strings it returns the original string unmodified.
+func encodeHeader(s string) string {
+	for _, r := range s {
+		if r > 127 {
+			return fmt.Sprintf("=?UTF-8?B?%s?=", base64.StdEncoding.EncodeToString([]byte(s)))
+		}
+	}
+	return s
 }
 
+// writeBase64BytesLines encodes bytes to base64 and writes it in lines of up to 76 chars.
+func writeBase64BytesLines(w *textproto.Writer, b []byte) {
+	enc := base64.StdEncoding.EncodeToString(b)
+	// number of lines
+	for i := 0; i < len(enc); i += 76 {
+		end := min(i+76, len(enc))
+		w.PrintfLine("%s", enc[i:end])
+	}
+}
+
+// randomString returns a hex string of length 2*n (because each byte => two hex chars).
 func randomString(n int) string {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
@@ -159,6 +174,8 @@ func randomString(n int) string {
 	return fmt.Sprintf("%x", b)
 }
 
+// generateMsgID generates a message id using the provided reference (domain or email).
+// If ref has an @, use the right-hand side as domain, otherwise use ref as domain.
 func generateMsgID(ref string) string {
 	s := strings.Split(ref, "@")
 	return fmt.Sprintf("%s@%s", randomString(16), s[len(s)-1])

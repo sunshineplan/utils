@@ -22,20 +22,19 @@ type Reader struct {
 }
 
 // NewReader returns a new Reader that reads from r.
-func NewReader(r io.Reader, hasFields bool) *Reader {
+func NewReader(r io.Reader, hasFields bool) (*Reader, error) {
 	reader := &Reader{Reader: csv.NewReader(r)}
 	if closer, ok := r.(io.Closer); ok {
 		reader.closer = closer
 	}
-
 	if hasFields {
 		var err error
 		reader.fields, err = reader.Read()
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 	}
-	return reader
+	return reader, nil
 }
 
 // ReadFile returns Reader reads from file.
@@ -44,9 +43,23 @@ func ReadFile(file string, hasFields bool) (*Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewReader(f, hasFields), nil
+	reader, err := NewReader(f, hasFields)
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	return reader, nil
 }
 
+// Read reads one record (a slice of fields) from r.
+// If the record has an unexpected number of fields,
+// Read returns the record along with the error [ErrFieldCount].
+// If the record contains a field that cannot be parsed,
+// Read returns a partial record along with the parse error.
+// The partial record contains all fields read before the error.
+// If there is no data left to be read, Read returns nil, [io.EOF].
+// If [Reader.ReuseRecord] is true, the returned slice may be shared
+// between multiple calls to Read.
 func (r *Reader) Read() (record []string, err error) {
 	record, err = r.Reader.Read()
 	if err == nil {
@@ -76,14 +89,12 @@ func (r *Reader) Scan(dest ...any) error {
 	if r.next == nil && r.nextErr == nil {
 		return fmt.Errorf("Scan called without calling Next")
 	}
-
 	if r.nextErr != nil {
 		return r.nextErr
 	}
 	if len(dest) != len(r.next) {
 		return fmt.Errorf("expected %d destination arguments in Scan, not %d", len(r.next), len(dest))
 	}
-
 	for i, v := range r.next {
 		if err := setCell(dest[i], v); err != nil {
 			return fmt.Errorf("Scan error on field index %d: %v", i, err)
@@ -104,7 +115,6 @@ func (r *Reader) Decode(dest any) error {
 	if r.nextErr != nil {
 		return r.nextErr
 	}
-
 	m := make(map[string]string)
 	for i, field := range r.fields {
 		if len(r.next) > i {
@@ -114,6 +124,7 @@ func (r *Reader) Decode(dest any) error {
 	return setRow(dest, m)
 }
 
+// Close closes the underlying reader if it implements the io.Closer interface.
 func (r *Reader) Close() error {
 	if r.closer != nil {
 		return r.closer.Close()
@@ -123,25 +134,19 @@ func (r *Reader) Close() error {
 
 // DecodeAll decodes each record from r into dest.
 func DecodeAll[S ~[]E, E any](r io.Reader, dest *S) (err error) {
-	defer func() {
-		if e := recover(); e != nil {
-			err = fmt.Errorf("%v", e)
-		}
-	}()
-
-	reader := NewReader(r, true)
-	defer reader.Close()
-
-	var res S
+	reader, err := NewReader(r, true)
+	if err != nil {
+		return
+	}
+	*dest = nil
 	for reader.Next() {
 		var t E
 		if err = reader.Decode(&t); err != nil {
+			*dest = nil
 			return
 		}
-		res = append(res, t)
+		*dest = append(*dest, t)
 	}
-	*dest = res
-
 	return
 }
 
@@ -151,5 +156,6 @@ func DecodeFile[S ~[]E, E any](file string, dest *S) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	return DecodeAll(f, dest)
 }

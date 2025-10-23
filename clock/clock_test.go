@@ -61,7 +61,7 @@ func TestParse(t *testing.T) {
 func TestSeconds(t *testing.T) {
 	for i, testcase := range []struct {
 		c        Clock
-		expected int64
+		expected uint64
 	}{
 		{New(0, 0, 0), 0},
 		{New(7, 1, 2), 7*secondsPerHour + 1*secondsPerMinute + 2},

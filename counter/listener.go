@@ -1,55 +1,66 @@
 package counter
 
-import "net"
+import (
+	"io"
+	"net"
+)
 
 var (
 	_ net.Listener = &Listener{}
 	_ net.Conn     = &conn{}
 )
 
+// Listener wraps a net.Listener to count bytes read and written across all connections.
 type Listener struct {
-	listener net.Listener
-	read     Counter
-	written  Counter
+	net.Listener
+	readBytes  Counter // Counter for bytes read across all connections
+	writeBytes Counter // Counter for bytes written across all connections
 }
 
+// NewListener creates a Listener that counts bytes read and written across all connections.
 func NewListener(listener net.Listener) *Listener {
-	return &Listener{listener: listener}
+	return &Listener{Listener: listener}
 }
 
+// Accept accepts a connection and wraps it with byte counting for reads and writes.
+// It returns the wrapped connection or an error if the accept fails.
 func (l *Listener) Accept() (net.Conn, error) {
-	c, err := l.listener.Accept()
+	c, err := l.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
-	return &conn{c, l}, nil
+	return &conn{
+		Conn: c,
+		r:    CountReader(c, &l.readBytes),
+		w:    CountWriter(c, &l.writeBytes),
+	}, nil
 }
 
-func (l *Listener) Close() error {
-	return l.listener.Close()
+// ReadBytes returns the total number of bytes read across all connections.
+func (l *Listener) ReadBytes() int64 {
+	return l.readBytes.Get()
 }
 
-func (l *Listener) Addr() net.Addr {
-	return l.listener.Addr()
+// WriteBytes returns the total number of bytes written across all connections.
+func (l *Listener) WriteBytes() int64 {
+	return l.writeBytes.Get()
 }
 
-func (l *Listener) ReadCount() int64 {
-	return l.read.Load()
-}
-
-func (l *Listener) WriteCount() int64 {
-	return l.written.Load()
-}
-
+// conn wraps a net.Conn to count bytes read and written.
 type conn struct {
 	net.Conn
-	listener *Listener
+	r io.Reader // Reader that counts bytes read
+	w io.Writer // Writer that counts bytes written
 }
 
-func (conn *conn) Write(b []byte) (n int, err error) {
-	return conn.listener.written.AddWriter(conn.Conn).Write(b)
+// Read reads from the underlying Reader and counts the bytes read.
+// It returns the number of bytes read and any error encountered.
+func (c *conn) Read(b []byte) (int, error) {
+	return c.r.Read(b)
 }
 
-func (conn *conn) Read(b []byte) (n int, err error) {
-	return conn.listener.read.AddReader(conn.Conn).Read(b)
+// Write writes to the underlying Writer and counts the bytes written.
+// It returns the number of bytes written and any error encountered.
+func (c *conn) Write(b []byte) (int, error) {
+	return c.w.Write(b)
 }

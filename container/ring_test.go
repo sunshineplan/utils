@@ -5,13 +5,13 @@
 package container
 
 import (
-	"container/ring"
 	"fmt"
+	"sync"
 	"testing"
 )
 
 // For debugging - keep around.
-func dump(r *ring.Ring) {
+func dump[T any](r *Ring[T]) {
 	if r == nil {
 		fmt.Println("empty")
 		return
@@ -24,7 +24,7 @@ func dump(r *ring.Ring) {
 	fmt.Println()
 }
 
-func verify[T int](t *testing.T, r *Ring[T], N int, sum int) {
+func verify(t *testing.T, r *Ring[int], N int, sum int) {
 	// Len
 	n := r.Len()
 	if n != N {
@@ -34,11 +34,9 @@ func verify[T int](t *testing.T, r *Ring[T], N int, sum int) {
 	// iteration
 	n = 0
 	s := 0
-	r.Do(func(p *T) {
+	r.Do(func(p int) {
 		n++
-		if p != nil {
-			s += int(*p)
-		}
+		s += p
 	})
 	if n != N {
 		t.Errorf("number of forward iterations == %d; expected %d", n, N)
@@ -47,41 +45,41 @@ func verify[T int](t *testing.T, r *Ring[T], N int, sum int) {
 		t.Errorf("forward ring sum = %d; expected %d", s, sum)
 	}
 
-	if r == nil || r.r == nil {
+	if r == nil {
 		return
 	}
 
 	// connections
-	if r.Next().r != nil {
-		var p *ring.Ring // previous element
-		for q := r.r; p == nil || q != r.r; q = q.Next() {
+	if r.Next() != nil {
+		var p *Ring[int] // previous element
+		for q := r; p == nil || q != r; q = q.next {
 			if p != nil && p != q.Prev() {
 				t.Errorf("prev = %p, expected q.prev = %p\n", p, q.Prev())
 			}
 			p = q
 		}
-		if p != r.Prev().r {
+		if p != r.Prev() {
 			t.Errorf("prev = %p, expected r.prev = %p\n", p, r.Prev())
 		}
 	}
 
 	// Move
-	if r.Move(0).r != r.r {
+	if r.Move(0) != r {
 		t.Errorf("r.Move(0) != r")
 	}
-	if r.Move(N).r != r.r {
+	if r.Move(N) != r {
 		t.Errorf("r.Move(%d) != r", N)
 	}
-	if r.Move(-N).r != r.r {
+	if r.Move(-N) != r {
 		t.Errorf("r.Move(%d) != r", -N)
 	}
 	for i := 0; i < 10; i++ {
 		ni := N + i
 		mi := ni % N
-		if r.Move(ni).r != r.Move(mi).r {
+		if r.Move(ni) != r.Move(mi) {
 			t.Errorf("r.Move(%d) != r.Move(%d)", ni, mi)
 		}
-		if r.Move(-ni).r != r.Move(-mi).r {
+		if r.Move(-ni) != r.Move(-mi) {
 			t.Errorf("r.Move(%d) != r.Move(%d)", -ni, -mi)
 		}
 	}
@@ -89,8 +87,8 @@ func verify[T int](t *testing.T, r *Ring[T], N int, sum int) {
 
 func TestCornerCases(t *testing.T) {
 	var (
-		r0 = &Ring[int]{newMutex(), nil}
-		r1 = Ring[int]{newMutex(), new(ring.Ring)}
+		r0 *Ring[int]
+		r1 Ring[int]
 	)
 	// Basics
 	verify(t, r0, 0, 0)
@@ -132,16 +130,16 @@ func TestNew(t *testing.T) {
 
 func TestLink1(t *testing.T) {
 	r1a := makeN(1)
-	var r1b = Ring[int]{newMutex(), &ring.Ring{}}
+	var r1b Ring[int]
 	r2a := r1a.Link(&r1b)
 	verify(t, r2a, 2, 1)
-	if r2a.r != r1a.r {
+	if r2a != r1a {
 		t.Errorf("a) 2-element link failed")
 	}
 
 	r2b := r2a.Link(r2a.Next())
 	verify(t, r2b, 2, 1)
-	if r2b.r != r2a.Next().r {
+	if r2b != r2a.Next() {
 		t.Errorf("b) 2-element link failed")
 	}
 
@@ -151,7 +149,7 @@ func TestLink1(t *testing.T) {
 }
 
 func TestLink2(t *testing.T) {
-	var r0 = &Ring[int]{newMutex(), nil}
+	var r0 *Ring[int]
 	r1a := NewRing[int](1)
 	r1a.Set(42)
 	r1b := NewRing[int](1)
@@ -172,7 +170,7 @@ func TestLink2(t *testing.T) {
 }
 
 func TestLink3(t *testing.T) {
-	var r = Ring[int]{newMutex(), new(ring.Ring)}
+	var r Ring[int]
 	n := 1
 	for i := 1; i < 10; i++ {
 		n += i
@@ -216,8 +214,119 @@ func TestLinkUnlink(t *testing.T) {
 
 // Test that calling Move() on an empty Ring initializes it.
 func TestMoveEmptyRing(t *testing.T) {
-	var r = Ring[int]{newMutex(), &ring.Ring{}}
+	var r Ring[int]
 
 	r.Move(1)
 	verify(t, &r, 1, 0)
+}
+
+// TestLinkSharedRing tests the Link function to ensure the shared ringMu is correctly set.
+func TestLinkSharedRing(t *testing.T) {
+	// Helper function to check if all elements in a ring share the same ringMu.
+	checkRingMu := func(t *testing.T, r *Ring[int], expectedMu *sync.RWMutex, name string) {
+		if r == nil {
+			t.Errorf("%s: ring is nil", name)
+			return
+		}
+		seen := make(map[*Ring[int]]bool)
+		current := r
+		for {
+			if current.ringMu != expectedMu {
+				t.Errorf("%s: element %p has ringMu %p, expected %p", name, current, current.ringMu, expectedMu)
+			}
+			seen[current] = true
+			current = current.Next()
+			if current == r {
+				break
+			}
+			if seen[current] {
+				t.Errorf("%s: cycle detected before reaching start", name)
+				break
+			}
+		}
+	}
+
+	// Test 1: Link two distinct rings.
+	t.Run("LinkDistinctRings", func(t *testing.T) {
+		r1 := NewRing[int](3)
+		r2 := NewRing[int](2)
+		originalR1Mu := r1.ringMu
+		originalR2Mu := r2.ringMu
+
+		// Link r1 and r2.
+		r1.Link(r2)
+
+		if originalR1Mu == originalR2Mu {
+			t.Fatalf("initial rings have same ringMu %p", originalR1Mu)
+		}
+
+		// Check that all elements in the combined ring share r1's ringMu.
+		checkRingMu(t, r1, originalR1Mu, "combined ring")
+
+		// Verify ring length.
+		if r1.Len() != 5 {
+			t.Errorf("combined ring length is %d, expected 5", r1.Len())
+		}
+	})
+
+	// Test 2: Link within the same ring.
+	t.Run("LinkSameRing", func(t *testing.T) {
+		r := NewRing[int](5)
+		originalMu := r.ringMu
+
+		// Move to the third element.
+		r3 := r.Move(2)
+
+		// Link r to r3, splitting the ring.
+		result := r.Link(r3)
+
+		// Check that the original ring (r) has 2 elements and retains original ringMu.
+		checkRingMu(t, r, originalMu, "original ring")
+
+		// Check that the result ring has 3 elements and a new ringMu.
+		if result.ringMu == originalMu {
+			t.Errorf("result ring has same ringMu %p as original %p", result.ringMu, originalMu)
+		}
+
+		checkRingMu(t, result, result.ringMu, "result ring")
+	})
+
+	// Test 3: Link a ring to itself.
+	t.Run("LinkSelf", func(t *testing.T) {
+		r := NewRing[int](5)
+		originalMu := r.ringMu
+
+		result := r.Link(r)
+
+		// Check that the ring remains unchanged and retains original ringMu.
+		checkRingMu(t, r, originalMu, "self-linked ring")
+		if r.Len() != 1 {
+			t.Errorf("self-linked ring length is %d, expected 1", r.Len())
+		}
+
+		// Check that the result ring has 3 elements and a new ringMu.
+		if result.ringMu == originalMu {
+			t.Errorf("result ring has same ringMu %p as original %p", result.ringMu, originalMu)
+		}
+
+		checkRingMu(t, result, result.ringMu, "result ring")
+	})
+
+	// Test 4: Link with nil.
+	t.Run("LinkNil", func(t *testing.T) {
+		r := NewRing[int](3)
+		originalMu := r.ringMu
+		originalNext := r.Next()
+
+		result := r.Link(nil)
+
+		// Check that the ring is unchanged and retains original ringMu.
+		checkRingMu(t, r, originalMu, "ring after linking nil")
+		if r.Len() != 3 {
+			t.Errorf("ring length is %d, expected 3", r.Len())
+		}
+		if result != originalNext {
+			t.Errorf("Link result is %p, expected %p", result, originalNext)
+		}
+	})
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestRemoveByRegexp(t *testing.T) {
+func TestRegexpRemover(t *testing.T) {
 	for i, testcase := range []struct {
 		re       *regexp.Regexp
 		s        string
@@ -15,7 +15,7 @@ func TestRemoveByRegexp(t *testing.T) {
 		{regexp.MustCompile(`\d+`), "abc123", "abc"},
 		{regexp.MustCompile(`\d+$`), "123abc456", "123abc"},
 	} {
-		if res, err := NewTasks().Append(RemoveByRegexp{testcase.re}).Process(testcase.s); err != nil {
+		if res, err := NewTasks().Append(RegexpRemover{testcase.re}).Process(testcase.s); err != nil {
 			t.Error(err)
 		} else if res != testcase.expected {
 			t.Errorf("#%d: got %q; want %q", i, res, testcase.expected)
@@ -23,7 +23,7 @@ func TestRemoveByRegexp(t *testing.T) {
 	}
 }
 
-func TestCut(t *testing.T) {
+func TestCutter(t *testing.T) {
 	for i, testcase := range []struct {
 		seq      string
 		s        string
@@ -34,7 +34,7 @@ func TestCut(t *testing.T) {
 		{" ", " abc 123", ""},
 		{"abc", "123abc456", "123"},
 	} {
-		if res, err := NewTasks().Append(Cut{testcase.seq}).Process(testcase.s); err != nil {
+		if res, err := NewTasks().Append(Cutter{testcase.seq}).Process(testcase.s); err != nil {
 			t.Error(err)
 		} else if res != testcase.expected {
 			t.Errorf("#%d: got %q; want %q", i, res, testcase.expected)
@@ -42,7 +42,7 @@ func TestCut(t *testing.T) {
 	}
 }
 
-func TestTrim(t *testing.T) {
+func TestTrimmer(t *testing.T) {
 	for i, testcase := range []struct {
 		cutset   string
 		s        string
@@ -53,7 +53,7 @@ func TestTrim(t *testing.T) {
 		{" ", " abc 123\n", "abc 123\n"},
 		{" \n", " abc 123\n", "abc 123"},
 	} {
-		if res, err := NewTasks().Append(Trim{testcase.cutset}).Process(testcase.s); err != nil {
+		if res, err := NewTasks().Append(Trimmer{testcase.cutset}).Process(testcase.s); err != nil {
 			t.Error(err)
 		} else if res != testcase.expected {
 			t.Errorf("#%d: got %q; want %q", i, res, testcase.expected)

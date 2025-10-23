@@ -1,12 +1,19 @@
 package confirm
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 )
 
 // Do asks the user for confirmation.
 func Do(prompt string, attempts int) bool {
+	return do(prompt, attempts, os.Stdout, os.Stdin)
+}
+
+func do(prompt string, attempts int, w io.Writer, r io.Reader) bool {
 	if prompt == "" {
 		prompt = "Are you sure?"
 	}
@@ -14,23 +21,31 @@ func Do(prompt string, attempts int) bool {
 		attempts = 3
 	}
 
-	fmt.Print(prompt, " (yes/no): ")
-	var input string
+	if _, err := fmt.Fprintf(w, "%s (yes/no): ", prompt); err != nil {
+		fmt.Println("Error writing to output:", err)
+		return false
+	}
+	scanner := bufio.NewScanner(r)
 	for ; attempts > 0; attempts-- {
-		if _, err := fmt.Scanln(&input); err != nil {
-			fmt.Println(err)
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				fmt.Fprintln(w, "Error reading input:", err)
+			} else {
+				fmt.Fprintln(w, "No input received (EOF).")
+			}
+			continue
 		}
-		switch strings.ToLower(strings.TrimSpace(input)) {
+		switch strings.ToLower(strings.TrimSpace(scanner.Text())) {
 		case "y", "yes":
 			return true
 		case "n", "no":
 			return false
 		default:
 			if attempts > 1 {
-				fmt.Print("Please type 'yes' or 'no': ")
+				fmt.Fprint(w, "Please type 'yes' or 'no': ")
 			}
 		}
 	}
-	fmt.Println("Max retries exceeded.")
+	fmt.Fprintln(w, "Max retries exceeded.")
 	return false
 }

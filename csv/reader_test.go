@@ -19,7 +19,10 @@ test
 a,1,"[1,2]"
 b,2,"[3,4]"
 `
-	r := NewReader(strings.NewReader(csv), true)
+	r, err := NewReader(strings.NewReader(csv), true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if expect := []string{"A", "B", "C"}; !slices.Equal(expect, r.fields) {
 		t.Errorf("expected %v; got %v", expect, r.fields)
 	}
@@ -35,7 +38,10 @@ b,2,"[3,4]"
 		t.Errorf("expected %v; got %v", expect, res1)
 	}
 
-	r = NewReader(strings.NewReader(csv), true)
+	r, err = NewReader(strings.NewReader(csv), true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var res2 []map[string]string
 	for r.Next() {
 		var res map[string]string

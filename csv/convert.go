@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+
+	"github.com/sunshineplan/utils/container"
 )
 
 var (
@@ -40,56 +42,88 @@ func strconvErr(err error) error {
 	return err
 }
 
+var convertMap container.Map[reflect.Type, func(reflect.Type, string) (reflect.Value, error)]
+
 func convert(t reflect.Type, s string) (reflect.Value, error) {
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer || t.Kind() == reflect.Interface {
 		return convert(t.Elem(), s)
 	}
-	v := reflect.Indirect(reflect.New(t))
-	if v.CanInt() {
-		n, err := strconv.ParseInt(s, 10, t.Bits())
-		if err != nil {
-			return v, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
-		}
-		v.SetInt(n)
-		return v, nil
-	} else if v.CanUint() {
-		u, err := strconv.ParseUint(s, 10, t.Bits())
-		if err != nil {
-			return v, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
-		}
-		v.SetUint(u)
-		return v, nil
-	} else if v.CanFloat() {
-		f, err := strconv.ParseFloat(s, t.Bits())
-		if err != nil {
-			return v, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
-		}
-		v.SetFloat(f)
-		return v, nil
-	} else if v.CanComplex() {
-		c, err := strconv.ParseComplex(s, t.Bits())
-		if err != nil {
-			return v, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
-		}
-		v.SetComplex(c)
-		return v, nil
+	fn, ok := convertMap.Load(t)
+	if ok {
+		return fn(t, s)
 	}
-	switch t.Kind() {
-	case reflect.String, reflect.Interface:
-		v.SetString(s)
-		return v, nil
-	case reflect.Bool:
-		b, err := strconv.ParseBool(s)
-		if err == nil {
-			return v, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), err)
-		}
-		v.SetBool(b)
-		return v, nil
-	case reflect.Slice:
-		if t.Elem().Kind() == reflect.Uint8 {
-			v.SetBytes([]byte(s))
+	v := reflect.New(t).Elem()
+	if v.CanInt() {
+		fn = func(t reflect.Type, s string) (reflect.Value, error) {
+			v := reflect.New(t).Elem()
+			n, err := strconv.ParseInt(s, 10, t.Bits())
+			if err != nil {
+				return reflect.Value{}, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
+			}
+			v.SetInt(n)
 			return v, nil
 		}
+	} else if v.CanUint() {
+		fn = func(t reflect.Type, s string) (reflect.Value, error) {
+			v := reflect.New(t).Elem()
+			u, err := strconv.ParseUint(s, 10, t.Bits())
+			if err != nil {
+				return reflect.Value{}, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
+			}
+			v.SetUint(u)
+			return v, nil
+		}
+	} else if v.CanFloat() {
+		fn = func(t reflect.Type, s string) (reflect.Value, error) {
+			v := reflect.New(t).Elem()
+			f, err := strconv.ParseFloat(s, t.Bits())
+			if err != nil {
+				return reflect.Value{}, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
+			}
+			v.SetFloat(f)
+			return v, nil
+		}
+	} else if v.CanComplex() {
+		fn = func(t reflect.Type, s string) (reflect.Value, error) {
+			v := reflect.New(t).Elem()
+			c, err := strconv.ParseComplex(s, t.Bits())
+			if err != nil {
+				return reflect.Value{}, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), strconvErr(err))
+			}
+			v.SetComplex(c)
+			return v, nil
+		}
+	} else {
+		switch t.Kind() {
+		case reflect.String:
+			fn = func(t reflect.Type, s string) (reflect.Value, error) {
+				v := reflect.New(t).Elem()
+				v.SetString(s)
+				return v, nil
+			}
+		case reflect.Bool:
+			fn = func(t reflect.Type, s string) (reflect.Value, error) {
+				v := reflect.New(t).Elem()
+				b, err := strconv.ParseBool(s)
+				if err == nil {
+					return reflect.Value{}, fmt.Errorf("converting type String %q to a %s: %v", s, t.Kind(), err)
+				}
+				v.SetBool(b)
+				return v, nil
+			}
+		case reflect.Slice:
+			if t.Elem().Kind() == reflect.Uint8 {
+				fn = func(t reflect.Type, s string) (reflect.Value, error) {
+					v := reflect.New(t).Elem()
+					v.SetBytes([]byte(s))
+					return v, nil
+				}
+			}
+		}
+	}
+	if fn != nil {
+		convertMap.Store(t, fn)
+		return fn(t, s)
 	}
 	return reflect.Value{}, errNotSet
 }
@@ -142,24 +176,14 @@ func setCell(dest any, s string) error {
 		}
 		return d.UnmarshalText([]byte(s))
 	}
-
 	dpv := reflect.ValueOf(dest)
-	if dpv.Kind() != reflect.Ptr {
+	if dpv.Kind() != reflect.Pointer {
 		return errors.New("destination not a pointer")
 	}
 	if dpv.IsNil() {
 		return errNilPtr
 	}
-	dv := reflect.Indirect(dpv)
-	if v := reflect.ValueOf(s); v.Type().AssignableTo(dv.Type()) {
-		dv.Set(v)
-		return nil
-	}
-	if dv.Kind() == reflect.Pointer {
-		dv.Set(reflect.New(dv.Type().Elem()))
-		return setCell(dv.Interface(), s)
-	}
-
+	dv := dpv.Elem()
 	if v, err := convert(dv.Type(), s); err != nil {
 		if err == errNotSet {
 			if err := json.Unmarshal([]byte(strconv.Quote(s)), dest); err != nil {
@@ -190,26 +214,23 @@ func setRow(dest any, m map[string]string) error {
 		b, _ := json.Marshal(m)
 		return d.UnmarshalJSON(b)
 	}
-
 	dpv := reflect.ValueOf(dest)
-	if dpv.Kind() != reflect.Ptr {
+	if dpv.Kind() != reflect.Pointer {
 		return errors.New("destination not a pointer")
 	}
 	if dpv.IsNil() {
 		return errNilPtr
 	}
-
-	dv := reflect.Indirect(dpv)
+	dv := dpv.Elem()
 	if v := reflect.ValueOf(m); v.Type().AssignableTo(dv.Type()) {
 		dv.Set(v)
 		return nil
 	}
-
 	if len(m) == 0 {
 		return nil
 	}
 	switch dv.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		dv.Set(reflect.New(dv.Type().Elem()))
 		return setRow(dv.Interface(), m)
 	case reflect.Map:

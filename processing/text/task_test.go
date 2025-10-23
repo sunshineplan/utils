@@ -3,7 +3,7 @@ package text
 import "testing"
 
 func TestTrimSpace(t *testing.T) {
-	task := NewTasks().TrimSpace()
+	task := NewTasks(TrimSpace())
 	for i, testcase := range []struct {
 		s        string
 		expected string
@@ -22,7 +22,7 @@ func TestTrimSpace(t *testing.T) {
 }
 
 func TestCutSpace(t *testing.T) {
-	task := NewTasks().CutSpace()
+	task := NewTasks(CutSpace())
 	for i, testcase := range []struct {
 		s        string
 		expected string
@@ -41,7 +41,7 @@ func TestCutSpace(t *testing.T) {
 }
 
 func TestRemoveParentheses(t *testing.T) {
-	task := NewTasks().RemoveParentheses()
+	task := NewTasks(RemoveParentheses())
 	for i, testcase := range []struct {
 		s        string
 		expected string
@@ -62,7 +62,7 @@ func TestRemoveParentheses(t *testing.T) {
 }
 
 func TestTasks(t *testing.T) {
-	task := NewTasks().TrimSpace().RemoveParentheses().CutSpace()
+	task := NewTasks(TrimSpace(), RemoveParentheses(), CutSpace())
 	for i, testcase := range []struct {
 		s        string
 		expected string

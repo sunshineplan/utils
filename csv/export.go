@@ -17,7 +17,7 @@ func ExportFile[S ~[]E, E any](fieldnames []string, slice S, file string) error 
 	if err != nil {
 		return err
 	}
-
+	defer f.Close()
 	return export(fieldnames, slice, f, false)
 }
 
@@ -32,13 +32,13 @@ func ExportUTF8File[S ~[]E, E any](fieldnames []string, slice S, file string) er
 	if err != nil {
 		return err
 	}
-
+	defer f.Close()
 	return export(fieldnames, slice, f, true)
 }
 
 func export[S ~[]E, E any](fieldnames []string, slice S, w io.Writer, utf8bom bool) (err error) {
 	csvWriter := NewWriter(w, utf8bom)
-	if fieldnames == nil {
+	if len(fieldnames) == 0 {
 		if len(slice) == 0 {
 			return fmt.Errorf("can't get struct fieldnames from zero length slice")
 		}
@@ -49,6 +49,5 @@ func export[S ~[]E, E any](fieldnames []string, slice S, w io.Writer, utf8bom bo
 	if err != nil {
 		return
 	}
-
 	return csvWriter.WriteAll(slice)
 }

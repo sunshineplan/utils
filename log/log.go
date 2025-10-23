@@ -6,130 +6,210 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"sync/atomic"
 )
 
-var std = newLogger(log.Default(), os.Stderr)
+// defaultLogger holds the default Logger instance, managed atomically for thread safety.
+var defaultLogger atomic.Pointer[Logger]
 
-func Default() *Logger { return std }
+// init initializes the default logger with stderr output.
+func init() {
+	defaultLogger.Store(newLogger(log.Default(), os.Stderr))
+}
 
+// Default returns the current default Logger instance.
+func Default() *Logger { return defaultLogger.Load() }
+
+// SetDefault sets the default Logger instance.
+func SetDefault(l *Logger) {
+	defaultLogger.Store(l)
+}
+
+// File returns the current log file path of the default Logger.
 func File() string {
-	return std.File()
+	return Default().File()
 }
 
+// SetOutput sets the output destination for the default Logger.
+// The file parameter specifies the log file path; if empty, no file output is used.
+// The extra parameter allows an additional output destination (e.g., stderr).
 func SetOutput(file string, extra io.Writer) {
-	std.SetOutput(file, extra)
+	Default().SetOutput(file, extra)
 }
 
+// SetFile sets the log file path for the default Logger, keeping the existing extra writer.
 func SetFile(file string) {
-	std.SetFile(file)
+	Default().SetFile(file)
 }
 
+// SetExtra sets an additional output destination for the default Logger, keeping the existing file.
 func SetExtra(extra io.Writer) {
-	std.SetExtra(extra)
+	Default().SetExtra(extra)
 }
 
+// Rotate reopens the log file and rotates the extra writer for the default Logger if applicable.
 func Rotate() {
-	std.Rotate()
+	Default().Rotate()
 }
 
+// Flags returns the current log flags of the default Logger.
 func Flags() int {
-	return std.Flags()
-}
-func SetFlags(flag int) {
-	std.SetFlags(flag)
-}
-func Prefix() string {
-	return std.Prefix()
-}
-func SetPrefix(prefix string) {
-	std.SetPrefix(prefix)
-}
-func Writer() io.Writer {
-	return std.Writer()
-}
-func Print(v ...any) {
-	std.Print(v...)
-}
-func Printf(format string, v ...any) {
-	std.Printf(format, v...)
-}
-func Println(v ...any) {
-	std.Println(v...)
-}
-func Fatal(v ...any) {
-	std.Fatal(v...)
-}
-func Fatalf(format string, v ...any) {
-	std.Fatalf(format, v...)
-}
-func Fatalln(v ...any) {
-	std.Fatalln(v...)
-}
-func Panic(v ...any) {
-	std.Panic(v...)
-}
-func Panicf(format string, v ...any) {
-	std.Panicf(format, v...)
-}
-func Panicln(v ...any) {
-	std.Panicln(v...)
-}
-func Output(calldepth int, s string) error {
-	return std.Output(calldepth+1, s) // +1 for this frame.
+	return Default().Flags()
 }
 
+// SetFlags sets the log flags for the default Logger.
+func SetFlags(flag int) {
+	Default().SetFlags(flag)
+}
+
+// Prefix returns the current log prefix of the default Logger.
+func Prefix() string {
+	return Default().Prefix()
+}
+
+// SetPrefix sets the log prefix for the default Logger.
+func SetPrefix(prefix string) {
+	Default().SetPrefix(prefix)
+}
+
+// Writer returns the current output writer of the default Logger.
+func Writer() io.Writer {
+	return Default().Writer()
+}
+
+// Print logs a message using the default Logger's Print method.
+func Print(v ...any) {
+	Default().Print(v...)
+}
+
+// Printf logs a formatted message using the default Logger's Printf method.
+func Printf(format string, v ...any) {
+	Default().Printf(format, v...)
+}
+
+// Println logs a message with a newline using the default Logger's Println method.
+func Println(v ...any) {
+	Default().Println(v...)
+}
+
+// Fatal logs a message and exits using the default Logger's Fatal method.
+func Fatal(v ...any) {
+	Default().Fatal(v...)
+}
+
+// Fatalf logs a formatted message and exits using the default Logger's Fatalf method.
+func Fatalf(format string, v ...any) {
+	Default().Fatalf(format, v...)
+}
+
+// Fatalln logs a message with a newline and exits using the default Logger's Fatalln method.
+func Fatalln(v ...any) {
+	Default().Fatalln(v...)
+}
+
+// Panic logs a message and panics using the default Logger's Panic method.
+func Panic(v ...any) {
+	Default().Panic(v...)
+}
+
+// Panicf logs a formatted message and panics using the default Logger's Panicf method.
+func Panicf(format string, v ...any) {
+	Default().Panicf(format, v...)
+}
+
+// Panicln logs a message with a newline and panics using the default Logger's Panicln method.
+func Panicln(v ...any) {
+	Default().Panicln(v...)
+}
+
+// Output logs a message with the specified call depth using the default Logger's Output method.
+func Output(calldepth int, s string) error {
+	return Default().Output(calldepth+1, s) // +1 for this frame.
+}
+
+// SetHandler sets the slog handler for the default Logger.
+// Note: The new handler may not respect the existing log level (obtained via [Level]), potentially disabling level control.
+// Ensure the provided handler is configured with the desired log level if needed.
 func SetHandler(h slog.Handler) {
-	std.mu.Lock()
-	defer std.mu.Unlock()
-	std.slog = slog.New(h)
+	Default().slog.Store(slog.New(h))
 }
-func Level() *slog.LevelVar {
-	return std.level
+
+// Level returns the log level of the default Logger.
+func Level() slog.Level {
+	return Default().Level()
 }
+
+// SetLevel sets the log level for the default Logger.
 func SetLevel(level slog.Level) {
-	std.level.Set(level)
+	Default().level.Set(level)
 }
+
+// Debug logs a message at Debug level using the default Logger.
 func Debug(msg string, args ...any) {
-	std.Debug(msg, args...)
+	Default().Debug(msg, args...)
 }
+
+// DebugContext logs a message at Debug level with context using the default Logger.
 func DebugContext(ctx context.Context, msg string, args ...any) {
-	std.DebugContext(ctx, msg, args...)
+	Default().DebugContext(ctx, msg, args...)
 }
+
+// Enabled checks if the specified log level is enabled for the default Logger.
 func Enabled(ctx context.Context, level slog.Level) bool {
-	return std.Enabled(ctx, level)
+	return Default().Enabled(ctx, level)
 }
+
+// Error logs a message at Error level using the default Logger.
 func Error(msg string, args ...any) {
-	std.Error(msg, args...)
+	Default().Error(msg, args...)
 }
+
+// ErrorContext logs a message at Error level with context using the default Logger.
 func ErrorContext(ctx context.Context, msg string, args ...any) {
-	std.ErrorContext(ctx, msg, args...)
+	Default().ErrorContext(ctx, msg, args...)
 }
-func LoggerHandler() slog.Handler {
-	return std.LoggerHandler()
+
+// Handler returns the slog handler of the default Logger.
+func Handler() slog.Handler {
+	return Default().Handler()
 }
+
+// Info logs a message at Info level using the default Logger.
 func Info(msg string, args ...any) {
-	std.Info(msg, args...)
+	Default().Info(msg, args...)
 }
+
+// InfoContext logs a message at Info level with context using the default Logger.
 func InfoContext(ctx context.Context, msg string, args ...any) {
-	std.InfoContext(ctx, msg, args...)
+	Default().InfoContext(ctx, msg, args...)
 }
+
+// Log logs a message at the specified level with context using the default Logger.
 func Log(ctx context.Context, level slog.Level, msg string, args ...any) {
-	std.Log(ctx, level, msg, args...)
+	Default().Log(ctx, level, msg, args...)
 }
+
+// LogAttrs logs a message at the specified level with attributes using the default Logger.
 func LogAttrs(ctx context.Context, level slog.Level, msg string, attrs ...slog.Attr) {
-	std.LogAttrs(ctx, level, msg, attrs...)
+	Default().LogAttrs(ctx, level, msg, attrs...)
 }
+
+// Warn logs a message at Warn level using the default Logger.
 func Warn(msg string, args ...any) {
-	std.Warn(msg, args...)
+	Default().Warn(msg, args...)
 }
+
+// WarnContext logs a message at Warn level with context using the default Logger.
 func WarnContext(ctx context.Context, msg string, args ...any) {
-	std.WarnContext(ctx, msg, args...)
+	Default().WarnContext(ctx, msg, args...)
 }
+
+// With returns a new Logger with the specified attributes, leaving the default Logger unchanged.
 func With(args ...any) *Logger {
-	std = std.With(args...)
-	return std
+	return Default().With(args...)
 }
+
+// WithGroup returns a new Logger with the specified group name, leaving the default Logger unchanged.
 func WithGroup(name string) *Logger {
-	std = std.WithGroup(name)
-	return std
+	return Default().WithGroup(name)
 }
