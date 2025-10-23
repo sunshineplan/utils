@@ -3,18 +3,16 @@ package cache
 import (
 	"context"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/sunshineplan/utils/container"
 )
 
 type item[T any] struct {
-	sync.Mutex
 	ctx       context.Context
 	cancel    context.CancelFunc
 	lifecycle time.Duration
-	value     T
+	value     container.Value[T]
 	fn        func() (T, error)
 }
 
@@ -23,16 +21,14 @@ func (i *item[T]) set(value T) {
 	if i.lifecycle > 0 {
 		i.ctx, i.cancel = context.WithTimeout(i.ctx, i.lifecycle)
 	}
-	i.value = value
+	i.value.Store(value)
 }
 
 func (i *item[T]) renew() T {
 	v, err := i.fn()
-	i.Lock()
-	defer i.Unlock()
 	if err != nil {
 		log.Print(err)
-		v = i.value
+		return i.value.Load()
 	}
 	i.set(v)
 	return v
@@ -92,17 +88,13 @@ func (c *CacheWithRenew[Key, Value]) Get(key Key) (value Value, ok bool) {
 	if i, ok = c.get(key); !ok {
 		return
 	}
-	i.Lock()
-	defer i.Unlock()
-	value = i.value
+	value = i.value.Load()
 	return
 }
 
 // Delete deletes the value for a key.
 func (c *CacheWithRenew[Key, Value]) Delete(key Key) {
 	if i, ok := c.m.LoadAndDelete(key); ok {
-		i.Lock()
-		defer i.Unlock()
 		if i.cancel != nil {
 			i.cancel()
 		}
@@ -113,9 +105,7 @@ func (c *CacheWithRenew[Key, Value]) Delete(key Key) {
 func (c *CacheWithRenew[Key, Value]) Swap(key Key, value Value) (previous Value, loaded bool) {
 	var i *item[Value]
 	if i, loaded = c.get(key); loaded {
-		i.Lock()
-		defer i.Unlock()
-		previous = i.value
+		previous = i.value.Load()
 		i.set(value)
 	}
 	return
@@ -125,8 +115,6 @@ func (c *CacheWithRenew[Key, Value]) Swap(key Key, value Value) (previous Value,
 func (c *CacheWithRenew[Key, Value]) Clear() {
 	c.m.Range(func(key Key, i *item[Value]) bool {
 		c.m.Delete(key)
-		i.Lock()
-		defer i.Unlock()
 		if i.cancel != nil {
 			i.cancel()
 		}
