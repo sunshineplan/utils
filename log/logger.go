@@ -157,8 +157,8 @@ func (l *Logger) ErrorContext(ctx context.Context, msg string, args ...any) {
 	l.slog.Load().ErrorContext(ctx, msg, args...)
 }
 
-// Handler returns the current slog handler.
-func (l *Logger) Handler() slog.Handler {
+// SlogHandler returns the current slog handler.
+func (l *Logger) SlogHandler() slog.Handler {
 	return l.slog.Load().Handler()
 }
 
