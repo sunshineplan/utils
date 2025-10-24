@@ -169,9 +169,9 @@ func ErrorContext(ctx context.Context, msg string, args ...any) {
 	Default().ErrorContext(ctx, msg, args...)
 }
 
-// Handler returns the slog handler of the default Logger.
-func Handler() slog.Handler {
-	return Default().Handler()
+// SlogHandler returns the slog handler of the default Logger.
+func SlogHandler() slog.Handler {
+	return Default().SlogHandler()
 }
 
 // Info logs a message at Info level using the default Logger.

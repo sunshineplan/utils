@@ -7,15 +7,18 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"text/template"
 	"time"
 
+	"github.com/sunshineplan/utils/container"
 	"github.com/sunshineplan/utils/unit"
 )
 
 const (
+	defaultBlockWidth  = 40
 	defaultRefresh     = 5 * time.Second
+	defaultRender      = time.Second
 	maxRefreshMultiple = 3
 )
 
@@ -27,27 +30,26 @@ var dots = []string{".  ", ".. ", "..."}
 // ProgressBar represents a customizable progress bar for tracking task progress.
 // It supports configurable templates, units, and refresh intervals.
 type ProgressBar[T int | int64] struct {
-	mu  sync.Mutex
 	buf strings.Builder
 
 	ctx       context.Context
 	cancel    context.CancelFunc
 	msgChan   chan string
 	done      chan struct{}
-	start     time.Time
+	start     container.Value[time.Time]
 	last      string
 	lastWidth int
 
-	blockWidth      int
-	refreshInterval time.Duration
-	renderInterval  time.Duration
-	template        *template.Template
+	blockWidth      container.Int[int]
+	refreshInterval container.Int[time.Duration]
+	renderInterval  container.Int[time.Duration]
+	template        atomic.Pointer[template.Template]
+	unit            container.Value[string]
 
 	current    genericCounter
 	total      int64
-	additional string
-	speed      float64
-	unit       string
+	additional container.Value[string]
+	speed      container.Value[float64]
 }
 
 type format struct {
@@ -66,70 +68,53 @@ func New[T int | int64](total T) *ProgressBar[T] {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &ProgressBar[T]{
-		ctx:             ctx,
-		cancel:          cancel,
-		msgChan:         make(chan string, 1),
-		done:            make(chan struct{}),
-		blockWidth:      40,
-		refreshInterval: defaultRefresh,
-		template:        template.Must(template.New("ProgressBar").Parse(defaultTemplate)),
-		current:         newNumberCounter(),
-		total:           int64(total),
+		ctx:     ctx,
+		cancel:  cancel,
+		msgChan: make(chan string, 1),
+		done:    make(chan struct{}),
+		current: newNumberCounter(),
+		total:   int64(total),
 	}
 }
 
 // SetWidth sets the progress bar block width.
-// It panics if called after the progress bar has started or if blockWidth is less than or equal to zero.
+// It panics if blockWidth is less than or equal to zero.
 func (pb *ProgressBar[T]) SetWidth(blockWidth int) *ProgressBar[T] {
-	pb.mu.Lock()
-	defer pb.mu.Unlock()
-	if !pb.start.IsZero() {
-		panic("progress bar is already started")
-	}
 	if blockWidth <= 0 {
 		panic(fmt.Sprintf("invalid block width: %d", blockWidth))
 	}
-	pb.blockWidth = blockWidth
+	pb.blockWidth.Store(blockWidth)
 	return pb
 }
 
 // SetRefreshInterval sets progress bar refresh interval time for check speed.
 // It panics if called after the progress bar has started or if interval is less than or equal to zero.
 func (pb *ProgressBar[T]) SetRefreshInterval(interval time.Duration) *ProgressBar[T] {
-	pb.mu.Lock()
-	defer pb.mu.Unlock()
-	if !pb.start.IsZero() {
+	if !pb.start.Load().IsZero() {
 		panic("progress bar is already started")
 	}
 	if interval <= 0 {
-		panic(fmt.Sprintf("invalid refresh interval: %v", interval))
+		panic(fmt.Sprintf("invalid refresh interval: %s", interval))
 	}
-	pb.refreshInterval = interval
+	pb.refreshInterval.Store(interval)
 	return pb
 }
 
 // SetRenderInterval sets the interval for updating the progress bar display.
 // It panics if called after the progress bar has started or if interval is less than or equal to zero.
 func (pb *ProgressBar[T]) SetRenderInterval(interval time.Duration) *ProgressBar[T] {
-	pb.mu.Lock()
-	defer pb.mu.Unlock()
-	if !pb.start.IsZero() {
+	if !pb.start.Load().IsZero() {
 		panic("progress bar is already started")
 	}
 	if interval <= 0 {
-		panic(fmt.Sprintf("invalid render interval: %v", interval))
+		panic(fmt.Sprintf("invalid render interval: %s", interval))
 	}
-	pb.renderInterval = interval
+	pb.renderInterval.Store(interval)
 	return pb
 }
 
 // SetTemplate sets progress bar template.
 func (pb *ProgressBar[T]) SetTemplate(tmplt string) error {
-	pb.mu.Lock()
-	defer pb.mu.Unlock()
-	if !pb.start.IsZero() {
-		return fmt.Errorf("progress bar is already started")
-	}
 	t := template.New("ProgressBar")
 	if _, err := t.Parse(tmplt); err != nil {
 		return fmt.Errorf("failed to parse template: %w", err)
@@ -137,19 +122,13 @@ func (pb *ProgressBar[T]) SetTemplate(tmplt string) error {
 	if err := t.Execute(io.Discard, format{}); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
-	pb.template = t
+	pb.template.Store(t)
 	return nil
 }
 
 // SetUnit sets progress bar unit.
-// It panics if called after the progress bar has started.
 func (pb *ProgressBar[T]) SetUnit(unit string) *ProgressBar[T] {
-	pb.mu.Lock()
-	defer pb.mu.Unlock()
-	if !pb.start.IsZero() {
-		panic("progress bar is already started")
-	}
-	pb.unit = unit
+	pb.unit.Store(unit)
 	return pb
 }
 
@@ -160,9 +139,7 @@ func (pb *ProgressBar[T]) Add(n T) {
 
 // Additional adds the specified string to the progress bar.
 func (pb *ProgressBar[T]) Additional(s string) {
-	pb.mu.Lock()
-	defer pb.mu.Unlock()
-	pb.additional = s
+	pb.additional.Store(s)
 }
 
 func (pb *ProgressBar[T]) now() int64 {
@@ -170,8 +147,6 @@ func (pb *ProgressBar[T]) now() int64 {
 }
 
 func (pb *ProgressBar[T]) print(s string, msg bool) {
-	pb.mu.Lock()
-	defer pb.mu.Unlock()
 	pb.buf.Reset()
 	if len(s) < pb.lastWidth {
 		pb.buf.WriteRune('\r')
@@ -193,9 +168,9 @@ func (pb *ProgressBar[T]) print(s string, msg bool) {
 }
 
 func (pb *ProgressBar[T]) startRefresh() {
-	start := pb.start
-	maxRefresh := pb.refreshInterval * maxRefreshMultiple
-	ticker := time.NewTicker(pb.refreshInterval)
+	start := pb.start.Load()
+	maxRefresh := pb.refreshInterval.Load() * maxRefreshMultiple
+	ticker := time.NewTicker(pb.refreshInterval.Load())
 	defer ticker.Stop()
 	for {
 		last := pb.now()
@@ -203,17 +178,15 @@ func (pb *ProgressBar[T]) startRefresh() {
 		case <-ticker.C:
 			now := pb.now()
 			totalSpeed := float64(now) / (float64(time.Since(start)) / float64(time.Second))
-			intervalSpeed := float64(now-last) / (float64(pb.refreshInterval) / float64(time.Second))
-			pb.mu.Lock()
+			intervalSpeed := float64(now-last) / (float64(pb.refreshInterval.Load()) / float64(time.Second))
 			if intervalSpeed == 0 {
-				pb.speed = totalSpeed
+				pb.speed.Store(totalSpeed)
 			} else {
-				pb.speed = intervalSpeed
+				pb.speed.Store(intervalSpeed)
 			}
-			pb.mu.Unlock()
-			if intervalSpeed == 0 && pb.refreshInterval < maxRefresh {
-				pb.refreshInterval += time.Second
-				ticker.Reset(pb.refreshInterval)
+			if intervalSpeed == 0 && pb.refreshInterval.Load() < maxRefresh {
+				d := pb.refreshInterval.Add(time.Second)
+				ticker.Reset(d)
 			}
 		case <-pb.ctx.Done():
 			return
@@ -224,11 +197,7 @@ func (pb *ProgressBar[T]) startRefresh() {
 }
 
 func (pb *ProgressBar[T]) startCount() {
-	interval := pb.renderInterval
-	if interval == 0 {
-		interval = time.Second
-	}
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(pb.renderInterval.Load())
 	defer func() {
 		ticker.Stop()
 		close(pb.done)
@@ -236,7 +205,7 @@ func (pb *ProgressBar[T]) startCount() {
 	}()
 	var lastNow int64
 	var f format
-	if pb.unit == "bytes" {
+	if pb.unit.Load() == "bytes" {
 		f.Total = unit.ByteSize(pb.total).String()
 	} else {
 		f.Total = strconv.FormatInt(pb.total, 10)
@@ -247,52 +216,51 @@ func (pb *ProgressBar[T]) startCount() {
 		select {
 		case <-ticker.C:
 			now := min(pb.now(), pb.total)
-			pb.mu.Lock()
 			if now != lastNow || f.Done == "" {
 				lastNow = now
-				done := int(int64(pb.blockWidth) * now / pb.total)
+				blockWidth := pb.blockWidth.Load()
+				done := int(int64(blockWidth) * now / pb.total)
 				percent := float64(now) * 100 / float64(pb.total)
 				if now < pb.total && done != 0 {
 					f.Done = strings.Repeat("=", done-1) + ">"
 				} else {
 					f.Done = strings.Repeat("=", done)
 				}
-				f.Undone = strings.Repeat(" ", pb.blockWidth-done)
+				f.Undone = strings.Repeat(" ", blockWidth-done)
 				f.Percent = fmt.Sprintf("%.2f%%", percent)
-				if pb.unit == "bytes" {
+				if pb.unit.Load() == "bytes" {
 					f.Current = unit.ByteSize(now).String()
 				} else {
 					f.Current = strconv.FormatInt(now, 10)
 				}
 			}
-			f.Additional = pb.additional
-			f.Elapsed = fmt.Sprintf("Elapsed: %s", time.Since(pb.start).Truncate(time.Second))
-			if pb.speed == 0 {
+			f.Additional = pb.additional.Load()
+			f.Elapsed = fmt.Sprintf("Elapsed: %s", time.Since(pb.start.Load()).Truncate(time.Second))
+			if speed := pb.speed.Load(); speed == 0 {
 				f.Speed = "--/s"
 				f.Left = "Left: calculating" + dots[dot%3]
 				dot++
 			} else {
-				if pb.unit == "bytes" {
-					f.Speed = unit.ByteSize(pb.speed).String() + "/s"
+				if pb.unit.Load() == "bytes" {
+					f.Speed = unit.ByteSize(speed).String() + "/s"
 				} else {
-					f.Speed = fmt.Sprintf("%.2f/s", pb.speed)
+					f.Speed = fmt.Sprintf("%.2f/s", speed)
 				}
-				f.Left = fmt.Sprintf("Left: %s", (time.Duration(float64(pb.total-now)/pb.speed) * time.Second).Truncate(time.Second))
+				f.Left = fmt.Sprintf("Left: %s", (time.Duration(float64(pb.total-now)/speed) * time.Second).Truncate(time.Second))
 			}
-			pb.mu.Unlock()
 			buf.Reset()
-			pb.template.Execute(&buf, f)
+			pb.template.Load().Execute(&buf, f)
 			pb.print(buf.String(), false)
 			if now == pb.total {
-				totalSpeed := float64(pb.total) / (float64(time.Since(pb.start)) / float64(time.Second))
-				if pb.unit == "bytes" {
+				totalSpeed := float64(pb.total) / (float64(time.Since(pb.start.Load())) / float64(time.Second))
+				if pb.unit.Load() == "bytes" {
 					f.Speed = unit.ByteSize(totalSpeed).String() + "/s"
 				} else {
 					f.Speed = fmt.Sprintf("%.2f/s", totalSpeed)
 				}
 				f.Left = "Complete"
 				buf.Reset()
-				pb.template.Execute(&buf, f)
+				pb.template.Load().Execute(&buf, f)
 				pb.print(buf.String(), false)
 				io.WriteString(os.Stdout, "\n")
 				return
@@ -300,8 +268,6 @@ func (pb *ProgressBar[T]) startCount() {
 		case msg := <-pb.msgChan:
 			pb.print(msg, true)
 		case <-pb.ctx.Done():
-			pb.mu.Lock()
-			defer pb.mu.Unlock()
 			io.WriteString(os.Stdout, "\nCancelled\n")
 			return
 		}
@@ -310,12 +276,22 @@ func (pb *ProgressBar[T]) startCount() {
 
 // Start starts the progress bar.
 func (pb *ProgressBar[T]) Start() error {
-	pb.mu.Lock()
-	defer pb.mu.Unlock()
-	if !pb.start.IsZero() {
+	if !pb.start.Load().IsZero() {
 		return fmt.Errorf("progress bar is already started")
 	}
-	pb.start = time.Now()
+	if pb.blockWidth.Load() == 0 {
+		pb.blockWidth.Store(defaultBlockWidth)
+	}
+	if pb.renderInterval.Load() == 0 {
+		pb.renderInterval.Store(defaultRender)
+	}
+	if pb.refreshInterval.Load() == 0 {
+		pb.refreshInterval.Store(defaultRefresh)
+	}
+	if pb.template.Load() == nil {
+		pb.template.Store(template.Must(template.New("ProgressBar").Parse(defaultTemplate)))
+	}
+	pb.start.Store(time.Now())
 	go pb.startRefresh()
 	go pb.startCount()
 	return nil
