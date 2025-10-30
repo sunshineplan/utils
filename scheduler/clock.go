@@ -12,11 +12,16 @@ var (
 	_ Schedule = clockSched{}
 )
 
+// Clock represents a specific time of day (hour, minute, second) that can be used
+// as a schedule condition. Each field (hour, min, sec) can be optional, allowing
+// partial matching (e.g., “every minute at second 0” or “every day at 12:00:*”).
 type Clock struct {
 	clock.Clock
 	hour, min, sec bool
 }
 
+// atClock creates a new clock instance from the given hour, minute, and second values.
+// A value of -1 is treated as a wildcard and replaced by 0 internally.
 func atClock(hour, min, sec int) clock.Clock {
 	if hour == -1 {
 		hour = 0
@@ -30,6 +35,8 @@ func atClock(hour, min, sec int) clock.Clock {
 	return clock.New(hour, min, sec)
 }
 
+// AtClock creates a new Clock schedule at the specified hour, minute, and second.
+// Use -1 for a wildcard (any value). Panics on invalid input.
 func AtClock(hour, min, sec int) *Clock {
 	if hour > 23 || hour < -1 ||
 		min > 59 || min < -1 ||
@@ -50,20 +57,26 @@ func AtClock(hour, min, sec int) *Clock {
 	return &c
 }
 
+// FullClock returns a Clock with all fields as wildcards (matches any time).
 func FullClock() *Clock { return new(Clock) }
 
+// AtHour returns a Clock that triggers at the specified hour (minute and second = 0).
 func AtHour(hour int) *Clock {
 	return AtClock(hour, 0, 0)
 }
 
+// AtMinute returns a Clock that triggers at the specified minute of any hour.
 func AtMinute(min int) *Clock {
 	return AtClock(-1, min, 0)
 }
 
+// AtSecond returns a Clock that triggers at the specified second of any minute.
 func AtSecond(sec int) *Clock {
 	return AtClock(-1, -1, sec)
 }
 
+// ClockFromString parses a clock string (e.g. "12:30:00") into a Clock schedule.
+// Panics if the string cannot be parsed.
 func ClockFromString(str string) *Clock {
 	c, err := clock.Parse(str)
 	if err != nil {
@@ -72,6 +85,7 @@ func ClockFromString(str string) *Clock {
 	return &Clock{c, true, true, true}
 }
 
+// HourSchedule creates a multi-schedule that triggers on any of the specified hours.
 func HourSchedule(hour ...int) Schedule {
 	var s multiSched
 	for _, hour := range hour {
@@ -80,6 +94,7 @@ func HourSchedule(hour ...int) Schedule {
 	return s
 }
 
+// MinuteSchedule creates a multi-schedule that triggers on any of the specified minutes.
 func MinuteSchedule(min ...int) Schedule {
 	var s multiSched
 	for _, min := range min {
@@ -88,6 +103,7 @@ func MinuteSchedule(min ...int) Schedule {
 	return s
 }
 
+// SecondSchedule creates a multi-schedule that triggers on any of the specified seconds.
 func SecondSchedule(sec ...int) Schedule {
 	var s multiSched
 	for _, sec := range sec {
@@ -96,6 +112,7 @@ func SecondSchedule(sec ...int) Schedule {
 	return s
 }
 
+// Hour sets the hour field of the Clock (or disables it if -1).
 func (c *Clock) Hour(hour int) *Clock {
 	if hour > 23 || hour < -1 {
 		panic(fmt.Sprint("invalid hour ", hour))
@@ -109,6 +126,7 @@ func (c *Clock) Hour(hour int) *Clock {
 	return c
 }
 
+// Minute sets the minute field of the Clock (or disables it if -1).
 func (c *Clock) Minute(min int) *Clock {
 	if min > 59 || min < -1 {
 		panic(fmt.Sprint("invalid minute ", min))
@@ -122,6 +140,7 @@ func (c *Clock) Minute(min int) *Clock {
 	return c
 }
 
+// Second sets the second field of the Clock (or disables it if -1).
 func (c *Clock) Second(sec int) *Clock {
 	if sec > 59 || sec < -1 {
 		panic(fmt.Sprint("invalid second ", sec))
@@ -135,6 +154,8 @@ func (c *Clock) Second(sec int) *Clock {
 	return c
 }
 
+// IsMatched reports whether the given time matches this Clock.
+// Wildcard fields (hour/min/sec=false) are ignored during comparison.
 func (c Clock) IsMatched(t time.Time) bool {
 	hour, min, sec := t.Clock()
 	return (!c.hour || c.Clock.Hour() == hour) &&
@@ -142,6 +163,8 @@ func (c Clock) IsMatched(t time.Time) bool {
 		(!c.sec || c.Clock.Second() == sec)
 }
 
+// Next returns the next time that matches this Clock configuration
+// after the given reference time. Handles wildcards intelligently.
 func (c Clock) Next(t time.Time) (next time.Time) {
 	t = t.Truncate(time.Second)
 	if c.IsMatched(t) {
@@ -165,7 +188,7 @@ func (c Clock) Next(t time.Time) (next time.Time) {
 		hour = t.Hour()
 	}
 	switch next = time.Date(year, month, day, hour, min, sec, 0, t.Location()); t.Compare(next) {
-	case 1:
+	case 1: // next < t
 		if !c.sec {
 			next = next.Add(-time.Duration(sec) * time.Second)
 		}
@@ -181,7 +204,7 @@ func (c Clock) Next(t time.Time) (next time.Time) {
 			return next.Add(time.Hour)
 		}
 		return next.AddDate(0, 0, 1)
-	case -1:
+	case -1: // next > t
 		if !c.sec {
 			next = next.Add(-time.Duration(sec) * time.Second)
 		}
@@ -189,11 +212,12 @@ func (c Clock) Next(t time.Time) (next time.Time) {
 			next = next.Add(-time.Duration(min) * time.Minute)
 		}
 		return
-	default:
+	default: // equal
 		return t
 	}
 }
 
+// String returns a human-readable representation such as "12:--:--" or "14:30:00".
 func (c Clock) String() string {
 	var hour, min, sec string
 	if !c.hour {
@@ -214,11 +238,16 @@ func (c Clock) String() string {
 	return fmt.Sprintf("%s:%s:%s", hour, min, sec)
 }
 
+// clockSched defines a schedule for a time interval within a day,
+// repeatedly triggering at a fixed duration between start and end.
 type clockSched struct {
 	start, end *Clock
 	d          time.Duration
 }
 
+// ClockSchedule creates a new schedule that triggers every d duration
+// between start and end (inclusive). The duration must be at least one second
+// and an integer multiple of a second.
 func ClockSchedule(start, end *Clock, d time.Duration) Schedule {
 	if d < time.Second || d%time.Second != 0 {
 		panic("the minimum duration is one second and must be a multiple of seconds")
@@ -226,11 +255,15 @@ func ClockSchedule(start, end *Clock, d time.Duration) Schedule {
 	return clockSched{start, end, d}
 }
 
+// IsMatched reports whether the given time falls within [start, end]
+// and aligns with the configured duration d.
 func (s clockSched) IsMatched(t time.Time) bool {
 	start, end, tc := s.start, s.end, AtClock(t.Clock()).Clock
 	return (start.Equal(tc) || start.Before(tc) && end.After(tc) || end.Equal(tc)) && tc.Since(start.Clock)%s.d == 0
 }
 
+// Next returns the next matching time within the configured range.
+// If none is found, it wraps to the next occurrence of start.
 func (s clockSched) Next(t time.Time) time.Time {
 	if s.IsMatched(t) {
 		t = t.Add(time.Second)
@@ -244,15 +277,7 @@ func (s clockSched) Next(t time.Time) time.Time {
 	return s.start.Next(t)
 }
 
-func (s clockSched) TickerDuration() time.Duration {
-	if s.start.Clock.Second() != 0 {
-		return time.Second
-	} else if s.start.Clock.Minute() != 0 && s.d%time.Minute == 0 {
-		return time.Minute
-	}
-	return s.d
-}
-
+// String returns a readable representation like "08:00:00-18:00:00(every 30m0s)".
 func (s clockSched) String() string {
 	return fmt.Sprintf("%q-%q(every %s)", s.start, s.end, s.d)
 }
