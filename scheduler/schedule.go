@@ -8,9 +8,15 @@ import (
 	"github.com/sunshineplan/utils/clock"
 )
 
+// Schedule defines a time-based trigger that determines
+// whether a given time matches a schedule and can compute the next trigger time.
 type Schedule interface {
+	// IsMatched reports whether the given time matches the schedule.
 	IsMatched(time.Time) bool
+	// Next returns the next time that satisfies the schedule after the given time.
+	// If there is no valid next time, a zero time is returned.
 	Next(time.Time) time.Time
+	// String returns a human-readable description of the schedule.
 	String() string
 }
 
@@ -20,12 +26,14 @@ var (
 	_ Schedule = tickerSched{}
 )
 
+// datetimeLayout defines supported layouts for parsing date/time strings.
 var datetimeLayout = []string{
 	"2006-01-02",
 	"2006-01-02 15:04",
 	"2006-01-02 15:04:05",
 }
 
+// parseTime attempts to parse a string using a list of layouts.
 func parseTime(value string, layout []string) (t time.Time, err error) {
 	for _, layout := range layout {
 		t, err = time.Parse(layout, value)
@@ -36,6 +44,9 @@ func parseTime(value string, layout []string) (t time.Time, err error) {
 	return
 }
 
+// ScheduleFromString constructs a Schedule from one or more string expressions.
+// It supports both clock expressions (parsed by [clock.Parse])
+// and absolute timestamps (e.g., "2006-01-02 15:04:05").
 func ScheduleFromString(str ...string) Schedule {
 	var s multiSched
 	for _, str := range str {
@@ -53,6 +64,8 @@ func ScheduleFromString(str ...string) Schedule {
 	return s
 }
 
+// sched represents a calendar-based schedule with optional year, month, day and time components.
+// A zero value (0) for year/month/day acts as a wildcard that matches any value.
 type sched struct {
 	year  int
 	month time.Month
@@ -60,6 +73,8 @@ type sched struct {
 	clock *Clock
 }
 
+// NewSchedule creates a new date-based Schedule.
+// Zero values for year/month/day represent wildcards that match any year, month, or day.
 func NewSchedule(year int, month time.Month, day int, clock *Clock) Schedule {
 	if clock == nil {
 		clock = new(Clock)
@@ -67,6 +82,7 @@ func NewSchedule(year int, month time.Month, day int, clock *Clock) Schedule {
 	return sched{year, month, day, clock}
 }
 
+// TimeSchedule creates a schedule based on one or more absolute times.
 func TimeSchedule(t ...time.Time) Schedule {
 	var s multiSched
 	for _, t := range t {
@@ -76,6 +92,7 @@ func TimeSchedule(t ...time.Time) Schedule {
 	return s
 }
 
+// IsMatched reports whether the given time matches the date and clock configuration.
 func (s sched) IsMatched(t time.Time) bool {
 	year, month, day := t.Date()
 	if (s.year == 0 || s.year == year) &&
@@ -86,11 +103,14 @@ func (s sched) IsMatched(t time.Time) bool {
 	return false
 }
 
+// Next returns the next time that matches this schedule after t.
+// If no valid next time exists, it returns a zero time.
 func (s sched) Next(t time.Time) (next time.Time) {
 	t = t.Truncate(time.Second)
 	next = s.clock.Next(t)
 	t = t.Add(time.Second)
 	year, month, day := next.Date()
+	// Apply wildcard substitutions
 	if s.year != 0 {
 		year = s.year
 	}
@@ -102,7 +122,8 @@ func (s sched) Next(t time.Time) (next time.Time) {
 	}
 	hour, min, sec := next.Clock()
 	switch next = time.Date(year, month, day, hour, min, sec, 0, t.Location()); t.Compare(next) {
-	case 1:
+	case 1: // t > next
+		// Reset lower time fields if they are not specified
 		if !s.clock.sec {
 			sec = 0
 		}
@@ -113,6 +134,7 @@ func (s sched) Next(t time.Time) (next time.Time) {
 			hour = 0
 		}
 		next = time.Date(year, month, day, hour, min, sec, 0, t.Location())
+		// Handle wildcard advancement for day/month/year
 		if s.day == 0 {
 			if next = next.AddDate(0, 0, 1); (next.Month() != month && s.month != 0) ||
 				(next.Year() != year && s.year != 0) ||
@@ -132,7 +154,7 @@ func (s sched) Next(t time.Time) (next time.Time) {
 		if s.year == 0 {
 			next = next.AddDate(1, 0, 0)
 		}
-	case -1:
+	case -1: // t < next
 		if !s.clock.sec {
 			sec = 0
 		}
@@ -161,6 +183,7 @@ func (s sched) Next(t time.Time) (next time.Time) {
 	return
 }
 
+// String returns the formatted representation of the schedule.
 func (s sched) String() string {
 	var year, month, day string
 	if s.year == 0 {
@@ -181,12 +204,14 @@ func (s sched) String() string {
 	return fmt.Sprintf("%s/%s/%s %s", year, month, day, s.clock)
 }
 
+// weekSched represents a schedule based on ISO week and weekday.
 type weekSched struct {
 	year, week int
 	weekday    *time.Weekday
 	clock      *Clock
 }
 
+// ISOWeekSchedule creates a schedule based on ISO week number and weekday.
 func ISOWeekSchedule(year int, week int, weekday *time.Weekday, clock *Clock) Schedule {
 	if clock == nil {
 		clock = new(Clock)
@@ -194,6 +219,7 @@ func ISOWeekSchedule(year int, week int, weekday *time.Weekday, clock *Clock) Sc
 	return weekSched{year, week, weekday, clock}
 }
 
+// Weekday creates a schedule that matches the specified weekdays at any time of day.
 func Weekday(weekday ...time.Weekday) Schedule {
 	var s multiSched
 	for _, weekday := range weekday {
@@ -202,11 +228,13 @@ func Weekday(weekday ...time.Weekday) Schedule {
 	return s
 }
 
+// Predefined weekday groups.
 var (
 	Weekdays = Weekday(time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday)
 	Weekends = Weekday(time.Saturday, time.Sunday)
 )
 
+// IsMatched reports whether the given time matches the week and weekday pattern.
 func (s weekSched) IsMatched(t time.Time) bool {
 	year, week := t.ISOWeek()
 	weekday := t.Weekday()
@@ -224,6 +252,7 @@ func (s weekSched) IsMatched(t time.Time) bool {
 	return false
 }
 
+// newWeekdayTime returns the time corresponding to a given ISO week, weekday, and clock.
 func newWeekdayTime(year int, week int, weekday time.Weekday, hour, min, sec int, loc *time.Location) time.Time {
 	t := time.Date(year, 1, 1, hour, min, sec, 0, loc)
 	if wd := t.Weekday(); wd != weekday {
@@ -247,6 +276,7 @@ func newWeekdayTime(year int, week int, weekday time.Weekday, hour, min, sec int
 	return t
 }
 
+// Next returns the next time that matches this ISO week schedule after t.
 func (s weekSched) Next(t time.Time) (next time.Time) {
 	if s.week < 0 || s.week > 53 {
 		return time.Time{}
@@ -267,7 +297,7 @@ func (s weekSched) Next(t time.Time) (next time.Time) {
 	}
 	hour, min, sec := next.Clock()
 	switch next = newWeekdayTime(year, week, weekday, hour, min, sec, t.Location()); t.Compare(next) {
-	case 1:
+	case 1: // t > next
 		if !s.clock.sec {
 			sec = 0
 		}
@@ -305,7 +335,7 @@ func (s weekSched) Next(t time.Time) (next time.Time) {
 				next = next.AddDate(0, 0, 7)
 			}
 		}
-	case -1:
+	case -1: // t < next
 		if !s.clock.sec {
 			sec = 0
 		}
@@ -334,6 +364,7 @@ func (s weekSched) Next(t time.Time) (next time.Time) {
 	return
 }
 
+// String returns the formatted representation of the ISO week schedule.
 func (s weekSched) String() string {
 	var year, week, weekday string
 	if s.year == 0 {
@@ -354,11 +385,14 @@ func (s weekSched) String() string {
 	return fmt.Sprintf("%s/ISOWeek:%s/Weekday:%s %s", year, week, weekday, s.clock)
 }
 
+// tickerSched represents a recurring schedule that triggers every fixed duration.
 type tickerSched struct {
 	d     time.Duration
 	start time.Time
 }
 
+// Every returns a schedule that triggers repeatedly at the given durations.
+// The minimum granularity is one second, and durations must be multiples of one second.
 func Every(d ...time.Duration) Schedule {
 	var s multiSched
 	for _, d := range d {
@@ -370,10 +404,12 @@ func Every(d ...time.Duration) Schedule {
 	return s
 }
 
+// init records the start time as the reference point for periodic scheduling.
 func (s *tickerSched) init(t time.Time) {
 	s.start = t.Truncate(time.Second)
 }
 
+// IsMatched reports whether the given time aligns exactly with the ticker interval.
 func (s tickerSched) IsMatched(t time.Time) bool {
 	if s.d == 0 {
 		return false
@@ -381,6 +417,7 @@ func (s tickerSched) IsMatched(t time.Time) bool {
 	return t.Truncate(time.Second).Sub(s.start)%s.d == 0
 }
 
+// Next returns the next tick time after t based on the duration interval.
 func (s tickerSched) Next(t time.Time) time.Time {
 	t = t.Truncate(time.Second)
 	if d := t.Sub(s.start); d > 0 {
@@ -393,6 +430,7 @@ func (s tickerSched) Next(t time.Time) time.Time {
 	return s.start.Add(s.d)
 }
 
+// String returns a human-readable representation of the ticker schedule.
 func (s tickerSched) String() string {
 	return fmt.Sprint("Every ", s.d)
 }
