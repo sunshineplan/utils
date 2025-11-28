@@ -1,8 +1,6 @@
 package text
 
-import (
-	"fmt"
-)
+import "fmt"
 
 var MaxIter = 100
 
