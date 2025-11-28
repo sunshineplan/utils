@@ -1,7 +1,9 @@
 package text
 
 import (
+	"bufio"
 	"fmt"
+	"html"
 	"regexp"
 	"strings"
 )
@@ -24,6 +26,7 @@ var (
 	_ Processor = RegexpRemover{}
 	_ Processor = Cutter{}
 	_ Processor = Trimmer{}
+	_ Processor = LineToParagraph{}
 )
 
 // processor is a generic implementation of Processor,
@@ -137,6 +140,51 @@ func (p Trimmer) Process(s string) (string, error) {
 	return strings.Trim(s, p.Cutset), nil
 }
 
+// LineToParagraph converts each line of text into a separate HTML <p>...</p> paragraph.
+// TrimSpace controls whether leading and trailing spaces are removed from each line before wrapping it in <p> tags.
+// Empty lines can be either skipped or rendered as empty <p></p> according to the SkipEmpty flag.
+type LineToParagraph struct {
+	// TrimSpace controls whether leading and trailing spaces are removed from each line.
+	// true  → trim spaces
+	// false → preserve spaces (default, matches previous behaviour)
+	TrimSpace bool
+	// SkipEmpty controls whether completely empty lines produce <p></p> or are ignored.
+	// true  → skip empty lines (default, matches previous behaviour)
+	// false → emit <p></p> for empty lines
+	SkipEmpty bool
+}
+
+// Describe returns a human-readable description of the processor.
+func (p LineToParagraph) Describe() string {
+	return fmt.Sprintf("LineToParagraph(TrimSpace=%t, SkipEmpty=%t)", p.TrimSpace, p.SkipEmpty)
+}
+
+// Once returns true – the transformation is idempotent and should run only once.
+func (LineToParagraph) Once() bool { return true }
+
+// Process transforms the input text line-by-line into HTML paragraphs.
+func (p LineToParagraph) Process(s string) (string, error) {
+	scanner := bufio.NewScanner(strings.NewReader(s))
+	var b strings.Builder
+	b.Grow(len(s))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if p.TrimSpace {
+			line = strings.TrimSpace(line)
+		}
+		if p.SkipEmpty && line == "" {
+			continue
+		}
+		b.WriteString("<p>")
+		b.WriteString(html.EscapeString(line))
+		b.WriteString("</p>\n")
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
 // TrimSpace returns a processor that removes leading and trailing spaces.
 func TrimSpace() Processor {
 	return NewProcessor("TrimSpace", false, WrapFunc(strings.TrimSpace))
@@ -160,6 +208,12 @@ func RemoveParentheses() Processor {
 		RegexpRemover{regexp.MustCompile(`\([^\)]*\)`)},
 		RegexpRemover{regexp.MustCompile(`（[^）]*）`)},
 	)
+}
+
+// ToParagraphs returns a processor that converts each line into a <p> paragraph.
+// If skipEmpty is true, empty lines are ignored; otherwise, they produce empty <p></p>.
+func ToParagraphs(skipEmpty bool) Processor {
+	return LineToParagraph{SkipEmpty: skipEmpty}
 }
 
 // WrapFunc wraps a simple string -> string function
