@@ -73,3 +73,24 @@ b,2,"[3,4]"
 		t.Errorf("expected %q; got %q", expect, res)
 	}
 }
+
+func TestDecodeSlice(t *testing.T) {
+	csv := `1
+2
+3
+`
+	var s1 []string
+	if err := DecodeAll(strings.NewReader(csv), &s1); err != nil {
+		t.Fatal(err)
+	}
+	if expect := []string{"1", "2", "3"}; !reflect.DeepEqual(expect, s1) {
+		t.Errorf("expected %v; got %v", expect, s1)
+	}
+	var s2 []int
+	if err := DecodeAll(strings.NewReader(csv), &s2); err != nil {
+		t.Fatal(err)
+	}
+	if expect := []int{1, 2, 3}; !reflect.DeepEqual(expect, s2) {
+		t.Errorf("expected %v; got %v", expect, s2)
+	}
+}

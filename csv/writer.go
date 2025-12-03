@@ -51,8 +51,8 @@ func (w *Writer) WriteFields(fields any) error {
 		}
 	default:
 		v := reflect.ValueOf(fields)
-		if v.Kind() == reflect.Pointer {
-			v = reflect.Indirect(v)
+		for v.Kind() == reflect.Pointer {
+			v = v.Elem()
 			if !v.IsValid() {
 				return fmt.Errorf("can not get fieldnames from nil pointer struct")
 			}
@@ -107,6 +107,8 @@ func (w *Writer) Write(record any) error {
 		return fmt.Errorf("fieldnames has not be written yet")
 	}
 	switch d := record.(type) {
+	case string:
+		return w.Writer.Write([]string{d})
 	case []string:
 		if len(d) == 0 {
 			return nil
@@ -117,8 +119,8 @@ func (w *Writer) Write(record any) error {
 		if v.Kind() == reflect.Interface {
 			v = v.Elem()
 		}
-		if v.Kind() == reflect.Pointer {
-			v = reflect.Indirect(v)
+		for v.Kind() == reflect.Pointer {
+			v = v.Elem()
 			if !v.IsValid() {
 				return nil
 			}
@@ -126,6 +128,10 @@ func (w *Writer) Write(record any) error {
 		r := w.pool.Get()
 		defer w.pool.Put(r)
 		switch v.Kind() {
+		case reflect.Slice:
+			for i := range v.Len() {
+				(*r)[i], _ = marshalText(v.Index(i).Interface())
+			}
 		case reflect.Map:
 			if keyType := reflect.TypeOf(v.Interface()).Key(); keyType.Kind() == reflect.String {
 				for i, field := range w.fields {
@@ -163,7 +169,7 @@ func (w *Writer) Write(record any) error {
 				}
 			}
 		default:
-			return fmt.Errorf("not support record format: %s", v.Kind())
+			(*r)[0], _ = marshalText(v.Interface())
 		}
 		if slices.Equal(*r, w.zero) {
 			return nil
@@ -175,9 +181,15 @@ func (w *Writer) Write(record any) error {
 // WriteAll writes multiple CSV records to w using Write and then calls Flush, returning any error from the Flush.
 func (w *Writer) WriteAll(records any) error {
 	switch s := records.(type) {
+	case []string:
+		for _, i := range s {
+			if err := w.Writer.Write([]string{i}); err != nil {
+				return err
+			}
+		}
 	case [][]string:
 		for _, i := range s {
-			if err := w.Write(i); err != nil {
+			if err := w.Writer.Write(i); err != nil {
 				return err
 			}
 		}

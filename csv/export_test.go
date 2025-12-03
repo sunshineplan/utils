@@ -15,6 +15,7 @@ func testExport[E any](t *testing.T, tc testcase[E], result string) {
 	var b bytes.Buffer
 	if err := Export(tc.fieldnames, tc.slice, &b); err != nil {
 		t.Error(tc.name, err)
+		return
 	}
 	if r := b.String(); r != result {
 		t.Errorf("%s expected %q; got %q", tc.name, result, r)
@@ -108,6 +109,27 @@ a,b
 		t.Errorf("expected %q; got %q", utf8bom, c[:3])
 	}
 	if r := string(c[3:]); r != result {
+		t.Errorf("expected %q; got %q", result, r)
+	}
+}
+
+func TestExportSlice(t *testing.T) {
+	result := `1
+2
+3
+`
+	var b bytes.Buffer
+	if err := Export(nil, []string{"1", "2", "3"}, &b); err != nil {
+		t.Fatal(err)
+	}
+	if r := b.String(); r != result {
+		t.Errorf("expected %q; got %q", result, r)
+	}
+	b.Reset()
+	if err := Export(nil, []int{1, 2, 3}, &b); err != nil {
+		t.Fatal(err)
+	}
+	if r := b.String(); r != result {
 		t.Errorf("expected %q; got %q", result, r)
 	}
 }

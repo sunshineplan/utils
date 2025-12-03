@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 )
@@ -14,8 +15,9 @@ type Reader struct {
 	*csv.Reader
 	closer io.Closer
 
-	once   sync.Once
-	fields []string
+	once      sync.Once
+	fields    []string
+	hasFields bool
 
 	next    []string
 	nextErr error
@@ -33,6 +35,7 @@ func NewReader(r io.Reader, hasFields bool) (*Reader, error) {
 		if err != nil {
 			return nil, err
 		}
+		reader.hasFields = true
 	}
 	return reader, nil
 }
@@ -75,6 +78,7 @@ func (r *Reader) Read() (record []string, err error) {
 // SetFields sets csv fields.
 func (r *Reader) SetFields(fields []string) {
 	r.fields = fields
+	r.hasFields = true
 }
 
 // Next prepares the next record for reading with the Scan or Decode method.
@@ -106,22 +110,25 @@ func (r *Reader) Scan(dest ...any) error {
 // Decode will unmarshal the current record into dest.
 // If column's value is like "[...]", it will be treated as slice.
 func (r *Reader) Decode(dest any) error {
-	if len(r.fields) == 0 {
-		return fmt.Errorf("csv fields is not parsed")
-	}
-	if r.next == nil && r.nextErr == nil {
-		return fmt.Errorf("Decode called without calling Next")
-	}
-	if r.nextErr != nil {
-		return r.nextErr
-	}
-	m := make(map[string]string)
-	for i, field := range r.fields {
-		if len(r.next) > i {
-			m[field] = r.next[i]
+	if r.hasFields {
+		if len(r.fields) == 0 {
+			return fmt.Errorf("csv fields is not parsed")
 		}
+		if r.next == nil && r.nextErr == nil {
+			return fmt.Errorf("Decode called without calling Next")
+		}
+		if r.nextErr != nil {
+			return r.nextErr
+		}
+		m := make(map[string]string)
+		for i, field := range r.fields {
+			if len(r.next) > i {
+				m[field] = r.next[i]
+			}
+		}
+		return setRow(dest, m)
 	}
-	return setRow(dest, m)
+	return setCell(dest, r.next[0])
 }
 
 // Close closes the underlying reader if it implements the io.Closer interface.
@@ -134,7 +141,16 @@ func (r *Reader) Close() error {
 
 // DecodeAll decodes each record from r into dest.
 func DecodeAll[S ~[]E, E any](r io.Reader, dest *S) (err error) {
-	reader, err := NewReader(r, true)
+	t := reflect.TypeFor[E]()
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	var reader *Reader
+	if kind := t.Kind(); kind == reflect.Struct || kind == reflect.Map {
+		reader, err = NewReader(r, true)
+	} else {
+		reader, err = NewReader(r, false)
+	}
 	if err != nil {
 		return
 	}
