@@ -24,6 +24,7 @@ var (
 	_ Processor = new(processor)
 	_ Processor = new(multiProcessor)
 	_ Processor = RegexpRemover{}
+	_ Processor = RegexpExtractor{}
 	_ Processor = Cutter{}
 	_ Processor = Trimmer{}
 	_ Processor = LineToParagraph{}
@@ -105,6 +106,23 @@ func (RegexpRemover) Once() bool { return false }
 // Process removes all matches of the regular expression from the input string.
 func (p RegexpRemover) Process(s string) (string, error) {
 	return p.Re.ReplaceAllString(s, ""), nil
+}
+
+// RegexpExtractor extracts the first substring that matches the given regular expression.
+// If no match is found, it returns an empty string.
+type RegexpExtractor struct {
+	Re *regexp.Regexp
+}
+
+// Describe returns a string representation of the RegexpExtractor.
+func (p RegexpExtractor) Describe() string { return fmt.Sprintf("RegexpExtractor(%q)", p.Re.String()) }
+
+// Once returns true, as extracting a specific part is a transformative operation usually done once.
+func (RegexpExtractor) Once() bool { return true }
+
+// Process finds the first match of the regular expression in the input string.
+func (p RegexpExtractor) Process(s string) (string, error) {
+	return p.Re.FindString(s), nil
 }
 
 // Cutter splits the input by the given separator and keeps only the part before it.

@@ -1,6 +1,7 @@
 package text
 
 import (
+	"fmt"
 	"regexp"
 	"testing"
 )
@@ -20,6 +21,67 @@ func TestRegexpRemover(t *testing.T) {
 		} else if res != testcase.expected {
 			t.Errorf("#%d: got %q; want %q", i, res, testcase.expected)
 		}
+	}
+}
+
+func TestRegexpExtractor(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		input   string
+		want    string
+	}{
+		{
+			name:    "Extract first number",
+			pattern: `\d+`,
+			input:   "Order ID: 12345, Count: 67",
+			want:    "12345",
+		},
+		{
+			name:    "Extract email",
+			pattern: `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`,
+			input:   "Please contact support@example.com for help.",
+			want:    "support@example.com",
+		},
+		{
+			name:    "No match found",
+			pattern: `\d+`,
+			input:   "No numbers here",
+			want:    "",
+		},
+		{
+			name:    "Empty input",
+			pattern: `\d+`,
+			input:   "",
+			want:    "",
+		},
+		{
+			name:    "Match start of string",
+			pattern: `^Hello`,
+			input:   "Hello World",
+			want:    "Hello",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			re := regexp.MustCompile(tt.pattern)
+			p := RegexpExtractor{Re: re}
+			expectedDesc := "RegexpExtractor(" + fmt.Sprintf("%q", re.String()) + ")"
+			if desc := p.Describe(); desc != expectedDesc {
+				t.Errorf("Describe() = %v, want %v", desc, expectedDesc)
+			}
+			if !p.Once() {
+				t.Error("Once() = false, want true")
+			}
+			got, err := p.Process(tt.input)
+			if err != nil {
+				t.Errorf("Process() error = %v, wantErr %v", err, nil)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Process() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
