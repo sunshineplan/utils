@@ -7,8 +7,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-
-	"github.com/sunshineplan/utils"
 )
 
 func TestValue(t *testing.T) {
@@ -41,7 +39,7 @@ func TestPointType(t *testing.T) {
 	if v := v.Load(); v != nil {
 		t.Fatalf("wrong value: got %v, want nil", v)
 	}
-	if old := v.Swap(utils.Ptr(1)); old != nil {
+	if old := v.Swap(new(1)); old != nil {
 		t.Fatalf("wrong value: got %v, want nil", v)
 	}
 }

@@ -3,8 +3,6 @@ package scheduler
 import (
 	"testing"
 	"time"
-
-	"github.com/sunshineplan/utils"
 )
 
 const format = "2006/01/02 15:04:05"
@@ -70,25 +68,25 @@ func TestISOWeekScheduleNext(t *testing.T) {
 		t    string
 		next string
 	}{
-		{ISOWeekSchedule(2000, 1, utils.Ptr(time.Monday), nil), "2000/01/03 12:00:00", "2000/01/03 12:00:01"},
-		{ISOWeekSchedule(2000, 1, utils.Ptr(time.Monday), nil), "1900/12/15 12:00:00", "2000/01/03 00:00:00"},
-		{ISOWeekSchedule(2000, 1, utils.Ptr(time.Monday), nil), "2000/01/15 12:00:00", "0001/01/01 00:00:00"},
+		{ISOWeekSchedule(2000, 1, new(time.Monday), nil), "2000/01/03 12:00:00", "2000/01/03 12:00:01"},
+		{ISOWeekSchedule(2000, 1, new(time.Monday), nil), "1900/12/15 12:00:00", "2000/01/03 00:00:00"},
+		{ISOWeekSchedule(2000, 1, new(time.Monday), nil), "2000/01/15 12:00:00", "0001/01/01 00:00:00"},
 
-		{ISOWeekSchedule(0, 1, utils.Ptr(time.Monday), nil), "2000/01/03 12:00:00", "2000/01/03 12:00:01"},
-		{ISOWeekSchedule(0, 1, utils.Ptr(time.Monday), nil), "1900/12/15 12:00:00", "1900/12/31 00:00:00"},
-		{ISOWeekSchedule(0, 1, utils.Ptr(time.Monday), nil), "2000/01/15 12:00:00", "2001/01/01 00:00:00"},
+		{ISOWeekSchedule(0, 1, new(time.Monday), nil), "2000/01/03 12:00:00", "2000/01/03 12:00:01"},
+		{ISOWeekSchedule(0, 1, new(time.Monday), nil), "1900/12/15 12:00:00", "1900/12/31 00:00:00"},
+		{ISOWeekSchedule(0, 1, new(time.Monday), nil), "2000/01/15 12:00:00", "2001/01/01 00:00:00"},
 
-		{ISOWeekSchedule(2000, 0, utils.Ptr(time.Monday), nil), "2000/01/03 12:00:00", "2000/01/03 12:00:01"},
-		{ISOWeekSchedule(2000, 0, utils.Ptr(time.Monday), nil), "2000/01/01 12:00:00", "2000/01/03 00:00:00"},
-		{ISOWeekSchedule(2000, 0, utils.Ptr(time.Monday), nil), "2000/01/05 12:00:00", "2000/01/10 00:00:00"},
+		{ISOWeekSchedule(2000, 0, new(time.Monday), nil), "2000/01/03 12:00:00", "2000/01/03 12:00:01"},
+		{ISOWeekSchedule(2000, 0, new(time.Monday), nil), "2000/01/01 12:00:00", "2000/01/03 00:00:00"},
+		{ISOWeekSchedule(2000, 0, new(time.Monday), nil), "2000/01/05 12:00:00", "2000/01/10 00:00:00"},
 
 		{ISOWeekSchedule(2000, 1, nil, nil), "2000/01/03 12:00:00", "2000/01/03 12:00:01"},
 		{ISOWeekSchedule(2000, 1, nil, nil), "2000/01/02 12:00:00", "2000/01/03 00:00:00"},
 		{ISOWeekSchedule(2000, 1, nil, nil), "2000/01/10 12:00:00", "0001/01/01 00:00:00"},
 
-		{ISOWeekSchedule(0, 0, utils.Ptr(time.Monday), nil), "2000/01/03 12:00:00", "2000/01/03 12:00:01"},
-		{ISOWeekSchedule(0, 0, utils.Ptr(time.Monday), nil), "1900/12/15 12:00:00", "1900/12/17 00:00:00"},
-		{ISOWeekSchedule(0, 0, utils.Ptr(time.Monday), nil), "2000/01/15 12:00:00", "2000/01/17 00:00:00"},
+		{ISOWeekSchedule(0, 0, new(time.Monday), nil), "2000/01/03 12:00:00", "2000/01/03 12:00:01"},
+		{ISOWeekSchedule(0, 0, new(time.Monday), nil), "1900/12/15 12:00:00", "1900/12/17 00:00:00"},
+		{ISOWeekSchedule(0, 0, new(time.Monday), nil), "2000/01/15 12:00:00", "2000/01/17 00:00:00"},
 
 		{ISOWeekSchedule(2000, 0, nil, nil), "2000/01/03 12:00:00", "2000/01/03 12:00:01"},
 		{ISOWeekSchedule(2000, 0, nil, nil), "2000/01/01 12:00:00", "2000/01/03 00:00:00"},

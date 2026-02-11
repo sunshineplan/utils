@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sunshineplan/utils"
 	"github.com/sunshineplan/utils/clock"
 )
 
@@ -223,7 +222,7 @@ func ISOWeekSchedule(year int, week int, weekday *time.Weekday, clock *Clock) Sc
 func Weekday(weekday ...time.Weekday) Schedule {
 	var s multiSched
 	for _, weekday := range weekday {
-		s = append(s, ISOWeekSchedule(0, 0, utils.Ptr(weekday), FullClock()))
+		s = append(s, ISOWeekSchedule(0, 0, new(weekday), FullClock()))
 	}
 	return s
 }
