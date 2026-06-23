@@ -1,7 +1,10 @@
 package flags
 
 import (
+	"errors"
 	"flag"
+	"os"
+	"os/exec"
 	"testing"
 )
 
@@ -22,11 +25,52 @@ func TestParse(t *testing.T) {
 	if *var2 != "" {
 		t.Errorf("expected %q; got %q", "", *var2)
 	}
+	config = ""
+}
+
+func TestParsePanicOnError(t *testing.T) {
 	flag.CommandLine.Init("", flag.PanicOnError)
+	os.Args = []string{"cmd", "-badflag"}
 	defer func() {
 		if err := recover(); err == nil {
-			t.Error("gave no panic; want panic")
+			t.Fatal("gave no panic; want panic")
 		}
 	}()
 	Parse()
+}
+
+func TestParseHelpExits(t *testing.T) {
+	if os.Getenv("TEST_PARSE_HELP_EXIT") == "1" {
+		flag.CommandLine.Init("", flag.ContinueOnError)
+		os.Args = []string{"cmd", "-help"}
+		Parse()
+		t.Fatal("Parse did not exit")
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(exe, "-test.run=TestParseHelpExits")
+	cmd.Env = append(os.Environ(), "TEST_PARSE_HELP_EXIT=1")
+	if err := cmd.Run(); err != nil {
+		if ee, ok := errors.AsType[*exec.ExitError](err); ok {
+			if ee.ExitCode() != 0 {
+				t.Fatalf("expected exit code 0; got %d", ee.ExitCode())
+			}
+		} else {
+			t.Fatalf("expected ExitError or nil; got %T", err)
+		}
+	}
+}
+
+func TestParseHelpDoesNotExitWhenHelpExitFalse(t *testing.T) {
+	HelpExit = false
+	flag.CommandLine.Init("", flag.ContinueOnError)
+	os.Args = []string{"cmd", "-help"}
+	if err := Parse(); !errors.Is(err, flag.ErrHelp) {
+		t.Fatalf("expected flag.ErrHelp; got %v", err)
+	}
+	HelpExit = true
 }
