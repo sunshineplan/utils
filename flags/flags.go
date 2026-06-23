@@ -17,6 +17,11 @@ var (
 	// when the specified configuration file is missing.
 	SilentMissingConfig bool
 
+	// HelpExit controls whether a help request (-help/-h) should cause a
+	// normal program exit when flag.CommandLine.ErrorHandling() is
+	// ContinueOnError.
+	HelpExit = true
+
 	// config stores the path of the configuration file.
 	config string
 )
@@ -75,15 +80,30 @@ func unquote(s string) string {
 // If a configuration file is provided, its flags are prepended to os.Args.
 // Errors during parsing or reading are handled according to the flag package’s
 // ErrorHandling setting.
+//
+// HelpExit controls whether a help request (-help/-h) should cause a normal
+// program exit when the current error handling mode is ContinueOnError.
 func Parse() error {
 	if config != "" {
 		args, err := getArgs()
 		if err != nil {
 			handleError(err)
 		}
-		return flag.CommandLine.Parse(append(args, os.Args[1:]...))
+		return parseArgs(append(args, os.Args[1:]...))
 	}
-	return flag.CommandLine.Parse(os.Args[1:])
+	return parseArgs(os.Args[1:])
+}
+
+func parseArgs(args []string) error {
+	err := flag.CommandLine.Parse(args)
+	if HelpExit &&
+		errors.Is(err, flag.ErrHelp) &&
+		flag.CommandLine.ErrorHandling() == flag.ContinueOnError {
+		// ContinueOnError is used by default to prevent automatic exit for parse
+		// failures, but help output is a normal termination case.
+		os.Exit(0)
+	}
+	return err
 }
 
 // handleError handles errors according to their type
