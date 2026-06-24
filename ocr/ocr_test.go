@@ -8,6 +8,17 @@ import (
 )
 
 func TestOCR(t *testing.T) {
+	apiKey, ok := os.LookupEnv("OCR_APIKEY")
+	if !ok || apiKey == "" {
+		t.Skip("OCR_APIKEY is not set; skipping OCR integration test")
+	}
+
+	prevKey := APIKey
+	APIKey = apiKey
+	defer func() {
+		APIKey = prevKey
+	}()
+
 	b, err := os.ReadFile("testdata/ocr.space.logo.png")
 	if err != nil {
 		t.Fatal(err)
