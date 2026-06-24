@@ -10,10 +10,9 @@ import (
 	"net/http"
 )
 
-const (
-	ocrAPI    = "https://api.ocr.space/parse/image"
-	ocrAPIKey = "5a64d478-9c89-43d8-88e3-c65de9999580"
-)
+const ocrAPI = "https://api.ocr.space/parse/image"
+
+var APIKey string
 
 var errNoResult = errors.New("no ocr result")
 
@@ -49,7 +48,7 @@ func OCRWithClient(r io.Reader, client *http.Client) (string, error) {
 
 	req, _ := http.NewRequest("POST", ocrAPI, &body)
 	req.Header.Set("Content-Type", w.FormDataContentType())
-	req.Header.Set("apikey", ocrAPIKey)
+	req.Header.Set("apikey", APIKey)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
