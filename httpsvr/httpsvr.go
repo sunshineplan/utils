@@ -118,18 +118,17 @@ func (s *Server) Serve(tls bool) (err error) {
 			return fmt.Errorf("failed to listen tcp: %w", err)
 		}
 	}
-	if err := s.ServeListener(listener, tls); err != nil {
+	if err := s.serveListener(listener, tls); err != nil {
 		return err
 	}
 	<-s.done
 	return nil
 }
 
-// ServeListener starts the HTTP or HTTPS server using a provided net.Listener.
-func (s *Server) ServeListener(listener net.Listener, isTLS bool) (err error) {
+func (s *Server) serveListener(listener net.Listener, isTLS bool) (err error) {
 	s.l = counter.NewListener(listener)
 	if isTLS {
-		err = s.Server.ServeTLS(s.l, "", "")
+		err = s.ServeTLS(s.l, "", "")
 	} else {
 		err = s.Server.Serve(s.l)
 	}
@@ -137,6 +136,11 @@ func (s *Server) ServeListener(listener net.Listener, isTLS bool) (err error) {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
 	return nil
+}
+
+// ServeListener starts the server using a provided net.Listener.
+func (s *Server) ServeListener(listener net.Listener) (err error) {
+	return s.serveListener(listener, false)
 }
 
 func (s *Server) Close() (err error) {
