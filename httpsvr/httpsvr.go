@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -33,13 +34,15 @@ type Server struct {
 	keyFile  string
 	reload   time.Duration
 
-	l *counter.Listener
+	l    *counter.Listener
+	done chan struct{}
+	once sync.Once
 }
 
 // New creates a new Server instance with default logger and error log.
 func New() *Server {
 	logger := log.Default()
-	return &Server{Server: &http.Server{ErrorLog: logger.Logger}, Logger: logger}
+	return &Server{Server: &http.Server{ErrorLog: logger.Logger}, Logger: logger, done: make(chan struct{})}
 }
 
 // SetLogger sets a custom logger for both the Server and its internal http.Server.
@@ -64,8 +67,6 @@ func (s *Server) Serve(tls bool) (err error) {
 	if s.reload == 0 {
 		s.reload = defaultReload
 	}
-	// Channel used to wait for graceful shutdown completion.
-	idleConnsClosed := make(chan struct{})
 	// Handle system signals for reload and graceful stop.
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
@@ -85,7 +86,6 @@ func (s *Server) Serve(tls bool) (err error) {
 				if err := s.Shutdown(ctx); err != nil {
 					s.Printf("failed to close server: %v", err)
 				}
-				close(idleConnsClosed)
 				return
 			}
 		}
@@ -118,18 +118,45 @@ func (s *Server) Serve(tls bool) (err error) {
 			return fmt.Errorf("failed to listen tcp: %w", err)
 		}
 	}
-	s.l = counter.NewListener(listener)
+	if err := s.serveListener(listener, tls); err != nil {
+		return err
+	}
+	<-s.done
+	return nil
+}
 
-	if tls {
-		err = s.Server.ServeTLS(s.l, "", "")
+func (s *Server) serveListener(listener net.Listener, isTLS bool) (err error) {
+	s.l = counter.NewListener(listener)
+	if isTLS {
+		err = s.ServeTLS(s.l, "", "")
 	} else {
 		err = s.Server.Serve(s.l)
 	}
 	if err != http.ErrServerClosed {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
-	<-idleConnsClosed
 	return nil
+}
+
+// ServeListener starts the server using a provided net.Listener.
+func (s *Server) ServeListener(listener net.Listener) (err error) {
+	return s.serveListener(listener, false)
+}
+
+func (s *Server) Close() (err error) {
+	err = s.Server.Close()
+	s.once.Do(func() {
+		close(s.done)
+	})
+	return
+}
+
+func (s *Server) Shutdown(ctx context.Context) (err error) {
+	err = s.Server.Shutdown(ctx)
+	s.once.Do(func() {
+		close(s.done)
+	})
+	return
 }
 
 // loadCertificate loads the current TLS certificate and key pair from disk.
@@ -205,20 +232,32 @@ func (s *Server) WriteBytes() int64 {
 
 // TCP runs an HTTP server using TCP network listener.
 func TCP(addr string, handler http.Handler) error {
-	return (&Server{Server: &http.Server{Addr: addr, Handler: handler}}).Run()
+	s := New()
+	s.Addr = addr
+	s.Handler = handler
+	return s.Run()
 }
 
 // TLS runs an HTTPS server using TCP network listener.
 func TLS(addr string, handler http.Handler, certFile, keyFile string) error {
-	return (&Server{Server: &http.Server{Addr: addr, Handler: handler}}).RunTLS(certFile, keyFile)
+	s := New()
+	s.Addr = addr
+	s.Handler = handler
+	return s.RunTLS(certFile, keyFile)
 }
 
 // Unix runs an HTTP server using Unix domain socket listener.
 func Unix(unix string, handler http.Handler) error {
-	return (&Server{Unix: unix, Server: &http.Server{Handler: handler}}).Run()
+	s := New()
+	s.Unix = unix
+	s.Handler = handler
+	return s.Run()
 }
 
 // UnixTLS runs an HTTPS server using Unix domain socket listener.
 func UnixTLS(unix string, handler http.Handler, certFile, keyFile string) error {
-	return (&Server{Unix: unix, Server: &http.Server{Handler: handler}}).RunTLS(certFile, keyFile)
+	s := New()
+	s.Unix = unix
+	s.Handler = handler
+	return s.RunTLS(certFile, keyFile)
 }
